@@ -1,9 +1,11 @@
 import torch
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from datasets import Dataset as HuggingFaceDataset
 from torch.utils.data import Dataset as TorchDataset
+from abc import abstractmethod
 
-from data.encoders.encoder import MidiEncoder
+from midi_tokenizers.midi_tokenizer import MidiTokenizer
+from object_generators.tokenizer_generator import TokenizerGenerator
 
 
 class MidiDataset(TorchDataset):
@@ -11,14 +13,21 @@ class MidiDataset(TorchDataset):
         self,
         dataset: HuggingFaceDataset,
         dataset_cfg: DictConfig,
-        encoder: MidiEncoder,
     ):
         super().__init__()
 
         # Dataset with tokenized MIDI data
         self.dataset = dataset
-        self.encoder = encoder
+        tokenzier_generator = TokenizerGenerator()
+        
+        # Dataset metadata
         self.dataset_cfg = dataset_cfg
+        tokenizer_parameters = OmegaConf.to_container(dataset_cfg["tokenizer_params"])
+        self.tokenizer = tokenzier_generator.generate_tokenizer(
+            dataset_cfg["tokenizer_name"], 
+            tokenizer_parameters,
+        )
+        
 
     def __len__(self) -> int:
         return len(self.dataset)
@@ -28,14 +37,6 @@ class MidiDataset(TorchDataset):
         out = self[idx] | self.dataset[idx]
         return out
 
+    @abstractmethod
     def __getitem__(self, idx: int) -> dict:
-        record = self.dataset[idx]
-
-        # Encoder defines the task
-        source_tokens_ids, target_tokens_ids = self.encoder.encode(record)
-
-        out = {
-            "source_token_ids": torch.tensor(source_tokens_ids, dtype=torch.int64),
-            "target_token_ids": torch.tensor(target_tokens_ids, dtype=torch.int64),
-        }
-        return out
+        pass
