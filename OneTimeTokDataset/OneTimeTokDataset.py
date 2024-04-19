@@ -1,6 +1,5 @@
 import json
 from typing import List
-from dataclasses import field, dataclass
 
 import datasets
 import numpy as np
@@ -12,12 +11,6 @@ from datasets import Split, Dataset, DatasetInfo, BuilderConfig, GeneratorBasedB
 _DESC = """
 Dataset with tokenized midi files, split to equal size.
 """
-
-
-@dataclass
-class TokenizedDatasetInfo(DatasetInfo):
-    tokenizer_name: str = "OneTimeTokenizer"
-    tokenizer_parameters: dict = field(default_factory=dict)
 
 
 class OneTimeTokDatasetConfig(BuilderConfig):
@@ -39,17 +32,17 @@ class OneTimeTokDatasetConfig(BuilderConfig):
         self.sequence_length: int = sequence_length
         self.sequence_step: int = sequence_step
         self.tokenizer_parameters = tokenizer_parameters
-        self.tokenizer_name = "OneTimeTokenzier"
+        self.tokenizer_name = "OneTimeTokenizer"
 
 
 class OneTimeTokDataset(GeneratorBasedBuilder):
-    def _info(self) -> TokenizedDatasetInfo:
+    def _info(self) -> DatasetInfo:
         tokenizer_info = {
             "tokenizer_name": self.config.tokenizer_name,
             "tokenizer_parameters": self.config.tokenizer_parameters,
         }
         # I found no better way of storing metadata :(
-        return TokenizedDatasetInfo(description=json.dumps(tokenizer_info))
+        return DatasetInfo(description=json.dumps(tokenizer_info))
 
     BUILDER_CONFIG_CLASS = OneTimeTokDatasetConfig
     BUILDER_CONFIGS = [
