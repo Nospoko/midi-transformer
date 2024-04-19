@@ -27,11 +27,13 @@ def main():
         name=tokenier_info["tokenizer_name"], 
         parameters=tokenier_info["tokenizer_parameters"],
     )
-    
     notes = tokenizer.untokenize(record["note_tokens"])
     piece = ff.MidiPiece(notes, source=record["source"])
 
     streamlit_pianoroll.from_fortepyan(piece=piece)
+    
+    with st.expander(label="tokens"):
+        st.write(record["note_tokens"])
     
 if __name__ == "__main__":
     main()
