@@ -8,12 +8,11 @@ from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
 
 
 def main():
-    dataset_names = ["OneTimeTokDataset"]
+    dataset_names = ["NoLossTokDataset", "OneTimeTokDataset"]
     dataset_name = st.selectbox(label="dataset", options=dataset_names)
     dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
 
-    if dataset_name == "OneTimeTokDataset":
-        dataset = load_dataset("./OneTimeTokDataset", name="debugging", split=dataset_split)
+    dataset = load_dataset(f"./{dataset_name}", name="debugging", split=dataset_split, trust_remote_code=True)
 
     idx = st.number_input(label="record_id", value=0, max_value=len(dataset))
     record = dataset[idx]
