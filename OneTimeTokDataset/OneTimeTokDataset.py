@@ -49,48 +49,48 @@ class OneTimeTokDataset(GeneratorBasedBuilder):
         OneTimeTokDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=64,
-            sequence_step=16,
+            sequence_length=256,
+            sequence_step=64,
             tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
             name="giant-short",
         ),
         OneTimeTokDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=[],
-            sequence_length=64,
-            sequence_step=16,
+            sequence_length=256,
+            sequence_step=64,
             tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
             name="basic-short",
         ),
         OneTimeTokDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=128,
-            sequence_step=16,
+            sequence_length=512,
+            sequence_step=64,
             tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
             name="giant-mid",
         ),
         OneTimeTokDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=[],
-            sequence_length=128,
-            sequence_step=16,
+            sequence_length=512,
+            sequence_step=64,
             tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
             name="basic-mid",
         ),
         OneTimeTokDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=256,
-            sequence_step=32,
+            sequence_length=1024,
+            sequence_step=64,
             tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
             name="giant-long",
         ),
         OneTimeTokDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=[],
-            sequence_length=256,
-            sequence_step=32,
+            sequence_length=1024,
+            sequence_step=64,
             tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
             name="basic-long",
         ),
@@ -123,37 +123,6 @@ class OneTimeTokDataset(GeneratorBasedBuilder):
             datasets.SplitGenerator(name=Split.VALIDATION, gen_kwargs={"dataset_shards": [base["validation"]]}),
         ]
 
-    def fix_token_sequences(self, tokens: list[str]):
-        """
-        If there are NOTE_OFF tokens before NOTE_ON in the list,
-        add NOTE_ON events at the beginning of the token list.
-        If there are NOTE_ON tokens that are left without NOTE_OFF, add them at the end as well.
-        """
-        pressed = np.zeros(shape=(110))
-        # There are velocity tokens before each event - we know with which velocity the key
-        # we are releasing was played
-        current_velocity_token = "VELOCITY_0"
-        for token in tokens:
-            if "VELOCITY" in token:
-                current_velocity_token = token
-
-            if "NOTE_ON" in token:
-                velocity = self.tokenizer.token_to_velocity_bin[current_velocity_token]
-                pressed[self.tokenizer.token_to_pitch[token]] = velocity
-
-            if "NOTE_OFF" in token:
-                pitch = self.tokenizer.token_to_pitch[token]
-                if pressed[pitch] == 0:
-                    tokens = [current_velocity_token, self.tokenizer.pitch_to_on_token[pitch]] + tokens
-                pressed[pitch] = 0
-            for key, state in enumerate(pressed):
-                if state > 0:
-                    note_off_token = self.tokenizer.pitch_to_off_token[key]
-                    velocity_token = self.tokenizer.velocity_bin_to_token[state]
-                    tokens = tokens + [velocity_token, note_off_token]
-
-        return tokens
-
     def tokenize_piece(self, piece: ff.MidiPiece):
         notes = piece.df
         tokens = self.tokenizer.tokenize(notes=notes)
@@ -179,11 +148,6 @@ class OneTimeTokDataset(GeneratorBasedBuilder):
             start = int(start)
             finish = start + self.config.sequence_length
             part = tokenized_record["note_tokens"][start:finish]
-
-            # I still wonder if we should fix the sequences - it is very time-consuming.
-            # Maybe take care of it during untokenization instead?
-            #
-            # part = self.fix_token_sequences(tokens=part)
 
             record = {
                 "note_tokens": part,
