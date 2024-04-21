@@ -32,13 +32,12 @@ class NoLossTokDatasetConfig(BuilderConfig):
         self.sequence_length: int = sequence_length
         self.sequence_step: int = sequence_step
         self.tokenizer_parameters = tokenizer_parameters
-        self.tokenizer_name = "NoLossTokenizer"
 
 
 class NoLossTokDataset(GeneratorBasedBuilder):
     def _info(self) -> DatasetInfo:
         tokenizer_info = {
-            "tokenizer_name": self.config.tokenizer_name,
+            "tokenizer_name": "NoLossTokenizer",
             "tokenizer_parameters": self.config.tokenizer_parameters,
         }
         # I found no better way of storing metadata :(

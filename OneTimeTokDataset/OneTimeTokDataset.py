@@ -32,13 +32,12 @@ class OneTimeTokDatasetConfig(BuilderConfig):
         self.sequence_length: int = sequence_length
         self.sequence_step: int = sequence_step
         self.tokenizer_parameters = tokenizer_parameters
-        self.tokenizer_name = "OneTimeTokenizer"
 
 
 class OneTimeTokDataset(GeneratorBasedBuilder):
     def _info(self) -> DatasetInfo:
         tokenizer_info = {
-            "tokenizer_name": self.config.tokenizer_name,
+            "tokenizer_name": "OneTimeTokenizer",
             "tokenizer_parameters": self.config.tokenizer_parameters,
         }
         # I found no better way of storing metadata :(
