@@ -3,7 +3,7 @@ from abc import abstractmethod
 
 from datasets import Dataset as HuggingFaceDataset
 from torch.utils.data import Dataset as TorchDataset
-from object_generators.tokenizer_generator import TokenizerGenerator
+from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
 
 
 class MidiDataset(TorchDataset):
@@ -19,9 +19,7 @@ class MidiDataset(TorchDataset):
         tokenizer_name = tokenizer_info["tokenizer_name"]
         tokenizer_parameters = tokenizer_info["tokenizer_parameters"]
 
-        tokenzier_generator = TokenizerGenerator()
-
-        self.tokenizer = tokenzier_generator.generate_tokenizer(
+        self.tokenizer = generate_tokenizer(
             tokenizer_name,
             tokenizer_parameters,
         )
