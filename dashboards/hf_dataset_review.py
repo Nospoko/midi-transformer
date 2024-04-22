@@ -1,10 +1,9 @@
-import json
-
 import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
 from datasets import load_dataset
-from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
+from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
+from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
 
 from OneTimeTokenDataset.OneTimeTokenDataset import OneTimeTokenDataset
 from ExponentialTimeTokenDataset.ExponentialTimeTokenDataset import ExponentialTimeTokenDataset
@@ -16,11 +15,15 @@ def main():
     configs = ["debugging", "giant-short", "basic-short", "giant-mid", "basic-mid", "giant-long", "basic-long"]
 
     config_name = st.selectbox(label="config name", options=configs)
+
     # Another way of accessing configs ...
     if dataset_name == "OneTimeTokenDataset":
         config = OneTimeTokenDataset.builder_configs[config_name]
+        tokenizer = OneTimeTokenizer(**config.tokenizer_parameters)
+
     elif dataset_name == "ExponentialTimeTokenDataset":
         config = ExponentialTimeTokenDataset.builder_configs[config_name]
+        tokenizer = NoLossTokenizer(**config.tokenizer_parameters)
     dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
 
     dataset = load_dataset(
@@ -42,11 +45,6 @@ def main():
     with st.expander(label="source"):
         st.json(record["source"])
 
-    tokenier_info = json.loads(dataset.description)
-    tokenizer = generate_tokenizer(
-        name=tokenier_info["tokenizer_name"],
-        parameters=tokenier_info["tokenizer_parameters"],
-    )
     notes = tokenizer.untokenize(record["note_tokens"])
     piece = ff.MidiPiece(notes, source=record["source"])
     st.write(
