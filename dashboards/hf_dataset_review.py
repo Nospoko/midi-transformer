@@ -26,7 +26,7 @@ def main():
     dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
 
     dataset = load_dataset(
-        f"{dataset_name}",
+        f"tokenized_midi_datasets/{dataset_name}",
         name=config_name,
         split=dataset_split,
         trust_remote_code=True,
