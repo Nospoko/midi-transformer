@@ -5,7 +5,7 @@ import datasets
 import numpy as np
 import fortepyan as ff
 from tqdm import tqdm
-from midi_tokenizers.one_time_tokenizer import NoLossTokenizer
+from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
 from datasets import Split, Dataset, DatasetInfo, BuilderConfig, GeneratorBasedBuilder
 
 _DESC = """
@@ -13,10 +13,10 @@ Dataset with tokenized midi files, split to equal size.
 """
 
 
-class NoLossTokDatasetConfig(BuilderConfig):
+class OneTimeTokenDatasetConfig(BuilderConfig):
     def __init__(
         self,
-        base_dataset_name: str = "roszcz/maestro-sustain-v2",
+        base_dataset_name: str = "roszcz/maestro-v1-sustain",
         extra_datasets: list[str] = [],
         sequence_length: int = 64,
         sequence_step: int = 42,
@@ -34,66 +34,66 @@ class NoLossTokDatasetConfig(BuilderConfig):
         self.tokenizer_parameters = tokenizer_parameters
 
 
-class NoLossTokDataset(GeneratorBasedBuilder):
+class OneTimeTokenDataset(GeneratorBasedBuilder):
     def _info(self) -> DatasetInfo:
         tokenizer_info = {
-            "tokenizer_name": "NoLossTokenizer",
+            "tokenizer_name": "OneTimeTokenizer",
             "tokenizer_parameters": self.config.tokenizer_parameters,
         }
         # I found no better way of storing metadata :(
         return DatasetInfo(description=json.dumps(tokenizer_info))
 
-    BUILDER_CONFIG_CLASS = NoLossTokDatasetConfig
+    BUILDER_CONFIG_CLASS = OneTimeTokenDatasetConfig
     BUILDER_CONFIGS = [
-        NoLossTokDatasetConfig(
+        OneTimeTokenDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=64,
-            sequence_step=16,
+            sequence_length=256,
+            sequence_step=64,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="giant-short",
         ),
-        NoLossTokDatasetConfig(
+        OneTimeTokenDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=[],
-            sequence_length=64,
-            sequence_step=16,
+            sequence_length=256,
+            sequence_step=64,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="basic-short",
         ),
-        NoLossTokDatasetConfig(
+        OneTimeTokenDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=128,
-            sequence_step=16,
+            sequence_length=512,
+            sequence_step=64,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="giant-mid",
         ),
-        NoLossTokDatasetConfig(
+        OneTimeTokenDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=[],
-            sequence_length=128,
-            sequence_step=16,
+            sequence_length=512,
+            sequence_step=64,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="basic-mid",
         ),
-        NoLossTokDatasetConfig(
+        OneTimeTokenDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=256,
-            sequence_step=32,
+            sequence_length=1024,
+            sequence_step=64,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="giant-long",
         ),
-        NoLossTokDatasetConfig(
+        OneTimeTokenDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=[],
-            sequence_length=256,
-            sequence_step=32,
+            sequence_length=1024,
+            sequence_step=64,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="basic-long",
         ),
-        NoLossTokDatasetConfig(
+        OneTimeTokenDatasetConfig(
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=[],
             sequence_length=512,
@@ -183,7 +183,7 @@ class NoLossTokDataset(GeneratorBasedBuilder):
         return pieces
 
     def _generate_examples(self, dataset_shards: list[Dataset]):
-        self.tokenizer = NoLossTokenizer(**self.config.tokenizer_parameters)
+        self.tokenizer = OneTimeTokenizer(**self.config.tokenizer_parameters)
         for dataset in dataset_shards:
             for it, record in tqdm(enumerate(dataset), total=len(dataset)):
                 piece = ff.MidiPiece.from_huggingface(dict(record))

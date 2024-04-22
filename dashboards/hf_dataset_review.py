@@ -6,25 +6,25 @@ import streamlit_pianoroll
 from datasets import load_dataset
 from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
 
-from NoLossTokDataset.NoLossTokDataset import NoLossTokDataset
-from OneTimeTokDataset.OneTimeTokDataset import OneTimeTokDataset
+from OneTimeTokenDataset.OneTimeTokenDataset import OneTimeTokenDataset
+from ExponentialTimeTokenDataset.ExponentialTimeTokenDataset import ExponentialTimeTokenDataset
 
 
 def main():
-    dataset_names = ["NoLossTokDataset", "OneTimeTokDataset"]
+    dataset_names = ["ExponentialTimeTokenDataset", "OneTimeTokenDataset"]
     dataset_name = st.selectbox(label="dataset", options=dataset_names)
     configs = ["debugging", "giant-short", "basic-short", "giant-mid", "basic-mid", "giant-long", "basic-long"]
 
     config_name = st.selectbox(label="config name", options=configs)
     # Another way of accessing configs ...
-    if dataset_name == "OneTimeTokDataset":
-        config = OneTimeTokDataset.builder_configs[config_name]
-    elif dataset_name == "NoLossTokDataset":
-        config = NoLossTokDataset.builder_configs[config_name]
+    if dataset_name == "OneTimeTokenDataset":
+        config = OneTimeTokenDataset.builder_configs[config_name]
+    elif dataset_name == "ExponentialTimeTokenDataset":
+        config = ExponentialTimeTokenDataset.builder_configs[config_name]
     dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
 
     dataset = load_dataset(
-        f"./{dataset_name}",
+        f"{dataset_name}",
         name=config_name,
         split=dataset_split,
         trust_remote_code=True,
