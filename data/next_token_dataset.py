@@ -1,5 +1,6 @@
 import torch
 from datasets import Dataset as HuggingFaceDataset
+from midi_tokenizers.midi_tokenizer import MidiTokenizer
 
 from data.dataset import MidiDataset
 
@@ -8,6 +9,7 @@ class NextTokenDataset(MidiDataset):
     def __init__(
         self,
         dataset: HuggingFaceDataset,
+        tokenizer: MidiTokenizer,
     ):
         super().__init__(
             dataset=dataset,

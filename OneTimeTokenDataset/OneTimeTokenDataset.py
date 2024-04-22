@@ -9,7 +9,7 @@ from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
 from datasets import Split, Dataset, DatasetInfo, BuilderConfig, GeneratorBasedBuilder
 
 _DESC = """
-Dataset with tokenized midi files, split to equal size.
+Dataset with midi files, tokenzied using OneTimeTokenizer, with records of equal size.
 """
 
 
@@ -36,12 +36,7 @@ class OneTimeTokenDatasetConfig(BuilderConfig):
 
 class OneTimeTokenDataset(GeneratorBasedBuilder):
     def _info(self) -> DatasetInfo:
-        tokenizer_info = {
-            "tokenizer_name": "OneTimeTokenizer",
-            "tokenizer_parameters": self.config.tokenizer_parameters,
-        }
-        # I found no better way of storing metadata :(
-        return DatasetInfo(description=json.dumps(tokenizer_info))
+        return DatasetInfo(description=_DESC)
 
     BUILDER_CONFIG_CLASS = OneTimeTokenDatasetConfig
     BUILDER_CONFIGS = [

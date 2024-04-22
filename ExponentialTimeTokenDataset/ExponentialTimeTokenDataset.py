@@ -9,7 +9,7 @@ from midi_tokenizers.one_time_tokenizer import NoLossTokenizer
 from datasets import Split, Dataset, DatasetInfo, BuilderConfig, GeneratorBasedBuilder
 
 _DESC = """
-Dataset with tokenized midi files, split to equal size.
+Dataset with midi files, tokenzied using NoLossTokenizer, with records of equal size.
 """
 
 
@@ -36,12 +36,7 @@ class ExponentialTimeTokenConfig(BuilderConfig):
 
 class ExponentialTimeTokenDataset(GeneratorBasedBuilder):
     def _info(self) -> DatasetInfo:
-        tokenizer_info = {
-            "tokenizer_name": "NoLossTokenizer",
-            "tokenizer_parameters": self.config.tokenizer_parameters,
-        }
-        # I found no better way of storing metadata :(
-        return DatasetInfo(description=json.dumps(tokenizer_info))
+        return DatasetInfo(description=_DESC)
 
     BUILDER_CONFIG_CLASS = ExponentialTimeTokenConfig
     BUILDER_CONFIGS = [

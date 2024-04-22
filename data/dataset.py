@@ -1,28 +1,23 @@
-import json
 from abc import abstractmethod
 
 from datasets import Dataset as HuggingFaceDataset
 from torch.utils.data import Dataset as TorchDataset
-from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
+from midi_tokenizers.midi_tokenizer import MidiTokenizer
 
 
 class MidiDataset(TorchDataset):
     def __init__(
         self,
         dataset: HuggingFaceDataset,
+        tokenizer: MidiTokenizer,
     ):
         super().__init__()
 
+        # MidiTokenizer which was used during creation of the dataset
+        self.tokenizer = tokenizer
+
         # Dataset with tokenized MIDI data
         self.dataset = dataset
-        tokenizer_info = json.loads(dataset.description)
-        tokenizer_name = tokenizer_info["tokenizer_name"]
-        tokenizer_parameters = tokenizer_info["tokenizer_parameters"]
-
-        self.tokenizer = generate_tokenizer(
-            tokenizer_name,
-            tokenizer_parameters,
-        )
 
     def __len__(self) -> int:
         return len(self.dataset)
