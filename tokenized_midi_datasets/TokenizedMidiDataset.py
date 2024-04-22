@@ -5,6 +5,9 @@ import numpy as np
 import fortepyan as ff
 from datasets import Split, DatasetInfo, BuilderConfig, GeneratorBasedBuilder
 
+# NOTE: If you make some changes here, you might want to delete your huggingface cache
+# at ~/.cache/huggingface/ to rebuild the datasets
+
 _DESC = """
 Dataset with midi files, tokenzied using MidiTokenizer with records of equal size.
 """
@@ -17,6 +20,7 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
         extra_datasets: list[str] = [],
         sequence_length: int = 64,
         sequence_step: int = 42,
+        pause_detection_threshold: int = 4,
         tokenizer_parameters: dict = {"min_time_unit": 0.001, "n_velocity_bins": 32},
         **kwargs,
     ):
@@ -29,6 +33,7 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
         self.sequence_length: int = sequence_length
         self.sequence_step: int = sequence_step
         self.tokenizer_parameters = tokenizer_parameters
+        self.pause_detection_threshold = pause_detection_threshold
 
 
 class TokenizedMidiDataset(GeneratorBasedBuilder):
@@ -41,7 +46,8 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
             sequence_length=256,
-            sequence_step=64,
+            sequence_step=32,
+            pause_detection_threshold=4,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="giant-short",
         ),
@@ -49,7 +55,8 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
             base_dataset_name="roszcz/maestro-sustain-v2",
             extra_datasets=[],
             sequence_length=256,
-            sequence_step=64,
+            sequence_step=32,
+            pause_detection_threshold=4,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="basic-short",
         ),
@@ -58,6 +65,7 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
             sequence_length=512,
             sequence_step=64,
+            pause_detection_threshold=4,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="giant-mid",
         ),
@@ -66,6 +74,7 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
             extra_datasets=[],
             sequence_length=512,
             sequence_step=64,
+            pause_detection_threshold=4,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="basic-mid",
         ),
@@ -74,6 +83,7 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
             sequence_length=1024,
             sequence_step=64,
+            pause_detection_threshold=4,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="giant-long",
         ),
@@ -82,6 +92,7 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
             extra_datasets=[],
             sequence_length=1024,
             sequence_step=64,
+            pause_detection_threshold=4,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="basic-long",
         ),
@@ -90,6 +101,7 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
             extra_datasets=[],
             sequence_length=512,
             sequence_step=512,
+            pause_detection_threshold=4,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="debugging",
         ),
@@ -153,9 +165,7 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
         silent_distance = next_start - piece.df.end
 
         # Seconds
-        distance_threshold = 4
-
-        ids = silent_distance > distance_threshold
+        ids = silent_distance > self.config.pause_detection_threshold
 
         break_idxs = np.where(ids)[0]
 
