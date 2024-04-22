@@ -5,8 +5,7 @@ from datasets import load_dataset
 from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
 from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
 
-from OneTimeTokenDataset.OneTimeTokenDataset import OneTimeTokenDataset
-from ExponentialTimeTokenDataset.ExponentialTimeTokenDataset import ExponentialTimeTokenDataset
+from tokenized_midi_datasets import OneTimeTokenDataset, ExponentialTimeTokenDataset
 
 
 def main():
@@ -16,7 +15,7 @@ def main():
 
     config_name = st.selectbox(label="config name", options=configs)
 
-    # Another way of accessing configs ...
+    # Another way of accessing configs without storing metadata
     if dataset_name == "OneTimeTokenDataset":
         config = OneTimeTokenDataset.builder_configs[config_name]
         tokenizer = OneTimeTokenizer(**config.tokenizer_parameters)
