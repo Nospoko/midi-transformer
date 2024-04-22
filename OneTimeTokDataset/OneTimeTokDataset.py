@@ -20,7 +20,7 @@ class OneTimeTokDatasetConfig(BuilderConfig):
         extra_datasets: list[str] = [],
         sequence_length: int = 64,
         sequence_step: int = 42,
-        tokenizer_parameters: dict = {"eps": 0.001, "n_velocity_bins": 32},
+        tokenizer_parameters: dict = {"min_time_unit": 0.001, "n_velocity_bins": 32},
         **kwargs,
     ):
         super().__init__()
@@ -50,7 +50,7 @@ class OneTimeTokDataset(GeneratorBasedBuilder):
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
             sequence_length=256,
             sequence_step=64,
-            tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
+            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="giant-short",
         ),
         OneTimeTokDatasetConfig(
@@ -58,7 +58,7 @@ class OneTimeTokDataset(GeneratorBasedBuilder):
             extra_datasets=[],
             sequence_length=256,
             sequence_step=64,
-            tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
+            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="basic-short",
         ),
         OneTimeTokDatasetConfig(
@@ -66,7 +66,7 @@ class OneTimeTokDataset(GeneratorBasedBuilder):
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
             sequence_length=512,
             sequence_step=64,
-            tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
+            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="giant-mid",
         ),
         OneTimeTokDatasetConfig(
@@ -74,7 +74,7 @@ class OneTimeTokDataset(GeneratorBasedBuilder):
             extra_datasets=[],
             sequence_length=512,
             sequence_step=64,
-            tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
+            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="basic-mid",
         ),
         OneTimeTokDatasetConfig(
@@ -82,7 +82,7 @@ class OneTimeTokDataset(GeneratorBasedBuilder):
             extra_datasets=["roszcz/giant-midi-sustain-v2"],
             sequence_length=1024,
             sequence_step=64,
-            tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
+            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="giant-long",
         ),
         OneTimeTokDatasetConfig(
@@ -90,7 +90,7 @@ class OneTimeTokDataset(GeneratorBasedBuilder):
             extra_datasets=[],
             sequence_length=1024,
             sequence_step=64,
-            tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
+            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="basic-long",
         ),
         OneTimeTokDatasetConfig(
@@ -98,7 +98,7 @@ class OneTimeTokDataset(GeneratorBasedBuilder):
             extra_datasets=[],
             sequence_length=512,
             sequence_step=512,
-            tokenizer_parameters={"eps": 0.001, "n_velocity_bins": 32},
+            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
             name="debugging",
         ),
     ]
@@ -127,7 +127,7 @@ class OneTimeTokDataset(GeneratorBasedBuilder):
         tokens = self.tokenizer.tokenize(notes=notes)
         new_record = {
             "note_tokens": tokens,
-            "source": piece.source,
+            "source": json.dumps(piece.source),
         }
         return new_record
 
