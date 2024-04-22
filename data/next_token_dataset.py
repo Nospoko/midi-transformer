@@ -11,9 +11,7 @@ class NextTokenDataset(MidiDataset):
         dataset: HuggingFaceDataset,
         tokenizer: MidiTokenizer,
     ):
-        super().__init__(
-            dataset=dataset,
-        )
+        super().__init__(dataset=dataset, tokenizer=tokenizer)
 
     def __getitem__(self, idx: int) -> dict:
         record = self.dataset[idx]
