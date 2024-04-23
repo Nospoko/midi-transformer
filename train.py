@@ -243,6 +243,7 @@ def main(cfg: DictConfig):
     if cfg.logging.wandb_log and master_process:
         wandb.init(project=cfg.logging.wandb_project, name=cfg.logging.wandb_run_name, config=config)
 
+    total_tokens = 0
     # training loop
     X, Y = get_batch("train")  # fetch the very first batch
     t0 = time.time()
@@ -251,6 +252,7 @@ def main(cfg: DictConfig):
     running_mfu = -1.0
     pbar = tqdm(range(cfg.optimizer.max_iters))
     for iter_num in pbar:
+        total_tokens += X.numel()
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if cfg.lr.decay_lr else cfg.optimizer.learning_rate
         for param_group in optimizer.param_groups:
@@ -330,7 +332,12 @@ def main(cfg: DictConfig):
                     "mfu": running_mfu * 100,  # convert to percentage
                 }
             )
-            pbar.set_description(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms, mfu {running_mfu*100:.2f}%")
+            tokens_per_second = total_tokens / dt
+            pbar.set_description(
+                f"iter {iter_num}: loss {lossf:.4f},"
+                + f"time {dt:.2f}s, mfu {running_mfu*100:.2f}%,"
+                + f"tokens_per_second {tokens_per_second}"
+            )
         iter_num += 1
         local_iter_num += 1
 
