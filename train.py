@@ -25,6 +25,7 @@ import hydra
 import torch
 import wandb
 import numpy as np
+from tqdm import tqdm
 from datasets import load_dataset
 from hydra.utils import to_absolute_path
 from omegaconf import OmegaConf, DictConfig
@@ -236,7 +237,7 @@ def main(cfg: DictConfig):
         decay_ratio = (it - cfg.lr.warmup_iters) / (cfg.lr.lr_decay_iters - cfg.lr.warmup_iters)
         assert 0 <= decay_ratio <= 1
         coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
-        return cfg.lr.min_lr + coeff * (cfg.lr.learning_rate - cfg.lr.min_lr)
+        return cfg.lr.min_lr + coeff * (cfg.optimizer.learning_rate - cfg.lr.min_lr)
 
     # logging
     if cfg.logging.wandb_log and master_process:
@@ -248,7 +249,8 @@ def main(cfg: DictConfig):
     local_iter_num = 0  # number of iterations in the lifetime of this process
     raw_model = model.module if ddp else model  # unwrap DDP container if needed
     running_mfu = -1.0
-    while True:
+    pbar = tqdm(range(cfg.optimizer.max_iters))
+    for iter_num in pbar:
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if cfg.lr.decay_lr else cfg.optimizer.learning_rate
         for param_group in optimizer.param_groups:
@@ -262,10 +264,8 @@ def main(cfg: DictConfig):
                 wandb.log(
                     {
                         "iter": iter_num,
-                        "train/loss": losses["train"],
-                        "val/loss": losses["val"],
-                        "lr": lr,
-                        "mfu": running_mfu * 100,  # convert to percentage
+                        "train_batch/loss": losses["train"],
+                        "val_batch/loss": losses["val"],
                     }
                 )
             if losses["val"] < best_val_loss or cfg.always_save_checkpoint:
@@ -322,13 +322,17 @@ def main(cfg: DictConfig):
             if local_iter_num >= 5:  # let the training loop settle a bit
                 mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
                 running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
-            print(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms, mfu {running_mfu*100:.2f}%")
+            wandb.log(
+                {
+                    "iter": iter_num,
+                    "train/loss": lossf,
+                    "lr": lr,
+                    "mfu": running_mfu * 100,  # convert to percentage
+                }
+            )
+            pbar.set_description(f"iter {iter_num}: loss {lossf:.4f}, time {dt*1000:.2f}ms, mfu {running_mfu*100:.2f}%")
         iter_num += 1
         local_iter_num += 1
-
-        # termination conditions
-        if iter_num > cfg.optimizer.max_iters:
-            break
 
     if ddp:
         destroy_process_group()
