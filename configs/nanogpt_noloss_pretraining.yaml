@@ -8,7 +8,7 @@ init_from: 'scratch'  # 'scratch' or 'resume' or 'gpt2*'
 task: pretraining
 
 logging:
-  wandb_log: false  # disabled by default
+  wandb_log: True  # disabled by default
   wandb_project: 'midi-gpt2'
   wandb_run_name: midi-gpt2-pretraining-${now:%Y-%m-%d-%H-%M}
   log_interval: 1

@@ -23,6 +23,7 @@ from contextlib import nullcontext
 
 import hydra
 import torch
+import wandb
 import numpy as np
 from datasets import load_dataset
 from hydra.utils import to_absolute_path
@@ -55,7 +56,7 @@ def main(cfg: DictConfig):
         num_proc=8,
         trust_remote_code=True,
     )
-    config = OmegaConf.create(cfg)
+    config = OmegaConf.to_container(cfg)
 
     tokenizer = generate_tokenizer(name=cfg.data.tokenizer, parameters=tokenizer_parameters)
 
@@ -197,7 +198,7 @@ def main(cfg: DictConfig):
     checkpoint = None  # free up memory
 
     # compile the model
-    if compile:
+    if cfg.system.compile:
         print("compiling the model... (takes a ~minute)")
         # this is never used...
         # unoptimized_model = model
@@ -239,8 +240,6 @@ def main(cfg: DictConfig):
 
     # logging
     if cfg.logging.wandb_log and master_process:
-        import wandb
-
         wandb.init(project=cfg.logging.wandb_project, name=cfg.logging.wandb_run_name, config=config)
 
     # training loop
