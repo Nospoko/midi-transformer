@@ -24,6 +24,7 @@ from contextlib import nullcontext
 import hydra
 import torch
 import numpy as np
+import torch._dynamo
 from datasets import load_dataset
 from hydra.utils import to_absolute_path
 from omegaconf import OmegaConf, DictConfig
@@ -35,6 +36,7 @@ from model import GPT, GPTConfig
 from data.next_token_dataset import NextTokenDataset
 from tokenized_midi_datasets import OneTimeTokenDataset, TokenizedMidiDataset, ExponentialTimeTokenDataset
 
+torch._dynamo.config.suppress_errors = True
 tokenizer_name_to_dataset_map: dict[str, TokenizedMidiDataset] = {
     "NoLossTokenizer": ExponentialTimeTokenDataset,
     "OneTimeTokenizer": OneTimeTokenDataset,
