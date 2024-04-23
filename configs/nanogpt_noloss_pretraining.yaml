@@ -8,7 +8,7 @@ init_from: 'scratch'  # 'scratch' or 'resume' or 'gpt2*'
 task: pretraining
 
 logging:
-  wandb_log: false  # disabled by default
+  wandb_log: True  # disabled by default
   wandb_project: 'midi-gpt2'
   wandb_run_name: midi-gpt2-pretraining-${now:%Y-%m-%d-%H-%M}
   run_name:
@@ -45,5 +45,5 @@ ddp:
 
 system:
   device: 'cuda:0'  # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1' etc., or try 'mps' on macbooks
-  dtype: 'float16'  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
+  dtype: 'bfloat16'  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
   compile: true  # use PyTorch 2.0 to compile the model to be faster
