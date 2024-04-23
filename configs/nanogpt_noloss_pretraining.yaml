@@ -1,6 +1,6 @@
 out_dir: 'out'
 eval_interval: 2000
-log_interval: 1
+
 eval_iters: 200
 eval_only: false  # if True, script exits right after the first eval
 always_save_checkpoint: true  # if True, always save a checkpoint after each eval
@@ -11,6 +11,7 @@ logging:
   wandb_log: false  # disabled by default
   wandb_project: 'midi-gpt2'
   wandb_run_name: midi-gpt2-pretraining-${now:%Y-%m-%d-%H-%M}
+  log_interval: 1
   run_name:
 
 data:
