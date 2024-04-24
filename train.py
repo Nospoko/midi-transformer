@@ -372,7 +372,7 @@ def main(cfg: DictConfig):
             )
             tokens_per_second = total_tokens / dt
             print(
-                "iter {iter_num}: loss {lossf:.4f}, "
+                f"iter {iter_num}: loss {lossf:.4f}, "
                 + f"time {dt:.2f}s, mfu {running_mfu*100:.2f}%, "
                 + f"tokens_per_second {tokens_per_second}"
             )
