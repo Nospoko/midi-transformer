@@ -128,16 +128,16 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
 
     def tokenize_piece(self, piece: ff.MidiPiece):
         notes = piece.df
-        tokens = self.tokenizer.tokenize(notes=notes)
+        tokens = self.tokenizer.encode(notes=notes)
         new_record = {
-            "note_tokens": tokens,
+            "note_token_ids": tokens,
             "source": json.dumps(piece.source),
         }
         return new_record
 
     def piece_to_records(self, piece: ff.MidiPiece) -> list[dict]:
         tokenized_record = self.tokenize_piece(piece)
-        n_tokens = len(tokenized_record["note_tokens"])
+        n_tokens = len(tokenized_record["note_token_ids"])
         # better practice than setting a global random state
         rs = np.random.RandomState(np.random.MT19937(np.random.SeedSequence(4)))
 
@@ -150,10 +150,10 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
         for start in start_points:
             start = int(start)
             finish = start + self.config.sequence_length
-            part = tokenized_record["note_tokens"][start:finish]
+            part = tokenized_record["note_token_ids"][start:finish]
 
             record = {
-                "note_tokens": part,
+                "note_token_ids": part,
                 "source": tokenized_record["source"],
             }
             chopped_sequences.append(record)

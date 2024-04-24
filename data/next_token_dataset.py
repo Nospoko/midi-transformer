@@ -15,8 +15,7 @@ class NextTokenDataset(MidiDataset):
 
     def __getitem__(self, idx: int) -> dict:
         record = self.dataset[idx]
-        tokens = record["note_tokens"]
-        encoding = [self.tokenizer.token_to_id[token] for token in tokens]
+        encoding = record["note_token_ids"]
 
         # the inputs to the transformer will be the offset sequence
         source_token_ids = encoding[:-1]
