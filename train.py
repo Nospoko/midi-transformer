@@ -26,7 +26,6 @@ import hydra
 import torch
 import wandb
 import numpy as np
-from tqdm import tqdm
 from datasets import load_dataset
 from hydra.utils import to_absolute_path
 from omegaconf import OmegaConf, DictConfig
@@ -287,9 +286,9 @@ def main(cfg: DictConfig):
     local_iter_num = 0  # number of iterations in the lifetime of this process
     raw_model = model.module if ddp else model  # unwrap DDP container if needed
     running_mfu = -1.0
-    pbar = tqdm(range(cfg.optimizer.max_iters))
+    iter_num = 0
 
-    for iter_num in pbar:
+    while True:
         total_tokens += X.numel()
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if cfg.lr.decay_lr else cfg.optimizer.learning_rate
@@ -372,13 +371,16 @@ def main(cfg: DictConfig):
                 }
             )
             tokens_per_second = total_tokens / dt
-            pbar.set_description(
-                f"iter {iter_num}: loss {lossf:.4f}, "
+            print(
+                "iter {iter_num}: loss {lossf:.4f}, "
                 + f"time {dt:.2f}s, mfu {running_mfu*100:.2f}%, "
                 + f"tokens_per_second {tokens_per_second}"
             )
         iter_num += 1
         local_iter_num += 1
+
+        if iter_num == cfg.optimizer.max_iters:
+            break
 
     if ddp:
         destroy_process_group()
