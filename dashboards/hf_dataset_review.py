@@ -9,7 +9,7 @@ from tokenized_midi_datasets import OneTimeTokenDataset, ExponentialTimeTokenDat
 
 
 def main():
-    dataset_names = ["ExponentialTimeTokenDataset", "OneTimeTokenDataset"]
+    dataset_names = ["ExponentialTimeTokenDataset", "OneTimeTokenDataset", "AwesomeTokensDataset"]
     dataset_name = st.selectbox(label="dataset", options=dataset_names)
     configs = ["debugging", "giant-short", "basic-short", "giant-mid", "basic-mid", "giant-long", "basic-long"]
 
