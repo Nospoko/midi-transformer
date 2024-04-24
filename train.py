@@ -321,7 +321,7 @@ def main(cfg: DictConfig):
                     }
                     out_dir = to_absolute_path(cfg.out_dir)
                     print(f"saving checkpoint to {out_dir}")
-                    torch.save(checkpoint, os.path.join(out_dir, cfg.logging.wand_run_name + ".pt"))
+                    torch.save(checkpoint, os.path.join(out_dir, cfg.logging.wandb_run_name + ".pt"))
         if iter_num == 0 and cfg.eval_only:
             break
 
