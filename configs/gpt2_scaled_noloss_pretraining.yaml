@@ -1,7 +1,7 @@
 out_dir: 'checkpoints'
-eval_interval: 5
+eval_interval: 2000
 
-eval_iters: 1
+eval_iters: 100
 eval_only: false  # if True, script exits right after the first eval
 always_save_checkpoint: true  # if True, always save a checkpoint after each eval
 init_from: 'scratch'  # 'scratch' or 'resume' or 'gpt2*'
@@ -31,7 +31,7 @@ model:
 
 optimizer:
   learning_rate: 1e-3  # small network - we can go up a little
-  max_iters: 320 # total number of training iterations - ~5B tokens for all training
+  max_iters: 32000 # total number of training iterations - ~500B tokens for all training on *-mid datasets
   weight_decay: 0.1
   beta1: 0.9
   beta2: 0.95
