@@ -1,4 +1,4 @@
-out_dir: 'out'
+out_dir: 'checkpoints'
 eval_interval: 2000
 
 eval_iters: 200
@@ -11,7 +11,7 @@ logging:
   wandb_log: True  # disabled by default
   wandb_project: 'midi-gpt2'
   wandb_run_name: midi-gpt2-pretraining-${now:%Y-%m-%d-%H-%M}
-  log_interval: 1
+  log_interval: 100
   run_name:
 
 data:
