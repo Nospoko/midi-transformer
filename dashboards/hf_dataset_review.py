@@ -44,7 +44,7 @@ def main():
     with st.expander(label="source"):
         st.json(record["source"])
 
-    notes = tokenizer.untokenize(record["note_tokens"])
+    notes = tokenizer.decode(record["note_token_ids"])
     piece = ff.MidiPiece(notes, source=record["source"])
     st.write(
         """
@@ -55,7 +55,7 @@ def main():
     streamlit_pianoroll.from_fortepyan(piece=piece)
 
     with st.expander(label="tokens"):
-        st.write(record["note_tokens"])
+        st.write([tokenizer.vocab[token_id] for token_id in record["note_token_ids"]])
 
 
 if __name__ == "__main__":
