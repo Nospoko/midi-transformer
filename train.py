@@ -305,8 +305,9 @@ def main(cfg: DictConfig):
                         "best_val_loss": best_val_loss,
                         "config": config,
                     }
-                    print(f"saving checkpoint to {cfg.out_dir}")
-                    torch.save(checkpoint, os.path.join(cfg.out_dir, "ckpt.pt"))
+                    out_dir = to_absolute_path(cfg.out_dir)
+                    print(f"saving checkpoint to {out_dir}")
+                    torch.save(checkpoint, os.path.join(out_dir, cfg.logging.wand_run_name + ".pt"))
         if iter_num == 0 and cfg.eval_only:
             break
 
