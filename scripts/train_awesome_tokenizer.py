@@ -2,7 +2,7 @@ from datasets import load_dataset, concatenate_datasets
 from midi_tokenizers.one_time_tokenizer import NoLossTokenizer
 from midi_trainable_tokenizers.awesome_midi_tokenzier import AwesomeMidiTokenizer
 
-# This is a script for training a BpeMidiTokenizer
+# This is a script for training an AwesomeMidiTokenizer
 
 
 def train(
