@@ -45,11 +45,13 @@ tokenizer_name_to_dataset_map: dict[str, TokenizedMidiDataset] = {
 
 @hydra.main(config_path="configs", config_name="nanogpt_noloss_pretraining")
 def main(cfg: DictConfig):
+    # Get the right data for the tokenizer specified in config
     dataset_builder = tokenizer_name_to_dataset_map[cfg.data.tokenizer]
     dataset_config = dataset_builder.builder_configs[cfg.data.dataset_name]
     tokenizer_parameters = dataset_config.tokenizer_parameters
 
-    # hydra changes paths - we have to change them back
+    # Hydra changes paths - we have to change them back
+    # Load the suitable dataset
     dataset_path = to_absolute_path(f"./tokenized_midi_datasets/{dataset_builder.__name__}")
     dataset = load_dataset(
         dataset_path,
@@ -57,6 +59,7 @@ def main(cfg: DictConfig):
         num_proc=8,
         trust_remote_code=True,
     )
+    # Keep config as a dict as well for logging at wandb
     config = OmegaConf.to_container(cfg)
 
     tokenizer = generate_tokenizer(name=cfg.data.tokenizer, parameters=tokenizer_parameters)
@@ -66,23 +69,29 @@ def main(cfg: DictConfig):
 
     device = cfg.system.device
 
-    # various inits, derived attributes, I/O setup
+    # Various inits, derived attributes, I/O setup
     ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
     if ddp:
         init_process_group(backend=cfg.ddp.backend)
+
         ddp_rank = int(os.environ["RANK"])
         ddp_local_rank = int(os.environ["LOCAL_RANK"])
         ddp_world_size = int(os.environ["WORLD_SIZE"])
+
         device = f"cuda:{ddp_local_rank}"
         torch.cuda.set_device(device)
+
         master_process = ddp_rank == 0  # this process will do logging, checkpointing etc.
+
         seed_offset = ddp_rank  # each process gets a different seed
-        # world_size number of processes will be training simultaneously, so we can scale
+
+        # World_size number of processes will be training simultaneously, so we can scale
         # down the desired gradient accumulation iterations per process proportionally
         assert cfg.data.gradient_accumulation_steps % ddp_world_size == 0
         cfg.data.gradient_accumulation_steps //= ddp_world_size
+
     else:
-        # if not ddp, we are running on a single gpu, and one process
+        # If not ddp, we are running on a single gpu, and one process
         master_process = True
         seed_offset = 0
         ddp_world_size = 1
@@ -96,7 +105,9 @@ def main(cfg: DictConfig):
     torch.manual_seed(1337 + seed_offset)
     torch.backends.cuda.matmul.allow_tf32 = True  # allow tf32 on matmul
     torch.backends.cudnn.allow_tf32 = True  # allow tf32 on cudnn
+
     device_type = "cuda" if "cuda" in device else "cpu"  # for later use in torch.autocast
+
     # note: float16 data type will automatically use a GradScaler
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
     ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
@@ -149,35 +160,44 @@ def main(cfg: DictConfig):
 
     elif cfg.init_from == "resume":
         print(f"Resuming training from {cfg.out_dir}")
+
         # resume training from a checkpoint.
         ckpt_path = os.path.join(cfg.out_dir, "ckpt.pt")
         checkpoint = torch.load(ckpt_path, map_location=device)
         checkpoint_model_args = checkpoint["model_args"]
+
         # force these config attributes to be equal otherwise we can't even resume training
         # the rest of the attributes (e.g. dropout) can stay as desired from command line
         for k in ["n_layer", "n_head", "n_embd", "block_size", "bias", "vocab_size"]:
             model_args[k] = checkpoint_model_args[k]
+
         # create the model
         gptconf = GPTConfig(**model_args)
         model = GPT(gptconf)
         state_dict = checkpoint["model"]
+
         # fix the keys of the state dictionary :(
         # honestly no idea how checkpoints sometimes get this prefix, have to debug more
         unwanted_prefix = "_orig_mod."
         for k, v in list(state_dict.items()):
             if k.startswith(unwanted_prefix):
                 state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
+
         model.load_state_dict(state_dict)
         iter_num = checkpoint["iter_num"]
         best_val_loss = checkpoint["best_val_loss"]
+
     elif cfg.init_from.startswith("gpt2"):
         print(f"Initializing from OpenAI GPT-2 weights: {cfg.init_from}")
+
         # initialize from OpenAI GPT-2 weights
         override_args = dict(dropout=cfg.model.dropout)
         model = GPT.from_pretrained(cfg.init_from, override_args)
+
         # read off the created config params, so we can store them into checkpoint correctly
         for k in ["n_layer", "n_head", "n_embd", "block_size", "bias", "vocab_size"]:
             model_args[k] = getattr(model.config, k)
+
     # crop down the model block size if desired, using model surgery
     if dataset_config.sequence_length < model.config.block_size:
         model.crop_block_size(dataset_config.sequence_length)
@@ -194,6 +214,7 @@ def main(cfg: DictConfig):
         betas=(cfg.optimizer.beta1, cfg.optimizer.beta2),
         device_type=device_type,
     )
+
     if cfg.init_from == "resume":
         optimizer.load_state_dict(checkpoint["optimizer"])
     checkpoint = None  # free up memory
@@ -201,7 +222,7 @@ def main(cfg: DictConfig):
     # compile the model
     if cfg.system.compile:
         print("compiling the model... (takes a ~minute)")
-        # this is never used...
+        # unoptimized_model is never used ...
         # unoptimized_model = model
         model = torch.compile(model)  # requires PyTorch 2.0
 
@@ -230,9 +251,11 @@ def main(cfg: DictConfig):
         # 1) linear warmup for warmup_iters steps
         if it < cfg.lr.warmup_iters:
             return cfg.optimizer.learning_rate * it / cfg.lr.warmup_iters
+
         # 2) if it > lr_decay_iters, return min learning rate
         if it > cfg.lr.lr_decay_iters:
             return cfg.lr.min_lr
+
         # 3) in between, use cosine decay down to min learning rate
         decay_ratio = (it - cfg.lr.warmup_iters) / (cfg.lr.lr_decay_iters - cfg.lr.warmup_iters)
         assert 0 <= decay_ratio <= 1
@@ -251,6 +274,7 @@ def main(cfg: DictConfig):
     raw_model = model.module if ddp else model  # unwrap DDP container if needed
     running_mfu = -1.0
     pbar = tqdm(range(cfg.optimizer.max_iters))
+
     for iter_num in pbar:
         total_tokens += X.numel()
         # determine and set the learning rate for this iteration
@@ -334,8 +358,8 @@ def main(cfg: DictConfig):
             )
             tokens_per_second = total_tokens / dt
             pbar.set_description(
-                f"iter {iter_num}: loss {lossf:.4f},"
-                + f"time {dt:.2f}s, mfu {running_mfu*100:.2f}%,"
+                f"iter {iter_num}: loss {lossf:.4f}, "
+                + f"time {dt:.2f}s, mfu {running_mfu*100:.2f}%, "
                 + f"tokens_per_second {tokens_per_second}"
             )
         iter_num += 1
