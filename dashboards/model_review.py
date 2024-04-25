@@ -15,7 +15,6 @@ from tokenized_midi_datasets import OneTimeTokenDataset, ExponentialTimeTokenDat
 
 
 def main():
-    
     with st.sidebar:
         devices = [f"cuda:{it}" for it in range(torch.cuda.device_count())] + ["cpu"]
         device = st.selectbox(label="device", options=devices)
@@ -128,7 +127,9 @@ def main():
         with torch.no_grad():
             with ctx:
                 output = model.generate(
-                    idx=input_sequence, max_new_tokens=max_new_tokens, temperature=temperature,
+                    idx=input_sequence,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
                 )
 
         output = output[0]  # , dataset_config.sequence_length :]
@@ -136,12 +137,12 @@ def main():
         generated_notes = tokenizer.decode(output)
 
         # start from new model-generated notes
-        generated_notes = generated_notes.iloc[piece.size:]
+        generated_notes = generated_notes.iloc[piece.size :]
         generated_notes = generated_notes.dropna(axis=0)
         generated_piece = ff.MidiPiece(df=generated_notes)
         streamlit_pianoroll.from_fortepyan(piece=generated_piece)
 
-        output = output[input_sequence.shape[-1]:]
+        output = output[input_sequence.shape[-1] :]
         with st.expander("generated tokens"):
             st.write([tokenizer.vocab[idx] for idx in output])
 
