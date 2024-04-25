@@ -15,8 +15,10 @@ from tokenized_midi_datasets import OneTimeTokenDataset, ExponentialTimeTokenDat
 
 
 def main():
+    
     with st.sidebar:
-        device = st.selectbox(label="device", options=["cpu", "cuda:0"])
+        devices = [f"cuda:{it}" for it in range(torch.cuda.device_count())] + ["cpu"]
+        device = st.selectbox(label="device", options=devices)
         checkpoints = glob("checkpoints/*.pt")
         checkpoint_path = st.selectbox(label="checkpoint", options=checkpoints)
 
@@ -27,8 +29,8 @@ def main():
         device_type = "cuda" if "cuda" in device else "cpu"  # for later use in torch.autocast
 
         checkpoint = torch.load(f=checkpoint_path, map_location=device)
-        model_config = checkpoint["config"]
-        cfg = OmegaConf.create(model_config)
+        train_config = checkpoint["config"]
+        cfg = OmegaConf.create(train_config)
         config_name = cfg.data.dataset_name
         ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
         ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
@@ -86,7 +88,10 @@ def main():
     model.eval()
     model.to(device)
 
-    with st.expander("config"):
+    with st.expander("train config"):
+        st.json(train_config)
+
+    with st.expander("dataset config"):
         st.write(dataset_config)
 
     idx = st.number_input(label="record_id", value=0, max_value=len(dataset))
@@ -101,9 +106,12 @@ def main():
         """
         If the tokenizer sees unmatched NOTE_OFF or NOTE_ON events
         it will treat them as if the notes were playing on the edges of the recording.
+        If it encounters a NaN the note is invalid.
         """
     )
     temperature = st.number_input(label="temperature", value=1.0)
+    max_new_tokens = st.number_input(label="max_new_tokens", value=dataset_config.sequence_length)
+
     io_columns = st.columns(2)
 
     with io_columns[0]:
@@ -120,14 +128,20 @@ def main():
         with torch.no_grad():
             with ctx:
                 output = model.generate(
-                    idx=input_sequence, max_new_tokens=dataset_config.sequence_length, temperature=temperature
+                    idx=input_sequence, max_new_tokens=max_new_tokens, temperature=temperature,
                 )
 
-        output = output[0, dataset_config.sequence_length :]
+        output = output[0]  # , dataset_config.sequence_length :]
+        # we want to decode the whole output so that the pressed notes can be unpressed by the tokenizer
         generated_notes = tokenizer.decode(output)
+
+        # start from new model-generated notes
+        generated_notes = generated_notes.iloc[piece.size:]
         generated_notes = generated_notes.dropna(axis=0)
         generated_piece = ff.MidiPiece(df=generated_notes)
         streamlit_pianoroll.from_fortepyan(piece=generated_piece)
+
+        output = output[input_sequence.shape[-1]:]
         with st.expander("generated tokens"):
             st.write([tokenizer.vocab[idx] for idx in output])
 
