@@ -125,6 +125,7 @@ def main():
 
         output = output[0, dataset_config.sequence_length :]
         generated_notes = tokenizer.decode(output)
+        generated_notes = generated_notes.dropna(axis=0)
         generated_piece = ff.MidiPiece(df=generated_notes)
         streamlit_pianoroll.from_fortepyan(piece=generated_piece)
         with st.expander("generated tokens"):

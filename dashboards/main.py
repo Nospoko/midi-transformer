@@ -5,7 +5,7 @@ from dashboards.hf_dataset_review import main as hf_datasets_review
 
 
 def main():
-    options = ["hf_datasets_review", "model_review"]
+    options = ["model_review", "hf_datasets_review"]
     display_mode = st.selectbox(label="display mode", options=options)
 
     match display_mode:
@@ -13,3 +13,7 @@ def main():
             hf_datasets_review()
         case "model_review":
             model_review()
+
+
+if __name__ == "__main__":
+    main()
