@@ -15,7 +15,7 @@ class AwesomeTokensDataset(TokenizedMidiDataset):
         return DatasetInfo(description=_DESC)
 
     def _generate_examples(self, dataset_shards: list[Dataset]):
-        pretrained_path = "pre-trained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
+        pretrained_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
         self.tokenizer = AwesomeMidiTokenizer.from_file(pretrained_path)
 
         for dataset in dataset_shards:

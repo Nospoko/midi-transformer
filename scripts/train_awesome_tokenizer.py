@@ -30,7 +30,7 @@ if __name__ == "__main__":
     max_vocab_size = 30000
 
     # Create the filename
-    path = "pre-trained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
+    path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
     train(
         path=path,
         min_time_unit=min_time_unit,

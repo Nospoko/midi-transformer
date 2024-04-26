@@ -5,6 +5,7 @@ References:
 https://github.com/openai/gpt-2/blob/master/src/model.py
 2) huggingface/transformers PyTorch implementation:
 https://github.com/huggingface/transformers/blob/main/src/transformers/models/gpt2/modeling_gpt2.py
+This code comes from https://github.com/karpathy/nanoGPT/
 """
 
 import math
