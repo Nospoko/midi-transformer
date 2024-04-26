@@ -103,7 +103,16 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
             sequence_step=512,
             pause_detection_threshold=4,
             tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
-            name="debugging",
+            name="basic-no-overlap",
+        ),
+        TokenizedMidiDatasetConfig(
+            base_dataset_name="roszcz/maestro-sustain-v2",
+            extra_datasets=["roszcz/giant-midi-sustain-v2"],
+            sequence_length=512,
+            sequence_step=512,
+            pause_detection_threshold=4,
+            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
+            name="giant-no-overlap",
         ),
     ]
     DEFAULT_CONFIG_NAME = "basic-mid"

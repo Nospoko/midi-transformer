@@ -35,11 +35,12 @@ from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
 
 from model import GPT, GPTConfig
 from data.next_token_dataset import NextTokenDataset
-from tokenized_midi_datasets import OneTimeTokenDataset, TokenizedMidiDataset, ExponentialTimeTokenDataset
+from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, TokenizedMidiDataset, ExponentialTimeTokenDataset
 
 tokenizer_name_to_dataset_map: dict[str, TokenizedMidiDataset] = {
     "NoLossTokenizer": ExponentialTimeTokenDataset,
     "OneTimeTokenizer": OneTimeTokenDataset,
+    "AwesomeTokenizer": AwesomeTokensDataset,
 }
 
 

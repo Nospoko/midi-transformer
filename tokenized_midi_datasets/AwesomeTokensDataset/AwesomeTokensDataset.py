@@ -18,7 +18,7 @@ class AwesomeTokensDataset(TokenizedMidiDataset):
         pretrained_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
         self.tokenizer = AwesomeMidiTokenizer.from_file(pretrained_path)
 
-        for dataset in dataset_shards:
+        for shard_id, dataset in enumerate(dataset_shards):
             for it, record in tqdm(enumerate(dataset), total=len(dataset)):
                 piece = ff.MidiPiece.from_huggingface(dict(record))
 
@@ -26,5 +26,5 @@ class AwesomeTokensDataset(TokenizedMidiDataset):
                 chopped_sequences = sum([self.piece_to_records(piece) for piece in pieces], [])
 
                 for jt, sequence in enumerate(chopped_sequences):
-                    key = f"{it}_{jt}"
+                    key = f"{it}_{jt}_{shard_id}"  # for some reason there was duplicate key error without shard_id
                     yield key, sequence
