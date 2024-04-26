@@ -2,6 +2,7 @@ from glob import glob
 from contextlib import nullcontext
 
 import torch
+import numpy as np
 import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
@@ -15,7 +16,6 @@ from tokenized_midi_datasets import OneTimeTokenDataset, ExponentialTimeTokenDat
 
 
 def main():
-    
     with st.sidebar:
         devices = [f"cuda:{it}" for it in range(torch.cuda.device_count())] + ["cpu"]
         device = st.selectbox(label="device", options=devices)
@@ -32,7 +32,7 @@ def main():
         train_config = checkpoint["config"]
         cfg = OmegaConf.create(train_config)
         config_name = cfg.data.dataset_name
-        ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
+        ptdtype = {"float32": torch.float32, "bfloat16": torch.float16, "float16": torch.float16}[cfg.system.dtype]
         ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
 
     if cfg.data.tokenizer == "OneTimeTokenizer":
@@ -128,7 +128,9 @@ def main():
         with torch.no_grad():
             with ctx:
                 output = model.generate(
-                    idx=input_sequence, max_new_tokens=max_new_tokens, temperature=temperature,
+                    idx=input_sequence,
+                    max_new_tokens=max_new_tokens,
+                    temperature=temperature,
                 )
 
         output = output[0]  # , dataset_config.sequence_length :]
@@ -136,12 +138,14 @@ def main():
         generated_notes = tokenizer.decode(output)
 
         # start from new model-generated notes
-        generated_notes = generated_notes.iloc[piece.size:]
+        generated_notes = generated_notes.iloc[piece.size :]
+        generated_notes[generated_notes["end"] <= generated_notes["start"]] = np.nan
         generated_notes = generated_notes.dropna(axis=0)
         generated_piece = ff.MidiPiece(df=generated_notes)
+        generated_piece.time_shift(-generated_notes.start.min())
         streamlit_pianoroll.from_fortepyan(piece=generated_piece)
 
-        output = output[input_sequence.shape[-1]:]
+        output = output[input_sequence.shape[-1] :]
         with st.expander("generated tokens"):
             st.write([tokenizer.vocab[idx] for idx in output])
 
