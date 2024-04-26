@@ -21,7 +21,6 @@ import math
 import time
 from contextlib import nullcontext
 
-import yaml
 import hydra
 import torch
 import wandb

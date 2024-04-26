@@ -126,12 +126,12 @@ def main():
     out_notes = tokenizer.decode(output)
     # start from new model-generated notes
     generated_notes = out_notes.iloc[piece.size :]
-    
+
     # I will implement different logic in tokenizer - leaving it just for now
     out_notes[out_notes["end"] <= out_notes["start"]] = np.nan
     out_notes = out_notes.dropna(axis=0)
     out_piece = ff.MidiPiece(out_notes)
-    
+
     generated_notes[generated_notes["end"] <= generated_notes["start"]] = np.nan
     generated_notes = generated_notes.dropna(axis=0)
     generated_piece = ff.MidiPiece(df=generated_notes)

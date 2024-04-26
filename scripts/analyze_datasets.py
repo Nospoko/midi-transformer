@@ -46,6 +46,9 @@ def print_num_tokens(dataset_name: str):
     print(f"\ttrain: {num_tokens_basic}\n\ttest: {num_tokens__test}\n\tvalidation:{num_tokens_val}")
     print(f"Giant {dataset_name} dataset tokens:")
     print(f"\ttrain: {num_tokens_giant}\n\ttest: {num_tokens__test}\n\tvalidation:{num_tokens_val}")
+    # Ratio the same as in base_tokenzizer inside
+    if dataset_name == "AwesomeTokensDataset":
+        return
 
     tokenizer = dataset_to_tokenizer_map[dataset_name]
     basic_time_tokens = 0
@@ -67,7 +70,7 @@ def print_num_tokens(dataset_name: str):
 
 
 def main():
-    dataset_names = ["ExponentialTimeTokenDataset", "OneTimeTokenDataset", "AwesomeTokensDataset"]
+    dataset_names = ["AwesomeTokensDataset", "ExponentialTimeTokenDataset"]  # , "OneTimeTokenDataset"]
     for name in dataset_names:
         print_num_tokens(name)
         print("\n")
