@@ -62,16 +62,6 @@ def main(cfg: DictConfig):
     )
     total_tokens = dataset_config.sequence_length * dataset["train"].num_rows
     print(f"tokens in a training dataset: {total_tokens}")
-    if cfg.architecture != "custom":
-        architecture_config_path = f"configs/architectures/{cfg.architecture}.yaml"
-        architecture_config_path = to_absolute_path(architecture_config_path)
-        with open(architecture_config_path, "r") as file:
-            architecture_config = yaml.safe_load(file)
-
-        # override model config
-        cfg.model.n_layer = architecture_config["n_layer"]
-        cfg.model.n_head = architecture_config["n_head"]
-        cfg.model.n_embd = architecture_config["n_embd"]
 
     # Keep config as a dict as well for logging at wandb and for checkpoints
     config = OmegaConf.to_container(cfg)

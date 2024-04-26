@@ -1,4 +1,0 @@
-#302M parameters with vocab_size=219
-n_layer: 24
-n_head: 16
-n_embd: 1024

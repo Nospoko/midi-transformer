@@ -112,6 +112,31 @@ def main():
     temperature = st.number_input(label="temperature", value=1.0)
     max_new_tokens = st.number_input(label="max_new_tokens", value=dataset_config.sequence_length)
 
+    input_sequence = torch.tensor([record["note_token_ids"]], device=device)
+    with torch.no_grad():
+        with ctx:
+            output = model.generate(
+                idx=input_sequence,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+            )
+
+    output = output[0]  # , dataset_config.sequence_length :]
+    # we want to decode the whole output so that the pressed notes can be unpressed by the tokenizer
+    out_notes = tokenizer.decode(output)
+    # start from new model-generated notes
+    generated_notes = out_notes.iloc[piece.size :]
+    
+    # I will implement different logic in tokenizer - leaving it just for now
+    out_notes[out_notes["end"] <= out_notes["start"]] = np.nan
+    out_notes = out_notes.dropna(axis=0)
+    out_piece = ff.MidiPiece(out_notes)
+    
+    generated_notes[generated_notes["end"] <= generated_notes["start"]] = np.nan
+    generated_notes = generated_notes.dropna(axis=0)
+    generated_piece = ff.MidiPiece(df=generated_notes)
+    generated_piece.time_shift(-generated_notes.start.min())
+
     io_columns = st.columns(2)
 
     with io_columns[0]:
@@ -124,30 +149,14 @@ def main():
     with io_columns[1]:
         st.write("generated:")
 
-        input_sequence = torch.tensor([record["note_token_ids"]], device=device)
-        with torch.no_grad():
-            with ctx:
-                output = model.generate(
-                    idx=input_sequence,
-                    max_new_tokens=max_new_tokens,
-                    temperature=temperature,
-                )
-
-        output = output[0]  # , dataset_config.sequence_length :]
-        # we want to decode the whole output so that the pressed notes can be unpressed by the tokenizer
-        generated_notes = tokenizer.decode(output)
-
-        # start from new model-generated notes
-        generated_notes = generated_notes.iloc[piece.size :]
-        generated_notes[generated_notes["end"] <= generated_notes["start"]] = np.nan
-        generated_notes = generated_notes.dropna(axis=0)
-        generated_piece = ff.MidiPiece(df=generated_notes)
-        generated_piece.time_shift(-generated_notes.start.min())
         streamlit_pianoroll.from_fortepyan(piece=generated_piece)
 
         output = output[input_sequence.shape[-1] :]
         with st.expander("generated tokens"):
             st.write([tokenizer.vocab[idx] for idx in output])
+
+    st.write("whole model output")
+    streamlit_pianoroll.from_fortepyan(piece=out_piece)
 
 
 if __name__ == "__main__":
