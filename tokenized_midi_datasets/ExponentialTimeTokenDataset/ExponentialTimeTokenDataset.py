@@ -15,7 +15,7 @@ class ExponentialTimeTokenDataset(TokenizedMidiDataset):
 
     def _generate_examples(self, dataset_shards: list[Dataset]):
         self.tokenizer = NoLossTokenizer(**self.config.tokenizer_parameters)
-        for dataset in dataset_shards:
+        for shard_id, dataset in enumerate(dataset_shards):
             for it, record in enumerate(dataset):
                 piece = ff.MidiPiece.from_huggingface(dict(record))
 
@@ -23,5 +23,5 @@ class ExponentialTimeTokenDataset(TokenizedMidiDataset):
                 chopped_sequences = sum([self.piece_to_records(piece) for piece in pieces], [])
 
                 for jt, sequence in enumerate(chopped_sequences):
-                    key = f"{it}_{jt}"
+                    key = f"{it}_{jt}_{shard_id}"
                     yield key, sequence
