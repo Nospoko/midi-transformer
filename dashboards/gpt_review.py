@@ -2,7 +2,6 @@ from glob import glob
 from contextlib import nullcontext
 
 import torch
-import numpy as np
 import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
@@ -32,7 +31,7 @@ def main():
         train_config = checkpoint["config"]
         cfg = OmegaConf.create(train_config)
         config_name = cfg.data.dataset_name
-        ptdtype = {"float32": torch.float32, "bfloat16": torch.float16, "float16": torch.float16}[cfg.system.dtype]
+        ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
         ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
 
     if cfg.data.tokenizer == "OneTimeTokenizer":
@@ -126,17 +125,8 @@ def main():
     out_notes = tokenizer.decode(output)
     # start from new model-generated notes
     generated_notes = out_notes.iloc[piece.size :]
-
-    # I will implement different logic in tokenizer - leaving it just for now
-    out_notes[out_notes["end"] <= out_notes["start"]] = np.nan
-    out_notes = out_notes.dropna(axis=0)
     out_piece = ff.MidiPiece(out_notes)
-
-    generated_notes[generated_notes["end"] <= generated_notes["start"]] = np.nan
-    generated_notes = generated_notes.dropna(axis=0)
     generated_piece = ff.MidiPiece(df=generated_notes)
-    generated_piece.time_shift(-generated_notes.start.min())
-
     io_columns = st.columns(2)
 
     with io_columns[0]:

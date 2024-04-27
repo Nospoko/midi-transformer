@@ -60,6 +60,7 @@ def print_num_tokens(dataset_name: str):
     basic_ratio = basic_time_tokens / num_tokens_basic
 
     print(f"Basic {dataset_name} time tokens to the rest ratio: {basic_ratio}")
+    print(f"{tokenizer.name} vocab size: {tokenizer.vocab_size}")
 
 
 def main():
