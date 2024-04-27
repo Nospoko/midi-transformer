@@ -124,9 +124,10 @@ def main():
     # we want to decode the whole output so that the pressed notes can be unpressed by the tokenizer
     out_notes = tokenizer.decode(output)
     # start from new model-generated notes
-    generated_notes = out_notes.iloc[piece.size :]
-    out_piece = ff.MidiPiece(out_notes)
+    generated_notes = out_notes.iloc[piece.size :].copy()
+    out_piece = ff.MidiPiece(df=out_notes)
     generated_piece = ff.MidiPiece(df=generated_notes)
+    generated_piece.time_shift(-generated_piece.df.start.min())
     io_columns = st.columns(2)
 
     with io_columns[0]:
