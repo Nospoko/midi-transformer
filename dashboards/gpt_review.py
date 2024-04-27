@@ -1,3 +1,5 @@
+import os
+import json
 from glob import glob
 from contextlib import nullcontext
 
@@ -11,6 +13,7 @@ from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
 from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
 
 from model import GPT, GPTConfig
+from dashboards.common.components import download_button
 from tokenized_midi_datasets import OneTimeTokenDataset, ExponentialTimeTokenDataset
 
 
@@ -95,17 +98,19 @@ def main():
 
     idx = st.number_input(label="record_id", value=0, max_value=len(dataset))
     record = dataset[idx]
+    source = json.loads(record["source"])
 
     with st.expander(label="source"):
-        st.json(record["source"])
+        st.json(source)
 
     notes = tokenizer.decode(record["note_token_ids"])
-    piece = ff.MidiPiece(notes, source=record["source"])
+    piece = ff.MidiPiece(notes, source=source)
     st.write(
         """
-        If the tokenizer sees unmatched NOTE_OFF or NOTE_ON events
-        it will treat them as if the notes were playing on the edges of the recording.
-        If it encounters a NaN the note is invalid.
+        If the tokenizer sees unmatched NOTE_ON events
+        it will treat them as if the note was pressed until the end of the recording.
+        If the tokenizef sees umatched NOTE_OFF rents, it will ignore it.
+        If it encounters a NaN or end <= start, the note is invalid.
         """
     )
     temperature = st.number_input(label="temperature", value=1.0)
@@ -145,6 +150,24 @@ def main():
         output = output[input_sequence.shape[-1] :]
         with st.expander("generated tokens"):
             st.write([tokenizer.vocab[idx] for idx in output])
+            title = source["title"]
+            composer = source["composer"]
+            piece_name = (title + composer).replace(" ", "_").casefold()
+            midi_path = f"tmp/variations_on_{piece_name}.mid"
+            generated_file = generated_piece.to_midi()
+
+        try:
+            generated_file.write(midi_path)
+            with open(midi_path, "rb") as file:
+                download_button_str = download_button(
+                    object_to_download=file.read(),
+                    download_filename=midi_path.split("/")[-1],
+                    button_text="Download generated midi",
+                )
+                st.markdown(download_button_str, unsafe_allow_html=True)
+        finally:
+            # make sure to always clean up
+            os.unlink(midi_path)
 
     st.write("whole model output")
     streamlit_pianoroll.from_fortepyan(piece=out_piece)
