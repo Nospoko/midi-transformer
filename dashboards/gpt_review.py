@@ -150,11 +150,11 @@ def main():
         output = output[input_sequence.shape[-1] :]
         with st.expander("generated tokens"):
             st.write([tokenizer.vocab[idx] for idx in output])
-            title = source["title"]
-            composer = source["composer"]
-            piece_name = (title + composer).replace(" ", "_").casefold()
-            midi_path = f"tmp/variations_on_{piece_name}.mid"
-            generated_file = generated_piece.to_midi()
+        title = source["title"]
+        composer = source["composer"]
+        piece_name = (title + composer).replace(" ", "_").casefold()
+        midi_path = f"tmp/variations_on_{piece_name}.mid"
+        generated_file = generated_piece.to_midi()
 
         try:
             generated_file.write(midi_path)
@@ -171,6 +171,20 @@ def main():
 
     st.write("whole model output")
     streamlit_pianoroll.from_fortepyan(piece=out_piece)
+    full_midi_path = f"tmp/full_variations_on_{piece_name}.mid"
+    out_file = generated_piece.to_midi()
+    try:
+        out_file.write(full_midi_path)
+        with open(full_midi_path, "rb") as file:
+            download_button_str = download_button(
+                object_to_download=file.read(),
+                download_filename=full_midi_path.split("/")[-1],
+                button_text="Download generated midi",
+            )
+            st.markdown(download_button_str, unsafe_allow_html=True)
+    finally:
+        # make sure to always clean up
+        os.unlink(full_midi_path)
 
 
 if __name__ == "__main__":
