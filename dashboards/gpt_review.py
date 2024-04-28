@@ -128,6 +128,7 @@ def main():
     output = output[0]  # , dataset_config.sequence_length :]
     # we want to decode the whole output so that the pressed notes can be unpressed by the tokenizer
     out_notes = tokenizer.decode(output)
+    out_piece = ff.MidiPiece(out_notes)
     # start from new model-generated notes
     generated_notes = out_notes.iloc[piece.size :].copy()
     generated_piece = ff.MidiPiece(df=generated_notes)
@@ -176,8 +177,9 @@ def main():
     expanded_input_notes = out_notes[: piece.size].copy()
     expanded_piece = ff.MidiPiece(expanded_input_notes)
     streamlit_pianoroll.from_fortepyan(piece=expanded_piece, secondary_piece=second_part)
+
     full_midi_path = f"tmp/full_variations_on_{piece_name}.mid"
-    out_file = generated_piece.to_midi()
+    out_file = out_piece.to_midi()
     try:
         out_file.write(full_midi_path)
         with open(full_midi_path, "rb") as file:
