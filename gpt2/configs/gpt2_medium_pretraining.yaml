@@ -1,5 +1,5 @@
 defaults:
-  - model: gpt2 # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
+  - model: gpt2_medium # "gpt2_minimal", "gpt2", "gpt2_large", "gpt2_xl"
   - data: exponential-mid
   - logging: pretraining
   - lr: pretraining-large

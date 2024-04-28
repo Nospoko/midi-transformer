@@ -1,41 +1,25 @@
 defaults:
   - model: gpt2_scaled # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
+  - data: exponential-mid
+  - logging: pretraining
+  - lr: pretraining-small
 
 out_dir: 'checkpoints'
-eval_interval: 2000
+eval_interval: 500
 
 eval_iters: 100
 eval_only: false  # if True, script exits right after the first eval
-always_save_checkpoint: true  # if True, always save a checkpoint after each eval
-init_from: 'scratch'  # 'scratch' or 'resume' or 'gpt2*'
+always_save_checkpoint: false  # if True, always save a checkpoint after each eval
+init_from: 'scratch'  # 'scratch' or 'resume' or 'midi-gpt2*'
 task: pretraining
-
-logging:
-  wandb_log: True  # disabled by default
-  wandb_project: 'midi-gpt2'
-  wandb_run_name: midi-gpt2-scaled-pretraining-${now:%Y-%m-%d-%H-%M}
-  log_interval: 100
-  run_name:
-
-data:
-  tokenizer: "NoLossTokenizer"
-  dataset_name: "giant-mid"
-  gradient_accumulation_steps: 20  # used to simulate larger batch sizes
-  batch_size: 16 # if gradient_accumulation_steps > 1, this is the micro-batch size
 
 optimizer:
   learning_rate: 1e-3  # small network - we can go up a little
-  max_iters: 32000 # total number of training iterations - ~500B tokens for all training on *-mid datasets
   weight_decay: 0.1
+  max_iters: ${data.max_iters} # define max_iters in data but leave the parameter here as well
   beta1: 0.9
   beta2: 0.95
   grad_clip: 1.0  # clip gradients at this value, or disable if == 0.0
-
-lr:
-  decay_lr: true  # whether to decay the learning rate
-  warmup_iters: 50  # how many steps to warm up for
-  lr_decay_iters: 320  # should be ~= max_iters per Chinchilla
-  min_lr: 1e-4  # minimum learning rate, should be ~= learning_rate/10 per Chinchilla
 
 ddp:
   backend: 'nccl'  # 'nccl', 'gloo', etc.

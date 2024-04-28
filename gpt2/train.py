@@ -258,7 +258,7 @@ def main(cfg: DictConfig):
         return cfg.lr.min_lr + coeff * (cfg.optimizer.learning_rate - cfg.lr.min_lr)
 
     milion_params = model.get_num_params() / 1e6
-    run_name = f"{milion_params:.2f}M_" + cfg.logging.wandb_run_name
+    run_name = f"midi-gpt2-{milion_params:.2f}M-" + cfg.logging.wandb_run_name_suffix
     # logging
     if cfg.logging.wandb_log and master_process:
         wandb.init(project=cfg.logging.wandb_project, name=run_name, config=config)
