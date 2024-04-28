@@ -12,13 +12,25 @@ def main():
     dataset_names = ["ExponentialTimeTokenDataset", "OneTimeTokenDataset", "AwesomeTokensDataset"]
     dataset_name = st.selectbox(label="dataset", options=dataset_names)
     configs = [
+        # Non-overlapping coarse
         "basic-no-overlap",
-        "giant-no-overlap" "giant-short",
+        "giant-no-overlap",
+        "basic-no-overlap-augmented",
+        "giant-no-overlap-augmented",
+        # High-res datasets
+        "giant-short",
         "basic-short",
         "giant-mid",
         "basic-mid",
         "giant-long",
         "basic-long",
+        # Coarse Datasets
+        "giant-short-coarse",
+        "basic-short-coarse",
+        "giant-mid-coarse",
+        "basic-mid-coarse",
+        "giant-long-coarse",
+        "basic-long-coarse",
     ]
 
     config_name = st.selectbox(label="config name", options=configs)

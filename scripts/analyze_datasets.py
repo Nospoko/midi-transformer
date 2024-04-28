@@ -18,13 +18,13 @@ def load_no_overlap_datasets(dataset_name: str) -> tuple[Dataset, Dataset]:
     datasets_directory = "tokenized_midi_datasets"
     basic_dataset = load_dataset(
         f"{datasets_directory}/{dataset_name}",
-        name="basic-no-overlap",
+        name="basic-no-overlap-augmented",
         trust_remote_code=True,
         num_proc=8,
     )
     giant_dataset = load_dataset(
         f"{datasets_directory}/{dataset_name}",
-        name="giant-no-overlap",
+        name="giant-no-overlap-augmented",
         trust_remote_code=True,
         num_proc=8,
     )

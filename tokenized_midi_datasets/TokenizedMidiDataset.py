@@ -3,7 +3,10 @@ import json
 import datasets
 import numpy as np
 import fortepyan as ff
-from datasets import Split, DatasetInfo, BuilderConfig, GeneratorBasedBuilder
+from datasets import Split, DatasetInfo, GeneratorBasedBuilder
+
+from data.augmentation import augment_dataset
+from tokenized_midi_datasets.TokenizedMidiDatasetConfig import BUILDER_CONFIGS, TokenizedMidiDatasetConfig
 
 # NOTE: If you make some changes here, you might want to delete your huggingface cache
 # at ~/.cache/huggingface/ to rebuild the datasets
@@ -13,162 +16,12 @@ Dataset with midi files, tokenzied using MidiTokenizer with records of equal siz
 """
 
 
-class TokenizedMidiDatasetConfig(BuilderConfig):
-    def __init__(
-        self,
-        base_dataset_name: str = "roszcz/maestro-v1-sustain",
-        extra_datasets: list[str] = [],
-        sequence_length: int = 64,
-        sequence_step: int = 42,
-        pause_detection_threshold: int = 4,
-        tokenizer_parameters: dict = {"min_time_unit": 0.001, "n_velocity_bins": 32},
-        **kwargs,
-    ):
-        super().__init__()
-        # Version history:
-        super().__init__(version=datasets.Version("0.0.1"), **kwargs)
-
-        self.base_dataset_name: str = base_dataset_name
-        self.extra_datasets: list[str] = extra_datasets
-        self.sequence_length: int = sequence_length
-        self.sequence_step: int = sequence_step
-        self.tokenizer_parameters = tokenizer_parameters
-        self.pause_detection_threshold = pause_detection_threshold
-
-
 class TokenizedMidiDataset(GeneratorBasedBuilder):
     def _info(self) -> DatasetInfo:
         return DatasetInfo(description=_DESC)
 
     BUILDER_CONFIG_CLASS = TokenizedMidiDatasetConfig
-    BUILDER_CONFIGS = [
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=256,
-            sequence_step=32,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
-            name="giant-short",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=[],
-            sequence_length=256,
-            sequence_step=32,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
-            name="basic-short",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=512,
-            sequence_step=64,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
-            name="giant-mid",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=[],
-            sequence_length=512,
-            sequence_step=64,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
-            name="basic-mid",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=1024,
-            sequence_step=128,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
-            name="giant-long",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=[],
-            sequence_length=1024,
-            sequence_step=128,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
-            name="basic-long",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=[],
-            sequence_length=512,
-            sequence_step=512,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
-            name="basic-no-overlap",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=512,
-            sequence_step=512,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
-            name="giant-no-overlap",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=256,
-            sequence_step=32,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
-            name="giant-short-coarse",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=[],
-            sequence_length=256,
-            sequence_step=32,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
-            name="basic-short-coarse",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=512,
-            sequence_step=64,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
-            name="giant-mid-coarse",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=[],
-            sequence_length=512,
-            sequence_step=64,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
-            name="basic-mid-coarse",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=["roszcz/giant-midi-sustain-v2"],
-            sequence_length=1024,
-            sequence_step=128,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
-            name="giant-long-coarse",
-        ),
-        TokenizedMidiDatasetConfig(
-            base_dataset_name="roszcz/maestro-sustain-v2",
-            extra_datasets=[],
-            sequence_length=1024,
-            sequence_step=128,
-            pause_detection_threshold=4,
-            tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
-            name="basic-long-coarse",
-        ),
-    ]
+    BUILDER_CONFIGS = BUILDER_CONFIGS
     DEFAULT_CONFIG_NAME = "basic-mid"
 
     def _split_generators(self, dl_manager: datasets.DownloadManager) -> list[datasets.SplitGenerator]:
@@ -178,6 +31,11 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
         other_datasets.append(base["train"])
 
         dataset = datasets.concatenate_datasets(other_datasets)
+        dataset = augment_dataset(
+            dataset=dataset,
+            augmentation_probability=self.config.augmentation_probability,
+            augmentation_repetitions=self.config.augmentation_repetitions,
+        )
 
         # This will enable multiprocessing in load_dataset()
         n_shards = 12
