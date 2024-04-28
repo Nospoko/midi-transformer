@@ -12,7 +12,7 @@ from datasets import load_dataset
 from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
 from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
 
-from model import GPT, GPTConfig
+from gpt2.model import GPT, GPTConfig
 from dashboards.common.components import download_button
 from tokenized_midi_datasets import OneTimeTokenDataset, ExponentialTimeTokenDataset
 
@@ -130,7 +130,6 @@ def main():
     out_notes = tokenizer.decode(output)
     # start from new model-generated notes
     generated_notes = out_notes.iloc[piece.size :].copy()
-    out_piece = ff.MidiPiece(df=out_notes)
     generated_piece = ff.MidiPiece(df=generated_notes)
     generated_piece.time_shift(-generated_piece.df.start.min())
     io_columns = st.columns(2)
@@ -170,7 +169,13 @@ def main():
             os.unlink(midi_path)
 
     st.write("whole model output")
-    streamlit_pianoroll.from_fortepyan(piece=out_piece)
+    generated_notes_with_offset = out_notes[piece.size :].copy()
+    second_part = ff.MidiPiece(generated_notes_with_offset)
+
+    # Model could have also add "NOTE_OFF" events to original sequence
+    expanded_input_notes = out_notes[: piece.size].copy()
+    expanded_piece = ff.MidiPiece(expanded_input_notes)
+    streamlit_pianoroll.from_fortepyan(piece=expanded_piece, secondary_piece=second_part)
     full_midi_path = f"tmp/full_variations_on_{piece_name}.mid"
     out_file = generated_piece.to_midi()
     try:
@@ -179,7 +184,7 @@ def main():
             download_button_str = download_button(
                 object_to_download=file.read(),
                 download_filename=full_midi_path.split("/")[-1],
-                button_text="Download generated midi",
+                button_text="Download midi with context",
             )
             st.markdown(download_button_str, unsafe_allow_html=True)
     finally:

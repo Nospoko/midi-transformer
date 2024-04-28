@@ -32,7 +32,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
 
-from model import GPT, GPTConfig
+from gpt2.model import GPT, GPTConfig
 from data.next_token_dataset import NextTokenDataset
 from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, TokenizedMidiDataset, ExponentialTimeTokenDataset
 
@@ -45,6 +45,7 @@ tokenizer_name_to_dataset_map: dict[str, TokenizedMidiDataset] = {
 
 @hydra.main(config_path="configs", config_name="gpt2_noloss_pretraining")
 def main(cfg: DictConfig):
+    out_dir = to_absolute_path(cfg.out_dir)
     # Get the right data for the tokenizer specified in config
     dataset_builder = tokenizer_name_to_dataset_map[cfg.data.tokenizer]
     dataset_config = dataset_builder.builder_configs[cfg.data.dataset_name]
@@ -155,9 +156,7 @@ def main(cfg: DictConfig):
         # init a new model from scratch
         print("Initializing a new model from scratch")
         # determine the vocab size we'll use for from-scratch training
-        if meta_vocab_size is None:
-            print("defaulting to vocab_size of GPT-2 to 50304 (50257 rounded up for efficiency)")
-        model_args["vocab_size"] = meta_vocab_size if meta_vocab_size is not None else 50304
+        model_args["vocab_size"] = meta_vocab_size
         gptconf = GPTConfig(**model_args)
         model = GPT(gptconf)
 
@@ -191,15 +190,8 @@ def main(cfg: DictConfig):
         best_val_loss = checkpoint["best_val_loss"]
 
     elif cfg.init_from.startswith("gpt2"):
-        print(f"Initializing from OpenAI GPT-2 weights: {cfg.init_from}")
-
-        # initialize from OpenAI GPT-2 weights
-        override_args = dict(dropout=cfg.model.dropout)
-        model = GPT.from_pretrained(cfg.init_from, override_args)
-
-        # read off the created config params, so we can store them into checkpoint correctly
-        for k in ["n_layer", "n_head", "n_embd", "block_size", "bias", "vocab_size"]:
-            model_args[k] = getattr(model.config, k)
+        # loading openAI weigths not supported
+        return
 
     # crop down the model block size if desired, using model surgery
     if dataset_config.sequence_length < model.config.block_size:
@@ -265,9 +257,11 @@ def main(cfg: DictConfig):
         coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
         return cfg.lr.min_lr + coeff * (cfg.optimizer.learning_rate - cfg.lr.min_lr)
 
+    milion_params = model.get_num_params() / 1e6
+    run_name = f"{milion_params:.2f}M_" + cfg.logging.wandb_run_name
     # logging
     if cfg.logging.wandb_log and master_process:
-        wandb.init(project=cfg.logging.wandb_project, name=cfg.logging.wandb_run_name, config=config)
+        wandb.init(project=cfg.logging.wandb_project, name=run_name, config=config)
 
     total_tokens = 0
     # training loop
@@ -310,7 +304,7 @@ def main(cfg: DictConfig):
                     }
                     out_dir = to_absolute_path(cfg.out_dir)
                     print(f"saving checkpoint to {out_dir}")
-                    torch.save(checkpoint, os.path.join(out_dir, cfg.logging.wandb_run_name + ".pt"))
+                    torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
         if iter_num == 0 and cfg.eval_only:
             break
 
