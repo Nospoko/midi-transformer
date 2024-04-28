@@ -2,6 +2,8 @@ from datasets import load_dataset
 from midi_tokenizers.one_time_tokenizer import NoLossTokenizer
 from midi_trainable_tokenizers.awesome_midi_tokenzier import AwesomeMidiTokenizer
 
+from data.masked_midi_dataset import special_tokens
+
 # This is a script for training an AwesomeMidiTokenizer
 
 
@@ -14,7 +16,10 @@ def train(
 ):
     base_tokenizer = NoLossTokenizer(min_time_unit=min_time_unit, n_velocity_bins=n_velocity_bins)
     tokenizer = AwesomeMidiTokenizer(
-        base_tokenizer=base_tokenizer, max_vocab_size=max_vocab_size, max_token_length=max_token_length
+        base_tokenizer=base_tokenizer,
+        max_vocab_size=max_vocab_size,
+        max_token_length=max_token_length,
+        special_tokens=special_tokens,
     )
     # Training the tokenizer on maestro will be enough for a good heristic
     dataset = load_dataset("roszcz/maestro-sustain-v2", split="train")

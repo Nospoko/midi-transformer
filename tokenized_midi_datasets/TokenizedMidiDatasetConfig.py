@@ -1,6 +1,8 @@
 import datasets
 from datasets import BuilderConfig
 
+from data.masked_midi_dataset import special_tokens
+
 
 class TokenizedMidiDatasetConfig(BuilderConfig):
     def __init__(
@@ -10,7 +12,7 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
         sequence_length: int = 64,
         sequence_step: int = 42,
         pause_detection_threshold: int = 4,
-        tokenizer_parameters: dict = {"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters: dict = {"min_time_unit": 0.01, "n_velocity_bins": 32, "special_tokens": special_tokens},
         augmentation_probability: float = 0.0,
         augmentation_repetitions: int = 0,
         **kwargs,
@@ -29,6 +31,11 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
         self.augmentation_repetitions = augmentation_repetitions
 
 
+# For the future pre-training I plan on using coarse datasets,
+# so high-resolution tokenizers can remain the same -
+# it will allow our first models to work properly on this branch.
+
+coarse_tokenizer_parameters = {"min_time_unit": 0.01, "n_velocity_bins": 32, "special_tokens": special_tokens}
 BUILDER_CONFIGS = [
     # High resolution datasets - no augmentation
     TokenizedMidiDatasetConfig(
@@ -74,7 +81,7 @@ BUILDER_CONFIGS = [
         sequence_length=512,
         sequence_step=512,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         name="basic-no-overlap",
     ),
     TokenizedMidiDatasetConfig(
@@ -83,7 +90,7 @@ BUILDER_CONFIGS = [
         sequence_length=512,
         sequence_step=512,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         name="giant-no-overlap",
     ),
     # Non-overlapping coarse datasets with augmentation
@@ -93,7 +100,7 @@ BUILDER_CONFIGS = [
         sequence_length=512,
         sequence_step=512,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         augmentation_probability=0.2,
         augmentation_repetitions=5,
         name="basic-no-overlap-augmented",
@@ -104,7 +111,7 @@ BUILDER_CONFIGS = [
         sequence_length=512,
         sequence_step=512,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         augmentation_probability=0.2,
         augmentation_repetitions=5,
         name="giant-no-overlap-augmented",
@@ -116,7 +123,7 @@ BUILDER_CONFIGS = [
         sequence_length=512,
         sequence_step=64,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         name="giant-mid-coarse",
     ),
     TokenizedMidiDatasetConfig(
@@ -125,7 +132,7 @@ BUILDER_CONFIGS = [
         sequence_length=512,
         sequence_step=64,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         name="basic-mid-coarse",
     ),
     TokenizedMidiDatasetConfig(
@@ -134,7 +141,7 @@ BUILDER_CONFIGS = [
         sequence_length=1024,
         sequence_step=128,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         name="giant-long-coarse",
     ),
     TokenizedMidiDatasetConfig(
@@ -143,7 +150,7 @@ BUILDER_CONFIGS = [
         sequence_length=1024,
         sequence_step=128,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         name="basic-long-coarse",
     ),
     # Augmented coarse datasets
@@ -153,7 +160,7 @@ BUILDER_CONFIGS = [
         sequence_length=512,
         sequence_step=64,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         augmentation_probability=0.2,
         augmentation_repetitions=5,
         name="giant-mid-coarse-augmented",
@@ -164,7 +171,7 @@ BUILDER_CONFIGS = [
         sequence_length=1024,
         sequence_step=128,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         augmentation_probability=0.2,
         augmentation_repetitions=5,
         name="giant-long-coarse-augmented",
@@ -176,7 +183,7 @@ BUILDER_CONFIGS = [
         sequence_length=512,
         sequence_step=512,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         name="colossal-no-overlap",
     ),
     TokenizedMidiDatasetConfig(
@@ -185,7 +192,7 @@ BUILDER_CONFIGS = [
         sequence_length=512,
         sequence_step=64,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         augmentation_probability=0.2,
         augmentation_repetitions=5,
         name="colossal-mid-coarse-augmented",
@@ -196,7 +203,7 @@ BUILDER_CONFIGS = [
         sequence_length=1024,
         sequence_step=128,
         pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        tokenizer_parameters=coarse_tokenizer_parameters,
         augmentation_probability=0.2,
         augmentation_repetitions=5,
         name="colossal-long-coarse-augmented",
