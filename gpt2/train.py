@@ -46,6 +46,11 @@ tokenizer_name_to_dataset_map: dict[str, TokenizedMidiDataset] = {
 @hydra.main(config_path="configs", config_name="gpt2_noloss_pretraining")
 def main(cfg: DictConfig):
     out_dir = to_absolute_path(cfg.out_dir)
+    if cfg.task == "pretraining":
+        out_dir = os.path.join(
+            out_dir,
+            "pretraining",
+        )
     # Get the right data for the tokenizer specified in config
     dataset_builder = tokenizer_name_to_dataset_map[cfg.data.tokenizer]
     dataset_config = dataset_builder.builder_configs[cfg.data.dataset_name]
@@ -105,7 +110,7 @@ def main(cfg: DictConfig):
     print(f"tokens per iteration will be: {tokens_per_iter:,}")
 
     if master_process:
-        os.makedirs(cfg.out_dir, exist_ok=True)
+        os.makedirs(out_dir, exist_ok=True)
     torch.manual_seed(1337 + seed_offset)
     torch.backends.cuda.matmul.allow_tf32 = True  # allow tf32 on matmul
     torch.backends.cudnn.allow_tf32 = True  # allow tf32 on cudnn
@@ -161,10 +166,10 @@ def main(cfg: DictConfig):
         model = GPT(gptconf)
 
     elif cfg.init_from == "resume":
-        print(f"Resuming training from {cfg.out_dir}")
+        print(f"Resuming training from {out_dir}")
 
         # resume training from a checkpoint.
-        ckpt_path = os.path.join(cfg.out_dir, "ckpt.pt")
+        ckpt_path = os.path.join(out_dir, "ckpt.pt")
         checkpoint = torch.load(ckpt_path, map_location=device)
         checkpoint_model_args = checkpoint["model_args"]
 
@@ -191,7 +196,7 @@ def main(cfg: DictConfig):
 
     elif cfg.init_from.startswith("midi-gpt2"):
         # resume training from a checkpoint.
-        ckpt_path = os.path.join(cfg.out_dir, f"pretrained/{cfg.init_from}")
+        ckpt_path = os.path.join(out_dir, f"pretrained/{cfg.init_from}")
         checkpoint = torch.load(ckpt_path, map_location=device)
         checkpoint_model_args = checkpoint["model_args"]
 
@@ -323,7 +328,6 @@ def main(cfg: DictConfig):
                         "best_val_loss": best_val_loss,
                         "config": config,
                     }
-                    out_dir = to_absolute_path(cfg.out_dir)
                     print(f"saving checkpoint to {out_dir}")
                     torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
         if iter_num == 0 and cfg.eval_only:

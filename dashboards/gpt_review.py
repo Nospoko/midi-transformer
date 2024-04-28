@@ -21,7 +21,7 @@ def main():
     with st.sidebar:
         devices = [f"cuda:{it}" for it in range(torch.cuda.device_count())] + ["cpu"]
         device = st.selectbox(label="device", options=devices)
-        checkpoints = glob("checkpoints/*.pt")
+        checkpoints = glob("checkpoints/*/*.pt")
         checkpoint_path = st.selectbox(label="checkpoint", options=checkpoints)
 
         torch.manual_seed(4)
