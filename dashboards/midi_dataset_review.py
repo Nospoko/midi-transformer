@@ -9,10 +9,14 @@ from tokenized_midi_datasets import ExponentialTimeTokenDataset
 
 
 def main():
-    st.write("MidiDataset review on example of ExponentialTimeTokenDataset")
-    tokenized_dataset_builder = ExponentialTimeTokenDataset()
-    tokenized_dataset = load_dataset("tokenized_midi_datasets/ExponentialTimeTokenDataset", name="basic-no-overlap")
-    tokenizer_parameters = tokenized_dataset_builder.builder_configs["basic-no-overlap"].tokenzier_parameters
+    st.write("MidiDataset review on an example of ExponentialTimeTokenDataset")
+    tokenized_dataset_builder = ExponentialTimeTokenDataset
+    tokenized_dataset = load_dataset(
+        "tokenized_midi_datasets/ExponentialTimeTokenDataset",
+        name="basic-no-overlap",
+        split="test",
+    )
+    tokenizer_parameters = tokenized_dataset_builder.builder_configs["basic-no-overlap"].tokenizer_parameters
     tokenizer = NoLossTokenizer(**tokenizer_parameters)
     dataset_names = ["NextTokenDataset"]
 

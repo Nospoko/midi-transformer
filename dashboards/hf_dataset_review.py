@@ -31,6 +31,10 @@ def main():
         "basic-mid-coarse",
         "giant-long-coarse",
         "basic-long-coarse",
+        # Colossal Datasets
+        "colossal-no-overlap",
+        "colossal-mid-coarse-augmented",
+        "colossal-long-coarse-augmented",
     ]
 
     config_name = st.selectbox(label="config name", options=configs)
