@@ -1,5 +1,4 @@
 import fortepyan as ff
-from tqdm import tqdm
 from datasets import Dataset, DatasetInfo
 from midi_trainable_tokenizers.awesome_midi_tokenzier import AwesomeMidiTokenizer
 
@@ -19,7 +18,7 @@ class AwesomeTokensDataset(TokenizedMidiDataset):
         self.tokenizer = AwesomeMidiTokenizer.from_file(pretrained_path)
 
         for shard_id, dataset in enumerate(dataset_shards):
-            for it, record in tqdm(enumerate(dataset), total=len(dataset)):
+            for it, record in enumerate(dataset):
                 piece = ff.MidiPiece.from_huggingface(dict(record))
 
                 pieces = self.filter_pauses(piece)

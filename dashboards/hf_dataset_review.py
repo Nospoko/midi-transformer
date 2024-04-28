@@ -2,14 +2,18 @@ import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
 from datasets import load_dataset
-from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
-from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
+from midi_trainable_tokenizers import AwesomeMidiTokenizer
+from midi_tokenizers import NoLossTokenizer, OneTimeTokenizer
 
-from tokenized_midi_datasets import OneTimeTokenDataset, ExponentialTimeTokenDataset
+from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, ExponentialTimeTokenDataset
 
 
 def main():
-    dataset_names = ["ExponentialTimeTokenDataset", "OneTimeTokenDataset", "AwesomeTokensDataset"]
+    dataset_names = [
+        "AwesomeTokensDataset",
+        "ExponentialTimeTokenDataset",
+        "OneTimeTokenDataset",
+    ]
     dataset_name = st.selectbox(label="dataset", options=dataset_names)
     configs = [
         # Non-overlapping coarse
@@ -18,15 +22,11 @@ def main():
         "basic-no-overlap-augmented",
         "giant-no-overlap-augmented",
         # High-res datasets
-        "giant-short",
-        "basic-short",
         "giant-mid",
         "basic-mid",
         "giant-long",
         "basic-long",
         # Coarse Datasets
-        "giant-short-coarse",
-        "basic-short-coarse",
         "giant-mid-coarse",
         "basic-mid-coarse",
         "giant-long-coarse",
@@ -43,6 +43,10 @@ def main():
     elif dataset_name == "ExponentialTimeTokenDataset":
         config = ExponentialTimeTokenDataset.builder_configs[config_name]
         tokenizer = NoLossTokenizer(**config.tokenizer_parameters)
+
+    elif dataset_name == "AwesomeTokensDataset":
+        config = AwesomeTokensDataset.builder_configs[config_name]
+        tokenizer = AwesomeMidiTokenizer.from_file("pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json")
     dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
 
     dataset = load_dataset(

@@ -2,10 +2,12 @@ import streamlit as st
 
 from dashboards.gpt_review import main as gpt_review
 from dashboards.hf_dataset_review import main as hf_datasets_review
+from dashboards.augmentation_review import main as augmentation_review
+from dashboards.midi_dataset_review import main as midi_dataset_review
 
 
 def main():
-    options = ["gpt_review", "hf_datasets_review"]
+    options = ["gpt_review", "hf_datasets_review", "augmentation_review", "midi_dataset_review"]
     display_mode = st.selectbox(label="display mode", options=options)
 
     match display_mode:
@@ -13,6 +15,10 @@ def main():
             hf_datasets_review()
         case "gpt_review":
             gpt_review()
+        case "augmentation_review":
+            augmentation_review()
+        case "midi_dataset_review":
+            midi_dataset_review()
 
 
 if __name__ == "__main__":

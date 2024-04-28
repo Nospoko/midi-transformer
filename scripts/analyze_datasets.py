@@ -24,7 +24,7 @@ def load_no_overlap_datasets(dataset_name: str) -> tuple[Dataset, Dataset]:
     )
     giant_dataset = load_dataset(
         f"{datasets_directory}/{dataset_name}",
-        name="giant-no-overlap-augmented",
+        name="giant-no-overlap",
         trust_remote_code=True,
         num_proc=8,
     )
@@ -42,7 +42,7 @@ def print_num_tokens(dataset_name: str):
 
     num_tokens_giant = giant_dataset["train"].num_rows * sequence_length
 
-    print(f"Basic {dataset_name} dataset tokens:")
+    print(f"Basic {dataset_name} augmented dataset tokens:")
     print(f"\ttrain: {num_tokens_basic}\n\ttest: {num_tokens__test}\n\tvalidation:{num_tokens_val}")
     print(f"Giant {dataset_name} dataset tokens:")
     print(f"\ttrain: {num_tokens_giant}\n\ttest: {num_tokens__test}\n\tvalidation:{num_tokens_val}")
