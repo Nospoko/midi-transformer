@@ -108,12 +108,12 @@ def main():
     with st.expander(label="source"):
         st.json(source)
 
-    val_dataset = NextTokenDataset(dataset=dataset["validation"], tokenizer=tokenizer)
-    eval_iters = train_config.eval_iters
+    val_dataset = NextTokenDataset(dataset=dataset, tokenizer=tokenizer)
+    eval_iters = cfg.eval_iters
 
-    def get_batch(split):
+    def get_batch():
         data = val_dataset
-        ix = np.random.randint(0, len(data), size=(train_config.data.batch_size,))
+        ix = np.random.randint(0, len(data), size=(cfg.data.batch_size,))
         # numpy to int :(
         x = torch.stack([data[int(i)]["source_token_ids"] for i in ix])
         y = torch.stack([data[int(i)]["target_token_ids"] for i in ix])
@@ -130,7 +130,7 @@ def main():
         model.eval()
         losses = torch.zeros(eval_iters)
         for k in range(cfg.eval_iters):
-            X, Y = get_batch("validation")
+            X, Y = get_batch()
             with ctx:
                 logits, loss = model(X, Y)
             losses[k] = loss.item()
