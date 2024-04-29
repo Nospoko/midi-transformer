@@ -253,6 +253,7 @@ def main(cfg: DictConfig):
         # unoptimized_model = model
         model = torch.compile(model)  # requires PyTorch 2.0
 
+    milion_params = model.get_num_params() / 1e6
     # wrap model into DDP container
     if ddp:
         model = DDP(model, device_ids=[ddp_local_rank])
@@ -289,7 +290,6 @@ def main(cfg: DictConfig):
         coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
         return cfg.lr.min_lr + coeff * (cfg.optimizer.learning_rate - cfg.lr.min_lr)
 
-    milion_params = model.get_num_params() / 1e6
     run_name = f"midi-gpt2-{milion_params:.0f}M-" + cfg.logging.wandb_run_name_suffix
     # logging
     if cfg.logging.wandb_log and master_process:
