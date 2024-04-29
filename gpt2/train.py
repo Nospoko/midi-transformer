@@ -302,6 +302,7 @@ def main(cfg: DictConfig):
         wandb.define_metric("train/loss", step_metric="total_tokens")
 
     total_tokens = 0
+    total_time = 0
     # training loop
     X, Y = get_batch("train")  # fetch the very first batch
     t0 = time.time()
@@ -376,6 +377,7 @@ def main(cfg: DictConfig):
         # timing and logging
         t1 = time.time()
         dt = t1 - t0
+        total_time += dt
         t0 = t1
         if iter_num % cfg.logging.log_interval == 0 and master_process:
             # get loss as float. note: this is a CPU-GPU sync point
@@ -385,7 +387,7 @@ def main(cfg: DictConfig):
                 mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
                 running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
 
-            tokens_per_second = total_tokens / dt
+            tokens_per_second = total_tokens / total_time
             wandb.log(
                 {
                     "iter": iter_num,
