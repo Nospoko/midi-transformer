@@ -25,6 +25,7 @@ import hydra
 import torch
 import wandb
 import numpy as np
+from dotenv import load_dotenv
 from datasets import load_dataset
 from hydra.utils import to_absolute_path
 from omegaconf import OmegaConf, DictConfig
@@ -36,6 +37,7 @@ from gpt2.model import GPT, GPTConfig
 from data.next_token_dataset import NextTokenDataset
 from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, TokenizedMidiDataset, ExponentialTimeTokenDataset
 
+load_dotenv()
 tokenizer_name_to_dataset_map: dict[str, TokenizedMidiDataset] = {
     "NoLossTokenizer": ExponentialTimeTokenDataset,
     "OneTimeTokenizer": OneTimeTokenDataset,
