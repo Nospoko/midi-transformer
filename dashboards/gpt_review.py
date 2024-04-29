@@ -135,7 +135,7 @@ def main():
 
     output: torch.Tensor = output[0]  # , dataset_config.sequence_length :]
     # we want to decode the whole output so that the pressed notes can be unpressed by the tokenizer
-    out_notes = tokenizer.decode(output.numpy())
+    out_notes = tokenizer.decode(output.cpu().numpy())
     out_piece = ff.MidiPiece(out_notes)
     # start from new model-generated notes
     generated_notes = out_notes.iloc[piece.size :].copy()
