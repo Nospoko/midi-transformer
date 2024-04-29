@@ -1,12 +1,10 @@
-import os
 import json
 from glob import glob
 from contextlib import nullcontext
 
 import torch
-import fortepyan as ff
+import numpy as np
 import streamlit as st
-import streamlit_pianoroll
 from omegaconf import OmegaConf
 from datasets import load_dataset
 from midi_trainable_tokenizers import AwesomeMidiTokenizer
@@ -14,7 +12,7 @@ from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
 from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
 
 from gpt2.model import GPT, GPTConfig
-from dashboards.common.components import download_button
+from data.next_token_dataset import NextTokenDataset
 from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, ExponentialTimeTokenDataset
 
 
@@ -35,7 +33,7 @@ def main():
         train_config = checkpoint["config"]
         cfg = OmegaConf.create(train_config)
         config_name = cfg.data.dataset_name
-        ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
+        ptdtype = {"float32": torch.float32, "bfloat16": torch.float16, "float16": torch.float16}[cfg.system.dtype]
         ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
 
     if cfg.data.tokenizer == "OneTimeTokenizer":
@@ -53,7 +51,6 @@ def main():
         dataset_name = "AwesomeTokensDataset"
         dataset_config = AwesomeTokensDataset.builder_configs[config_name]
         tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
-
     dataset_split = st.selectbox(label="split", options=["validation", "train", "test"])
 
     dataset = load_dataset(
@@ -111,95 +108,37 @@ def main():
     with st.expander(label="source"):
         st.json(source)
 
-    notes = tokenizer.decode(record["note_token_ids"])
-    piece = ff.MidiPiece(notes, source=source)
-    st.write(
-        """
-        If the tokenizer sees unmatched NOTE_ON events
-        it will treat them as if the note was pressed until the end of the recording.
-        If the tokenizef sees umatched NOTE_OFF rents, it will ignore it.
-        If it encounters a NaN or end <= start, the note is invalid.
-        """
-    )
-    temperature = st.number_input(label="temperature", value=1.0)
-    max_new_tokens = st.number_input(label="max_new_tokens", value=dataset_config.sequence_length)
+    val_dataset = NextTokenDataset(dataset=dataset["validation"], tokenizer=tokenizer)
+    eval_iters = train_config.eval_iters
 
-    input_sequence = torch.tensor([record["note_token_ids"]], device=device)
-    with torch.no_grad():
-        with ctx:
-            output = model.generate(
-                idx=input_sequence,
-                max_new_tokens=max_new_tokens,
-                temperature=temperature,
-            )
+    def get_batch(split):
+        data = val_dataset
+        ix = np.random.randint(0, len(data), size=(train_config.data.batch_size,))
+        # numpy to int :(
+        x = torch.stack([data[int(i)]["source_token_ids"] for i in ix])
+        y = torch.stack([data[int(i)]["target_token_ids"] for i in ix])
+        if device_type == "cuda":
+            # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
+            x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)
+        else:
+            x, y = x.to(device), y.to(device)
+        return x, y
 
-    output = output[0]  # , dataset_config.sequence_length :]
-    # we want to decode the whole output so that the pressed notes can be unpressed by the tokenizer
-    out_notes = tokenizer.decode(output)
-    out_piece = ff.MidiPiece(out_notes)
-    # start from new model-generated notes
-    generated_notes = out_notes.iloc[piece.size :].copy()
-    generated_piece = ff.MidiPiece(df=generated_notes)
-    generated_piece.time_shift(-generated_piece.df.start.min())
-    io_columns = st.columns(2)
+    @torch.no_grad()
+    def estimate_loss():
+        out = {}
+        model.eval()
+        losses = torch.zeros(eval_iters)
+        for k in range(cfg.eval_iters):
+            X, Y = get_batch("validation")
+            with ctx:
+                logits, loss = model(X, Y)
+            losses[k] = loss.item()
+        out["validation"] = losses.mean()
+        model.train()
+        return out
 
-    with io_columns[0]:
-        st.write("original:")
-        streamlit_pianoroll.from_fortepyan(piece=piece)
-
-        with st.expander(label="tokens"):
-            st.write([tokenizer.vocab[idx] for idx in record["note_token_ids"]])
-
-    with io_columns[1]:
-        st.write("generated:")
-
-        streamlit_pianoroll.from_fortepyan(piece=generated_piece)
-
-        output = output[input_sequence.shape[-1] :]
-        with st.expander("generated tokens"):
-            st.write([tokenizer.vocab[idx] for idx in output])
-        title = source["title"]
-        composer = source["composer"]
-        piece_name = (title + composer).replace(" ", "_").casefold()
-        midi_path = f"tmp/variations_on_{piece_name}.mid"
-        generated_file = generated_piece.to_midi()
-
-        try:
-            generated_file.write(midi_path)
-            with open(midi_path, "rb") as file:
-                download_button_str = download_button(
-                    object_to_download=file.read(),
-                    download_filename=midi_path.split("/")[-1],
-                    button_text="Download generated midi",
-                )
-                st.markdown(download_button_str, unsafe_allow_html=True)
-        finally:
-            # make sure to always clean up
-            os.unlink(midi_path)
-
-    st.write("whole model output")
-    generated_notes_with_offset = out_notes[piece.size :].copy()
-    second_part = ff.MidiPiece(generated_notes_with_offset)
-
-    # Model could have also add "NOTE_OFF" events to original sequence
-    expanded_input_notes = out_notes[: piece.size].copy()
-    expanded_piece = ff.MidiPiece(expanded_input_notes)
-    streamlit_pianoroll.from_fortepyan(piece=expanded_piece, secondary_piece=second_part)
-
-    full_midi_path = f"tmp/full_variations_on_{piece_name}.mid"
-    out_file = out_piece.to_midi()
-    try:
-        out_file.write(full_midi_path)
-        with open(full_midi_path, "rb") as file:
-            download_button_str = download_button(
-                object_to_download=file.read(),
-                download_filename=full_midi_path.split("/")[-1],
-                button_text="Download midi with context",
-            )
-            st.markdown(download_button_str, unsafe_allow_html=True)
-    finally:
-        # make sure to always clean up
-        os.unlink(full_midi_path)
+    st.write(estimate_loss())
 
 
 if __name__ == "__main__":
