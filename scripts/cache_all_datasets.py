@@ -6,8 +6,8 @@ def main():
     config_names = [
         "giant-mid-coarse",
         "giant-long-coarse",
-        "giant-mid-augmented",
-        "giant-long-augmented",
+        "giant-mid-coarse-augmented",
+        "giant-long-coarse-augmented",
         "colossal-mid-coarse-augmented",
         "colossal-long-coarse-augmented",
     ]

@@ -41,7 +41,7 @@ load_dotenv()
 tokenizer_name_to_dataset_map: dict[str, TokenizedMidiDataset] = {
     "NoLossTokenizer": ExponentialTimeTokenDataset,
     "OneTimeTokenizer": OneTimeTokenDataset,
-    "AwesomeTokenizer": AwesomeTokensDataset,
+    "AwesomeMidiTokenizer": AwesomeTokensDataset,
 }
 
 
