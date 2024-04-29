@@ -1,5 +1,5 @@
 # Run this first and wait for the datasets to cache
-python3.10 -m scripts.cache_datasets
+python3.10 -m scripts.cache_all_datasets
 
 # train on exponential datasets
 python3.10 -m gpt2.train --config-name=gpt2_small
