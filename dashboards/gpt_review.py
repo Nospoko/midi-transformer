@@ -48,7 +48,7 @@ def main():
         dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name]
         tokenizer = NoLossTokenizer(**dataset_config.tokenizer_parameters)
 
-    elif cfg.data.tokenizer == "AwesomeTokensDataset":
+    elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
         tokenizer_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
         dataset_name = "AwesomeTokensDataset"
         dataset_config = AwesomeTokensDataset.builder_configs[config_name]
