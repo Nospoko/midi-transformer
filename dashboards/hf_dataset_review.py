@@ -72,7 +72,7 @@ def main():
     with st.expander(label="source"):
         st.json(record["source"])
 
-    notes = tokenizer.decode(record["note_token_ids"])
+    notes = tokenizer.decode(record["note_token_ids"].numpy())
     piece = ff.MidiPiece(notes, source=record["source"])
     st.write(
         """

@@ -111,7 +111,7 @@ def main():
     with st.expander(label="source"):
         st.json(source)
 
-    notes = tokenizer.decode(record["note_token_ids"])
+    notes = tokenizer.decode(record["note_token_ids"].numpy())
     piece = ff.MidiPiece(notes, source=source)
     st.write(
         """
@@ -133,9 +133,9 @@ def main():
                 temperature=temperature,
             )
 
-    output = output[0]  # , dataset_config.sequence_length :]
+    output: torch.Tensor = output[0]  # , dataset_config.sequence_length :]
     # we want to decode the whole output so that the pressed notes can be unpressed by the tokenizer
-    out_notes = tokenizer.decode(output)
+    out_notes = tokenizer.decode(output.numpy())
     out_piece = ff.MidiPiece(out_notes)
     # start from new model-generated notes
     generated_notes = out_notes.iloc[piece.size :].copy()

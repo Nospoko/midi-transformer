@@ -302,17 +302,16 @@ def main(cfg: DictConfig):
         wandb.define_metric("train/loss", step_metric="total_tokens")
 
     total_tokens = 0
-    total_time = 0
     # training loop
     X, Y = get_batch("train")  # fetch the very first batch
     t0 = time.time()
     local_iter_num = 0  # number of iterations in the lifetime of this process
     raw_model = model.module if ddp else model  # unwrap DDP container if needed
     running_mfu = -1.0
-    iter_num = 0
-
+    iter_num = 1
     while True:
-        total_tokens += X.numel()
+        current_tokens = X.numel()
+        total_tokens += current_tokens
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if cfg.lr.decay_lr else cfg.optimizer.learning_rate
         for param_group in optimizer.param_groups:
@@ -333,19 +332,16 @@ def main(cfg: DictConfig):
                 )
             if losses["val"] < best_val_loss or cfg.always_save_checkpoint:
                 best_val_loss = losses["val"]
-                if iter_num > 0:
-                    checkpoint = {
-                        "model": raw_model.state_dict(),
-                        "optimizer": optimizer.state_dict(),
-                        "model_args": model_args,
-                        "iter_num": iter_num,
-                        "best_val_loss": best_val_loss,
-                        "config": config,
-                    }
-                    print(f"saving checkpoint to {out_dir}")
-                    torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
-        if iter_num == 0 and cfg.eval_only:
-            break
+                checkpoint = {
+                    "model": raw_model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "model_args": model_args,
+                    "iter_num": iter_num,
+                    "best_val_loss": best_val_loss,
+                    "config": config,
+                }
+                print(f"saving checkpoint to {out_dir}")
+                torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
 
         # forward backward update, with optional gradient accumulation to simulate larger batch size
         # and using the GradScaler if data type is float16
@@ -377,7 +373,6 @@ def main(cfg: DictConfig):
         # timing and logging
         t1 = time.time()
         dt = t1 - t0
-        total_time += dt
         t0 = t1
         if iter_num % cfg.logging.log_interval == 0 and master_process:
             # get loss as float. note: this is a CPU-GPU sync point
@@ -387,7 +382,7 @@ def main(cfg: DictConfig):
                 mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
                 running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
 
-            tokens_per_second = total_tokens / total_time
+            tokens_per_second = current_tokens / dt
             wandb.log(
                 {
                     "iter": iter_num,
