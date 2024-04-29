@@ -89,13 +89,13 @@ def augment_dataset(dataset: Dataset, augmentation_probability: float, augmentat
         fn_kwargs=augmentation_arguments,
         batched=True,
         batch_size=1,
-        num_proc=num_cpus,
+        num_proc=num_cpus // 2,
     )
     dataset = dataset.map(
         apply_speed_change,
         fn_kwargs=augmentation_arguments,
         batched=True,
         batch_size=1,
-        num_proc=num_cpus,
+        num_proc=num_cpus // 2,
     )
     return dataset
