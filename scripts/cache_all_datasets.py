@@ -1,4 +1,7 @@
 from datasets import load_dataset
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def main():

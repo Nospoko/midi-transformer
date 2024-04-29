@@ -73,8 +73,8 @@ def main(cfg: DictConfig):
 
     # Keep config as a dict as well for logging at wandb and for checkpoints
     config = OmegaConf.to_container(cfg)
-    if cfg.data.tokenzier == "AwesomeMidiTokenizer":
-        tokenizer_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
+    if cfg.data.tokenizer == "AwesomeMidiTokenizer":
+        tokenizer_path = to_absolute_path("pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json")
         tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
     else:
         tokenizer = generate_tokenizer(name=cfg.data.tokenizer, parameters=tokenizer_parameters)
