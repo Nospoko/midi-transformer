@@ -1,5 +1,5 @@
-from datasets import load_dataset
 from dotenv import load_dotenv
+from datasets import load_dataset
 
 load_dotenv()
 
@@ -21,6 +21,7 @@ def main():
                 path=f"tokenized_midi_datasets/{dataset_name}",
                 name=config_name,
                 trust_remote_code=True,
+                num_proc=12,
             )
 
 

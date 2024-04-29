@@ -10,11 +10,11 @@ python3.10 -m gpt2.train --config-name=gpt2_pretraining model="gpt2_medium"
 # train on awesome tokens datasets
 python3.10 -m gpt2.train --config-name=gpt2_pretraining model="gpt2_medium" data="awesome-giant"
 python3.10 -m gpt2.train --config-name=gpt2_pretraining model="gpt2" data="awesome-giant"
-python3.10 -m gpt2.train --config-name=gpt2_small data = "awesome-giant"
+python3.10 -m gpt2.train --config-name=gpt2_small_pretraining data = "awesome-giant"
 
 # train without augmentation
-python3.10 -m gpt2.train --config-name=gpt2_pretraining model="gpt2" data="awesome-giant" data.dataset_name: "giant-mid-coarse"
-python3.10 -m gpt2.train --config-name=gpt2_pretraining model="gpt2" data="exponential-giant" data.dataset_name: "giant-mid-coarse"
+python3.10 -m gpt2.train --config-name=gpt2_pretraining model="gpt2" data="awesome-giant" data.dataset_name="giant-mid-coarse"
+python3.10 -m gpt2.train --config-name=gpt2_pretraining model="gpt2" data="exponential-giant" data.dataset_name="giant-mid-coarse"
 
 # Try training a large model
 python3.10 -m gpt2.train --config-name=gpt2_pretraining model="gpt2_large" data="awesome-colossal"

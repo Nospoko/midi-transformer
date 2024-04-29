@@ -1,4 +1,5 @@
 import fortepyan as ff
+from hydra.utils import to_absolute_path
 from datasets import Dataset, DatasetInfo
 from midi_trainable_tokenizers.awesome_midi_tokenzier import AwesomeMidiTokenizer
 
@@ -14,7 +15,7 @@ class AwesomeTokensDataset(TokenizedMidiDataset):
         return DatasetInfo(description=_DESC)
 
     def _generate_examples(self, dataset_shards: list[Dataset]):
-        pretrained_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
+        pretrained_path = to_absolute_path("pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json")
         self.tokenizer = AwesomeMidiTokenizer.from_file(pretrained_path)
 
         for shard_id, dataset in enumerate(dataset_shards):
