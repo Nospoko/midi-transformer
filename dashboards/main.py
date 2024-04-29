@@ -1,10 +1,13 @@
 import streamlit as st
+from dotenv import load_dotenv
 
 from dashboards.run_eval import main as run_eval
 from dashboards.gpt_review import main as gpt_review
 from dashboards.hf_dataset_review import main as hf_datasets_review
 from dashboards.augmentation_review import main as augmentation_review
 from dashboards.midi_dataset_review import main as midi_dataset_review
+
+load_dotenv()
 
 
 def main():
