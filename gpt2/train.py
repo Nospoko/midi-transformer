@@ -29,6 +29,7 @@ from dotenv import load_dotenv
 from datasets import load_dataset
 from hydra.utils import to_absolute_path
 from omegaconf import OmegaConf, DictConfig
+from midi_trainable_tokenizers import AwesomeMidiTokenizer
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
@@ -72,8 +73,11 @@ def main(cfg: DictConfig):
 
     # Keep config as a dict as well for logging at wandb and for checkpoints
     config = OmegaConf.to_container(cfg)
-
-    tokenizer = generate_tokenizer(name=cfg.data.tokenizer, parameters=tokenizer_parameters)
+    if cfg.data.tokenzier == "AwesomeMidiTokenzier":
+        tokenizer_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
+        tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
+    else:
+        tokenizer = generate_tokenizer(name=cfg.data.tokenizer, parameters=tokenizer_parameters)
 
     train_dataset = NextTokenDataset(dataset=dataset["train"], tokenizer=tokenizer)
     val_dataset = NextTokenDataset(dataset=dataset["validation"], tokenizer=tokenizer)
