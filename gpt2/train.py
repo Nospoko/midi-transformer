@@ -290,6 +290,12 @@ def main(cfg: DictConfig):
     # logging
     if cfg.logging.wandb_log and master_process:
         wandb.init(project=cfg.logging.wandb_project, name=run_name, config=config)
+        # define our custom x axis metric
+        wandb.define_metric("total_tokens")
+        # define which metrics will be plotted against it
+        wandb.define_metric("train_batch/loss", step_metric="total_tokens")
+        wandb.define_metric("val_batch/loss", step_metric="total_tokens")
+        wandb.define_metric("train/loss", step_metric="total_tokens")
 
     total_tokens = 0
     # training loop
@@ -317,6 +323,7 @@ def main(cfg: DictConfig):
                         "iter": iter_num,
                         "train_batch/loss": losses["train"],
                         "val_batch/loss": losses["val"],
+                        "total_tokens": total_tokens,
                     }
                 )
             if losses["val"] < best_val_loss or cfg.always_save_checkpoint:
@@ -373,15 +380,18 @@ def main(cfg: DictConfig):
             if local_iter_num >= 5:  # let the training loop settle a bit
                 mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
                 running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
+
+            tokens_per_second = total_tokens / dt
             wandb.log(
                 {
                     "iter": iter_num,
                     "train/loss": lossf,
                     "lr": lr,
                     "mfu": running_mfu * 100,  # convert to percentage
+                    "total_tokens": total_tokens,
+                    "tokens_per_second": tokens_per_second,
                 }
             )
-            tokens_per_second = total_tokens / dt
             print(
                 f"iter {iter_num}: loss {lossf:.4f}, "
                 + f"time {dt:.2f}s, mfu {running_mfu*100:.2f}%, "
