@@ -33,14 +33,6 @@ def main():
 
         checkpoint = torch.load(f=checkpoint_path, map_location=device)
 
-        with open(checkpoint_path, "rb") as file:
-            download_button_str = download_button(
-                object_to_download=file.read(),
-                download_filename=checkpoint_path.split("/")[-1],
-                button_text="Download checkpoint",
-            )
-            st.markdown(download_button_str, unsafe_allow_html=True)
-
         train_config = checkpoint["config"]
         cfg = OmegaConf.create(train_config)
         config_name = cfg.data.dataset_name
