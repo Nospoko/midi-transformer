@@ -311,7 +311,7 @@ def main(cfg: DictConfig):
     iter_num = 1
     while True:
         current_tokens = X.numel()
-        total_tokens += current_tokens
+        # total_tokens += current_tokens
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if cfg.lr.decay_lr else cfg.optimizer.learning_rate
         for param_group in optimizer.param_groups:
@@ -345,6 +345,8 @@ def main(cfg: DictConfig):
 
         # forward backward update, with optional gradient accumulation to simulate larger batch size
         # and using the GradScaler if data type is float16
+        t00 = time.time()
+        n_iter_tokens = 0
         for micro_step in range(cfg.data.gradient_accumulation_steps):
             if ddp:
                 # in DDP training we only need to sync gradients at the last micro step.
@@ -353,22 +355,30 @@ def main(cfg: DictConfig):
                 # looking at the source of that context manager, it just toggles this variable
                 model.require_backward_grad_sync = micro_step == cfg.data.gradient_accumulation_steps - 1
             with ctx:
+                n_iter_tokens += X.numel()
                 logits, loss = model(X, Y)
                 # scale the loss to account for gradient accumulation
                 loss = loss / cfg.data.gradient_accumulation_steps
+
             # immediately async prefetch next batch while model is doing the forward pass on the GPU
             X, Y = get_batch("train")
             # backward pass, with gradient scaling if training in fp16
             scaler.scale(loss).backward()
+
+        total_tokens += n_iter_tokens
+
         # clip the gradient
         if cfg.optimizer.grad_clip != 0.0:
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.optimizer.grad_clip)
+
         # step the optimizer and scaler if training in fp16
         scaler.step(optimizer)
         scaler.update()
         # flush the gradients as soon as we can, no need for this memory anymore
         optimizer.zero_grad(set_to_none=True)
+
+        t_forward_backward = time.time() - t00
 
         # timing and logging
         t1 = time.time()
@@ -382,7 +392,11 @@ def main(cfg: DictConfig):
                 mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
                 running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
 
+            # I'm not sure about this
             tokens_per_second = current_tokens / dt
+
+            # Here's my version
+            tps = n_iter_tokens / t_forward_backward
             wandb.log(
                 {
                     "iter": iter_num,
@@ -390,13 +404,15 @@ def main(cfg: DictConfig):
                     "lr": lr,
                     "mfu": running_mfu * 100,  # convert to percentage
                     "total_tokens": total_tokens,
+                    "tps": tps,
                     "tokens_per_second": tokens_per_second,
                 }
             )
             print(
                 f"iter {iter_num}: loss {lossf:.4f}, "
                 + f"time {dt:.2f}s, mfu {running_mfu*100:.2f}%, "
-                + f"tokens_per_second {tokens_per_second}"
+                + f"tokens_per_second {tokens_per_second:.2f} "
+                + f"tps {tps:.2f}"
             )
         iter_num += 1
         local_iter_num += 1

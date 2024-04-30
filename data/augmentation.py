@@ -78,7 +78,7 @@ def augment_dataset(dataset: Dataset, augmentation_probability: float, augmentat
     if augmentation_repetitions == 0:
         return dataset
 
-    num_cpus = cpu_count()
+    num_cpus = cpu_count() - 4
 
     augmentation_arguments = {
         "augmentation_probability": augmentation_probability,
@@ -89,13 +89,13 @@ def augment_dataset(dataset: Dataset, augmentation_probability: float, augmentat
         fn_kwargs=augmentation_arguments,
         batched=True,
         batch_size=1,
-        num_proc=num_cpus // 2,
+        num_proc=num_cpus,
     )
     dataset = dataset.map(
         apply_speed_change,
         fn_kwargs=augmentation_arguments,
         batched=True,
         batch_size=1,
-        num_proc=num_cpus // 2,
+        num_proc=num_cpus,
     )
     return dataset

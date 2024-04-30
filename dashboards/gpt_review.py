@@ -34,6 +34,7 @@ def main():
         checkpoint = torch.load(f=checkpoint_path, map_location=device)
 
         train_config = checkpoint["config"]
+        st.write("Best Loss:", checkpoint["best_val_loss"].item())
         cfg = OmegaConf.create(train_config)
         config_name = cfg.data.dataset_name
         ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
