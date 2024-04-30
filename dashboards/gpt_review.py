@@ -32,6 +32,15 @@ def main():
         device_type = "cuda" if "cuda" in device else "cpu"  # for later use in torch.autocast
 
         checkpoint = torch.load(f=checkpoint_path, map_location=device)
+
+        with open(checkpoint_path, "rb") as file:
+            download_button_str = download_button(
+                object_to_download=file.read(),
+                download_filename=checkpoint_path.split("/")[-1],
+                button_text="Download checkpoint",
+            )
+            st.markdown(download_button_str, unsafe_allow_html=True)
+
         train_config = checkpoint["config"]
         cfg = OmegaConf.create(train_config)
         config_name = cfg.data.dataset_name
@@ -161,7 +170,8 @@ def main():
         title = source["title"]
         composer = source["composer"]
         piece_name = (title + composer).replace(" ", "_").casefold()
-        midi_path = f"tmp/variations_on_{piece_name}.mid"
+        milion_parameters = model.get_num_params() / 1e6
+        midi_path = f"tmp/{milion_parameters:.0f}_variations_on_{piece_name}.mid"
         generated_file = generated_piece.to_midi()
 
         try:
@@ -186,7 +196,7 @@ def main():
     expanded_piece = ff.MidiPiece(expanded_input_notes)
     streamlit_pianoroll.from_fortepyan(piece=expanded_piece, secondary_piece=second_part)
 
-    full_midi_path = f"tmp/full_variations_on_{piece_name}.mid"
+    full_midi_path = f"tmp/full_{milion_parameters}_variations_on_{piece_name}.mid"
     out_file = out_piece.to_midi()
     try:
         out_file.write(full_midi_path)
