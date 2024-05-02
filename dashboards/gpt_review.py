@@ -34,37 +34,57 @@ def main():
         checkpoint = torch.load(f=checkpoint_path, map_location=device)
 
         train_config = checkpoint["config"]
-        st.write("Best Loss:", checkpoint["best_val_loss"].item())
         cfg = OmegaConf.create(train_config)
         config_name = cfg.data.dataset_name
         ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
         ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
-
-    if cfg.data.tokenizer == "OneTimeTokenizer":
-        dataset_name = "OneTimeTokenDataset"
-        dataset_config = OneTimeTokenDataset.builder_configs[config_name]
-        tokenizer = OneTimeTokenizer(**dataset_config.tokenizer_parameters)
-
-    elif cfg.data.tokenizer == "NoLossTokenizer":
-        dataset_name = "ExponentialTimeTokenDataset"
-        dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name]
-        tokenizer = NoLossTokenizer(**dataset_config.tokenizer_parameters)
-
-    elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
-        tokenizer_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
-        dataset_name = "AwesomeTokensDataset"
-        dataset_config = AwesomeTokensDataset.builder_configs[config_name]
-        tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
-
     dataset_split = st.selectbox(label="split", options=["validation", "train", "test"])
 
-    dataset = load_dataset(
-        f"tokenized_midi_datasets/{dataset_name}",
-        name=config_name,
-        split=dataset_split,
-        trust_remote_code=True,
-        num_proc=8,
-    )
+    if "dataset_name" in train_config["data"].keys():
+        if cfg.data.tokenizer == "OneTimeTokenizer":
+            dataset_name = "OneTimeTokenDataset"
+            dataset_config = OneTimeTokenDataset.builder_configs[config_name]
+            tokenizer = OneTimeTokenizer(**dataset_config.tokenizer_parameters)
+
+        elif cfg.data.tokenizer == "NoLossTokenizer":
+            dataset_name = "ExponentialTimeTokenDataset"
+            dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name]
+            tokenizer = NoLossTokenizer(**dataset_config.tokenizer_parameters)
+
+        elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
+            tokenizer_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
+            dataset_name = "AwesomeTokensDataset"
+            dataset_config = AwesomeTokensDataset.builder_configs[config_name]
+            tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
+
+        dataset = load_dataset(
+            f"tokenized_midi_datasets/{dataset_name}",
+            name=config_name,
+            split=dataset_split,
+            trust_remote_code=True,
+            num_proc=8,
+        )
+    else:
+        dataset_config = cfg.dataset
+        if cfg.data.tokenizer == "OneTimeTokenizer":
+            dataset_name = "OneTimeTokenDataset"
+            tokenizer = OneTimeTokenizer(**dataset_config.tokenizer_parameters)
+
+        elif cfg.data.tokenizer == "NoLossTokenizer":
+            dataset_name = "ExponentialTimeTokenDataset"
+            tokenizer = NoLossTokenizer(**dataset_config.tokenizer_parameters)
+
+        elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
+            tokenizer_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
+            dataset_name = "AwesomeTokensDataset"
+            tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
+        dataset = load_dataset(
+            f"tokenized_midi_datasets/{dataset_name}",
+            split=dataset_split,
+            trust_remote_code=True,
+            num_proc=8,
+            **dataset_config,
+        )
 
     # model init
     model_args = dict(

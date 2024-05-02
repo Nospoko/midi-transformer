@@ -1,0 +1,11 @@
+base_dataset_name: "roszcz/maestro-sustain-v2"
+extra_datasets: []
+sequence_length: 512
+sequence_step: 512
+pause_detection_threshold: 4
+tokenizer_parameters:
+  min_time_unit: 0.01
+  n_velocity_bins: 32
+augmentation_probability: 0.2
+augmentation_repetitions: 5
+name: "basic-no-overlap-augmented"

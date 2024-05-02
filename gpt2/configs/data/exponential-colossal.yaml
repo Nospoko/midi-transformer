@@ -1,5 +1,4 @@
 tokenizer: "NoLossTokenizer"
-dataset_name: "colossal-mid-coarse-augmented"
 gradient_accumulation_steps: 20  # used to simulate larger batch sizes
 # 32 * 1024 * 4 / 1000 ~= 131Mb
 batch_size: 32  # if gradient_accumulation_steps > 1, this is the micro-batch size

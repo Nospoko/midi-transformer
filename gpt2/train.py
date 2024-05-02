@@ -36,13 +36,12 @@ from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
 
 from gpt2.model import GPT, GPTConfig
 from data.next_token_dataset import NextTokenDataset
-from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, TokenizedMidiDataset, ExponentialTimeTokenDataset
 
 load_dotenv()
-tokenizer_name_to_dataset_map: dict[str, TokenizedMidiDataset] = {
-    "NoLossTokenizer": ExponentialTimeTokenDataset,
-    "OneTimeTokenizer": OneTimeTokenDataset,
-    "AwesomeMidiTokenizer": AwesomeTokensDataset,
+tokenizer_name_to_dataset_map: dict[str, str] = {
+    "NoLossTokenizer": "ExponentialTimeTokenDataset",
+    "OneTimeTokenizer": "OneTimeTokenDataset",
+    "AwesomeMidiTokenizer": "AwesomeTokensDataset",
 }
 
 
@@ -55,18 +54,18 @@ def main(cfg: DictConfig):
             "pretraining",
         )
     # Get the right data for the tokenizer specified in config
-    dataset_builder = tokenizer_name_to_dataset_map[cfg.data.tokenizer]
-    dataset_config = dataset_builder.builder_configs[cfg.data.dataset_name]
+    dataset_name = tokenizer_name_to_dataset_map[cfg.data.tokenizer]
+    dataset_config = cfg.dataset
     tokenizer_parameters = dataset_config.tokenizer_parameters
 
     # Hydra changes paths - we have to change them back
     # Load the suitable dataset
-    dataset_path = to_absolute_path(f"./tokenized_midi_datasets/{dataset_builder.__name__}")
+    dataset_path = to_absolute_path(f"./tokenized_midi_datasets/{dataset_name}")
     dataset = load_dataset(
         dataset_path,
-        name=cfg.data.dataset_name,
         num_proc=8,
         trust_remote_code=True,
+        **dataset_config,
     )
     total_tokens = dataset_config.sequence_length * dataset["train"].num_rows
     print(f"tokens in a training dataset: {total_tokens}")
