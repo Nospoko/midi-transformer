@@ -17,7 +17,6 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
         augmentation_repetitions: int = 0,
         **kwargs,
     ):
-        super().__init__()
         # Version history:
         super().__init__(version=datasets.Version("0.0.1"), **kwargs)
 

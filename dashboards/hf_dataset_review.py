@@ -50,7 +50,10 @@ def main():
 
     elif dataset_name == "AwesomeTokensDataset":
         config = AwesomeTokensDataset.builder_configs[config_name]
-        tokenizer = AwesomeMidiTokenizer.from_file("pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json")
+        min_time_unit = config.tokenizer_parameters["min_time_unit"]
+        n_velocity_bins = config.tokenizer_parameters["n_velocity_bins"]
+        tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
+        tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
     dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
 
     dataset = load_dataset(
@@ -76,8 +79,7 @@ def main():
     piece = ff.MidiPiece(notes, source=record["source"])
     st.write(
         """
-        If the tokenizer sees unmatched NOTE_OFF or NOTE_ON events
-        it will treat them as if the notes were playing on the edges of the recording.
+        If the tokenizer sees unmatched NOTE_OFF events, it will ignore them.
         """
     )
     streamlit_pianoroll.from_fortepyan(piece=piece)

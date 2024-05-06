@@ -14,6 +14,10 @@ class AwesomeTokensDataset(TokenizedMidiDataset):
         return DatasetInfo(description=_DESC)
 
     def load_tokenizer(self):
-        pretrained_path = to_absolute_path("pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json")
+        tokenizer_parameters = self.config.tokenizer_parameters
+        n_velocity_bins = tokenizer_parameters["n_velocity_bins"]
+        min_time_unit = tokenizer_parameters["min_time_unit"]
+        tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
+        pretrained_path = to_absolute_path(tokenizer_path)
         tokenizer = AwesomeMidiTokenizer.from_file(pretrained_path)
         return tokenizer
