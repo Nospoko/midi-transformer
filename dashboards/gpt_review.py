@@ -35,12 +35,12 @@ def main():
 
         train_config = checkpoint["config"]
         cfg = OmegaConf.create(train_config)
-        config_name = cfg.data.dataset_name
         ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
         ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
     dataset_split = st.selectbox(label="split", options=["validation", "train", "test"])
 
     if "dataset_name" in train_config["data"].keys():
+        config_name = cfg.data.dataset_name
         if cfg.data.tokenizer == "OneTimeTokenizer":
             dataset_name = "OneTimeTokenDataset"
             dataset_config = OneTimeTokenDataset.builder_configs[config_name]

@@ -1,5 +1,4 @@
-import fortepyan as ff
-from datasets import Dataset, DatasetInfo
+from datasets import DatasetInfo
 from midi_tokenizers.one_time_tokenizer import NoLossTokenizer
 
 from tokenized_midi_datasets import TokenizedMidiDataset
@@ -13,15 +12,5 @@ class ExponentialTimeTokenDataset(TokenizedMidiDataset):
     def _info(self) -> DatasetInfo:
         return DatasetInfo(description=_DESC)
 
-    def _generate_examples(self, dataset_shards: list[Dataset]):
-        self.tokenizer = NoLossTokenizer(**self.config.tokenizer_parameters)
-        for shard_id, dataset in enumerate(dataset_shards):
-            for it, record in enumerate(dataset):
-                piece = ff.MidiPiece.from_huggingface(dict(record))
-
-                pieces = self.filter_pauses(piece)
-                chopped_sequences = sum([self.piece_to_records(piece) for piece in pieces], [])
-
-                for jt, sequence in enumerate(chopped_sequences):
-                    key = f"{it}_{jt}_{shard_id}"
-                    yield key, sequence
+    def load_tokenizer(self):
+        return NoLossTokenizer(**self.config.tokenizer_parameters)

@@ -1,9 +1,10 @@
 import json
+from abc import abstractmethod
 
 import datasets
 import numpy as np
 import fortepyan as ff
-from datasets import Split, DatasetInfo, GeneratorBasedBuilder
+from datasets import Split, Dataset, DatasetInfo, GeneratorBasedBuilder
 
 from data.augmentation import augment_dataset
 from tokenized_midi_datasets.TokenizedMidiDatasetConfig import BUILDER_CONFIGS, TokenizedMidiDatasetConfig
@@ -104,3 +105,21 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
             start = finish
 
         return pieces
+
+    def _generate_examples(self, dataset_shards: list[Dataset]):
+        self.tokenizer = self.load_tokenizer()
+
+        for shard_id, dataset in enumerate(dataset_shards):
+            for it, record in enumerate(dataset):
+                piece = ff.MidiPiece.from_huggingface(dict(record))
+
+                pieces = self.filter_pauses(piece)
+                chopped_sequences = sum([self.piece_to_records(piece) for piece in pieces], [])
+
+                for jt, sequence in enumerate(chopped_sequences):
+                    key = f"{it}_{jt}_{shard_id}"  # for some reason there was duplicate key error without shard_id
+                    yield key, sequence
+
+    @abstractmethod
+    def load_tokenizer(self):
+        pass
