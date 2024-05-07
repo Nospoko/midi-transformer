@@ -37,37 +37,39 @@ def main():
         cfg = OmegaConf.create(train_config)
         ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
         ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
+    base_dataset_path = st.text_input(label="base dataset", value="roszcz/maestro-sustain-v2")
     dataset_split = st.selectbox(label="split", options=["validation", "train", "test"])
 
+    # This if is for compatibility with models trained before 1.05
     if "dataset_name" in train_config["data"].keys():
         config_name = cfg.data.dataset_name
         if cfg.data.tokenizer == "OneTimeTokenizer":
             dataset_name = "OneTimeTokenDataset"
-            dataset_config = OneTimeTokenDataset.builder_configs[config_name]
+            dataset_config = OneTimeTokenDataset.builder_configs[config_name].builder_parameters
+            dataset_config = OmegaConf.create(dataset_config)
+
             tokenizer = OneTimeTokenizer(**dataset_config.tokenizer_parameters)
 
         elif cfg.data.tokenizer == "NoLossTokenizer":
             dataset_name = "ExponentialTimeTokenDataset"
-            dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name]
+            dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name].builder_parameters
+            dataset_config = OmegaConf.create(dataset_config)
+
             tokenizer = NoLossTokenizer(**dataset_config.tokenizer_parameters)
 
         elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
             dataset_name = "AwesomeTokensDataset"
-            dataset_config = AwesomeTokensDataset.builder_configs[config_name]
+            dataset_config = AwesomeTokensDataset.builder_configs[config_name].builder_paramers
+            dataset_config = OmegaConf.create(dataset_config)
+
             min_time_unit = dataset_config.tokenizer_parameters["min_time_unit"]
             n_velocity_bins = dataset_config.tokenizer_parameters["n_velocity_bins"]
             tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
             tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
 
-        dataset = load_dataset(
-            f"tokenized_midi_datasets/{dataset_name}",
-            name=config_name,
-            split=dataset_split,
-            trust_remote_code=True,
-            num_proc=8,
-        )
     else:
         dataset_config = cfg.dataset
+
         if cfg.data.tokenizer == "OneTimeTokenizer":
             dataset_name = "OneTimeTokenDataset"
             tokenizer = OneTimeTokenizer(**dataset_config.tokenizer_parameters)
@@ -83,13 +85,20 @@ def main():
             tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
             tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
             dataset_name = "AwesomeTokensDataset"
-        dataset = load_dataset(
-            f"tokenized_midi_datasets/{dataset_name}",
-            split=dataset_split,
-            trust_remote_code=True,
-            num_proc=8,
-            **dataset_config,
-        )
+
+    dataset_config.base_dataset_name = base_dataset_path
+    # Do not use any extra datasets
+    dataset_config.extra_datasets = []
+    # Disable augmentation
+    dataset_config.augmentation_repetitions = 0
+
+    dataset = load_dataset(
+        f"tokenized_midi_datasets/{dataset_name}",
+        split=dataset_split,
+        trust_remote_code=True,
+        num_proc=8,
+        **dataset_config,
+    )
 
     # model init
     model_args = dict(

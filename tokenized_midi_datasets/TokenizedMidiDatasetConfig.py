@@ -29,6 +29,19 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
         self.augmentation_probability = augmentation_probability
         self.augmentation_repetitions = augmentation_repetitions
 
+    @property
+    def builder_parameters(self):
+        return {
+            "base_dataset_name": self.base_dataset_name,
+            "extra_datasets": self.extra_datasets,
+            "sequence_length": self.sequence_length,
+            "sequence_step": self.sequence_step,
+            "tokenizer_parameters": self.tokenizer_parameters,
+            "pause_detection_threshold": self.pause_detection_threshold,
+            "augmentation_probability": self.augmentation_probability,
+            "augmentation_repetitions": self.augmentation_repetitions,
+        }
+
 
 # For the future pre-training I plan on using coarse datasets,
 # so high-resolution tokenizers can remain the same -
