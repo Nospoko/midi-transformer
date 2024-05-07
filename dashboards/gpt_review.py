@@ -80,8 +80,8 @@ def main():
 
         elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
             tokenizer_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
-            min_time_unit = dataset_config.tokenzier_parameters["min_time_unit"]
-            n_velocity_bins = dataset_config.tokenzier_parameters["n_velocity_bins"]
+            min_time_unit = dataset_config.tokenizer_parameters["min_time_unit"]
+            n_velocity_bins = dataset_config.tokenizer_parameters["n_velocity_bins"]
             tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
             tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
             dataset_name = "AwesomeTokensDataset"
