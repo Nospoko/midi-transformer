@@ -59,7 +59,7 @@ def main():
 
         elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
             dataset_name = "AwesomeTokensDataset"
-            dataset_config = AwesomeTokensDataset.builder_configs[config_name].builder_paramers
+            dataset_config = AwesomeTokensDataset.builder_configs[config_name].builder_parameters
             dataset_config = OmegaConf.create(dataset_config)
 
             min_time_unit = dataset_config.tokenizer_parameters["min_time_unit"]
