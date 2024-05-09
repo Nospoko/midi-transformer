@@ -211,12 +211,32 @@ def main():
     generated_piece.time_shift(-generated_piece.df.start.min())
     io_columns = st.columns(2)
 
+    title = source["title"]
+    composer = source["composer"]
+    piece_name = (title + composer).replace(" ", "_").casefold()
+
     with io_columns[0]:
         st.write("original:")
         streamlit_pianoroll.from_fortepyan(piece=piece)
 
         with st.expander(label="tokens"):
             st.write([tokenizer.vocab[idx] for idx in record["note_token_ids"]])
+
+        original_midi_path = f"tmp/fragment_of_{piece_name}.mid"
+        source_file = piece.to_midi()
+
+        try:
+            source_file.write(original_midi_path)
+            with open(original_midi_path, "rb") as file:
+                download_button_str = download_button(
+                    object_to_download=file.read(),
+                    download_filename=original_midi_path.split("/")[-1],
+                    button_text="Download source midi",
+                )
+                st.markdown(download_button_str, unsafe_allow_html=True)
+        finally:
+            # make sure to always clean up
+            os.unlink(original_midi_path)
 
     with io_columns[1]:
         st.write("generated:")
@@ -226,9 +246,7 @@ def main():
         output = output[input_sequence.shape[-1] :]
         with st.expander("generated tokens"):
             st.write([tokenizer.vocab[idx] for idx in output])
-        title = source["title"]
-        composer = source["composer"]
-        piece_name = (title + composer).replace(" ", "_").casefold()
+
         milion_parameters = model.get_num_params() / 1e6
         midi_path = f"tmp/{milion_parameters:.0f}_variations_on_{piece_name}.mid"
         generated_file = generated_piece.to_midi()
