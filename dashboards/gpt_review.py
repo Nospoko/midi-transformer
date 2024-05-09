@@ -35,6 +35,7 @@ def select_part_dataset(midi_dataset: Dataset):
 
     ids = source_df.composer == selected_composer
     piece_titles = source_df[ids].title.unique()
+    
     selected_title = st.selectbox(
         label="Select title",
         options=piece_titles,
@@ -128,9 +129,7 @@ def main():
         num_proc=8,
         **dataset_config,
     )
-    with st.form("piece selector"):
-        dataset = select_part_dataset(midi_dataset=dataset)
-        st.form_submit_button("Run")
+    dataset = select_part_dataset(midi_dataset=dataset)
 
     # model init
     model_args = dict(
@@ -189,9 +188,13 @@ def main():
         If it encounters a NaN or end <= start, the note is invalid.
         """
     )
-    temperature = st.number_input(label="temperature", value=1.0)
-    max_new_tokens = st.number_input(label="max_new_tokens", value=dataset_config.sequence_length)
-
+    with st.form("generate parameters"):
+        temperature = st.number_input(label="temperature", value=1.0)
+        max_new_tokens = st.number_input(label="max_new_tokens", value=dataset_config.sequence_length)
+        run = st.form_submit_button("Generate")
+    if not run:
+        return
+    
     input_sequence = torch.tensor([record["note_token_ids"]], device=device)
     with torch.no_grad():
         with ctx:
