@@ -222,7 +222,7 @@ def main():
         with st.expander(label="tokens"):
             st.write([tokenizer.vocab[idx] for idx in record["note_token_ids"]])
 
-        original_midi_path = f"tmp/fragment_of_{piece_name}.mid"
+        original_midi_path = f"tmp/fragment_of_{piece_name}_{idx}.mid"
         source_file = piece.to_midi()
 
         try:
@@ -248,7 +248,7 @@ def main():
             st.write([tokenizer.vocab[idx] for idx in output])
 
         milion_parameters = model.get_num_params() / 1e6
-        midi_path = f"tmp/{milion_parameters:.0f}_variations_on_{piece_name}.mid"
+        midi_path = f"tmp/{milion_parameters:.0f}_variations_on_{piece_name}_{idx}.mid"
         generated_file = generated_piece.to_midi()
 
         try:
@@ -273,7 +273,7 @@ def main():
     expanded_piece = ff.MidiPiece(expanded_input_notes)
     streamlit_pianoroll.from_fortepyan(piece=expanded_piece, secondary_piece=second_part)
 
-    full_midi_path = f"tmp/full_{milion_parameters}_variations_on_{piece_name}.mid"
+    full_midi_path = f"tmp/full_{milion_parameters}_variations_on_{piece_name}_{idx}.mid"
     out_file = out_piece.to_midi()
     try:
         out_file.write(full_midi_path)
