@@ -3,12 +3,13 @@ import json
 from glob import glob
 from contextlib import nullcontext
 
+import yaml
 import torch
 import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
 from omegaconf import OmegaConf
-from datasets import load_dataset
+from datasets import Dataset, load_dataset
 from midi_trainable_tokenizers import AwesomeMidiTokenizer
 from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
 from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
@@ -16,6 +17,34 @@ from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
 from gpt2.model import GPT, GPTConfig
 from dashboards.common.components import download_button
 from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, ExponentialTimeTokenDataset
+
+
+def select_part_dataset(midi_dataset: Dataset):
+    source_df = midi_dataset.to_pandas()
+    source_df["source"] = source_df["source"].map(lambda source: yaml.safe_load(source))
+    source_df["composer"] = [source["composer"] for source in source_df.source]
+    source_df["title"] = [source["title"] for source in source_df.source]
+
+    composers = source_df.composer.unique()
+
+    selected_composer = st.selectbox(
+        label="Select composer",
+        options=composers,
+        index=3,
+    )
+
+    ids = source_df.composer == selected_composer
+    piece_titles = source_df[ids].title.unique()
+    selected_title = st.selectbox(
+        label="Select title",
+        options=piece_titles,
+    )
+
+    ids = (source_df.composer == selected_composer) & (source_df.title == selected_title)
+    part_df = source_df[ids]
+    part_dataset = midi_dataset.select(part_df.index.values)
+
+    return part_dataset
 
 
 def main():
@@ -99,6 +128,9 @@ def main():
         num_proc=8,
         **dataset_config,
     )
+    with st.form("piece selector"):
+        dataset = select_part_dataset(midi_dataset=dataset)
+        st.form_submit_button("Run")
 
     # model init
     model_args = dict(
