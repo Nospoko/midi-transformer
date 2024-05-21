@@ -51,7 +51,7 @@ def main():
         dataset_name = "AwesomeTokensDataset"
         dataset_config = AwesomeTokensDataset.builder_configs[config_name]
         tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
-    dataset_split = st.selectbox(label="split", options=["validation", "train", "test"])
+    dataset_split = st.text_input(label="split", value="validation+test")
 
     dataset = load_dataset(
         f"tokenized_midi_datasets/{dataset_name}",

@@ -35,7 +35,7 @@ def select_part_dataset(midi_dataset: Dataset):
 
     ids = source_df.composer == selected_composer
     piece_titles = source_df[ids].title.unique()
-    
+
     selected_title = st.selectbox(
         label="Select title",
         options=piece_titles,
@@ -65,7 +65,7 @@ def main():
 
         train_config = checkpoint["config"]
         cfg = OmegaConf.create(train_config)
-        ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
+        ptdtype = {"float32": torch.float32, "bfloat16": torch.float16, "float16": torch.float16}[cfg.system.dtype]
         ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
     base_dataset_path = st.text_input(label="base dataset", value="roszcz/maestro-sustain-v2")
     dataset_split = st.selectbox(label="split", options=["validation", "train", "test"])
@@ -194,7 +194,7 @@ def main():
         run = st.form_submit_button("Generate")
     if not run:
         return
-    
+
     input_sequence = torch.tensor([record["note_token_ids"]], device=device)
     with torch.no_grad():
         with ctx:
