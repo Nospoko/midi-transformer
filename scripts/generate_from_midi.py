@@ -13,7 +13,7 @@ from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, E
 
 
 def load_model_and_tokenizer(checkpoint_path: str, device: torch.device) -> tuple[GPT, MidiTokenizer, DictConfig]:
-    checkpoint = torch.load(f=checkpoint_path, map_location=device)
+    checkpoint = torch.load(f=checkpoint_path, map_location="cpu")
     train_config = checkpoint["config"]
     cfg = OmegaConf.create(train_config)
 
@@ -55,7 +55,7 @@ def load_model_and_tokenizer(checkpoint_path: str, device: torch.device) -> tupl
     checkpoint_model_args = checkpoint["model_args"]
     for k in ["n_layer", "n_head", "n_embd", "block_size", "bias", "vocab_size"]:
         model_args[k] = checkpoint_model_args[k]
-
+    print("initializing model")
     gptconf = GPTConfig(**model_args)
     model = GPT(gptconf)
     state_dict = checkpoint["model"]
@@ -67,16 +67,16 @@ def load_model_and_tokenizer(checkpoint_path: str, device: torch.device) -> tupl
 
     model.load_state_dict(state_dict)
     model.eval()
-    model.to(device)
 
-    return model, tokenizer, cfg
+    return model, tokenizer, cfg, dataset_config
 
 
 def main(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model, tokenizer, cfg = load_model_and_tokenizer(args.model_path, device)
-    dataset_config = cfg.dataset
-
+    model, tokenizer, cfg, dataset_config = load_model_and_tokenizer(args.model_path, device)
+    print("putting model on gpu")
+    model.to(device)
+    dataset_config = OmegaConf.create(dataset_config)
     torch.manual_seed(4)
     torch.cuda.manual_seed(4)
     torch.backends.cuda.matmul.allow_tf32 = True
