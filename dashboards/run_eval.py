@@ -8,8 +8,8 @@ import streamlit as st
 from omegaconf import OmegaConf
 from datasets import load_dataset
 from midi_trainable_tokenizers import AwesomeMidiTokenizer
-from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
 from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
+from midi_tokenizers.no_loss_tokenizer import ExponentialTimeTokenizer
 
 from gpt2.model import GPT, GPTConfig
 from data.next_token_dataset import NextTokenDataset
@@ -41,10 +41,10 @@ def main():
         dataset_config = OneTimeTokenDataset.builder_configs[config_name]
         tokenizer = OneTimeTokenizer(**dataset_config.tokenizer_parameters)
 
-    elif cfg.data.tokenizer == "NoLossTokenizer":
+    elif cfg.data.tokenizer == "ExponentialTimeTokenizer":
         dataset_name = "ExponentialTimeTokenDataset"
         dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name]
-        tokenizer = NoLossTokenizer(**dataset_config.tokenizer_parameters)
+        tokenizer = ExponentialTimeTokenizer(**dataset_config.tokenizer_parameters)
 
     elif cfg.data.tokenizer == "AwesomeTokensDataset":
         tokenizer_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"

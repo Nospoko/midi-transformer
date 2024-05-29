@@ -2,13 +2,13 @@ import re
 
 from datasets import Dataset, load_dataset
 from midi_tokenizers.midi_tokenizer import MidiTokenizer
-from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
 from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
+from midi_tokenizers.no_loss_tokenizer import ExponentialTimeTokenizer
 from midi_trainable_tokenizers.awesome_midi_tokenzier import AwesomeMidiTokenizer
 
 awesome_tokenzier_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
 dataset_to_tokenizer_map: dict[str, MidiTokenizer] = {
-    "ExponentialTimeTokenDataset": NoLossTokenizer(min_time_unit=0.01, n_velocity_bins=32),
+    "ExponentialTimeTokenDataset": ExponentialTimeTokenizer(min_time_unit=0.01, n_velocity_bins=32),
     "OneTimeTokenDataset": OneTimeTokenizer(min_time_unit=0.01, n_velocity_bins=32),
     "AwesomeTokensDataset": AwesomeMidiTokenizer.from_file(path=awesome_tokenzier_path),
 }

@@ -39,7 +39,7 @@ from data.next_token_dataset import NextTokenDataset
 
 load_dotenv()
 tokenizer_name_to_dataset_map: dict[str, str] = {
-    "NoLossTokenizer": "ExponentialTimeTokenDataset",
+    "ExponentialTimeTokenizer": "ExponentialTimeTokenDataset",
     "OneTimeTokenizer": "OneTimeTokenDataset",
     "AwesomeMidiTokenizer": "AwesomeTokensDataset",
 }

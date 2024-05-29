@@ -2,7 +2,7 @@ import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
 from datasets import load_dataset
-from midi_tokenizers import NoLossTokenizer
+from midi_tokenizers import ExponentialTimeTokenizer
 
 from data.next_token_dataset import NextTokenDataset
 from tokenized_midi_datasets import ExponentialTimeTokenDataset
@@ -17,7 +17,7 @@ def main():
         split="test",
     )
     tokenizer_parameters = tokenized_dataset_builder.builder_configs["basic-no-overlap"].tokenizer_parameters
-    tokenizer = NoLossTokenizer(**tokenizer_parameters)
+    tokenizer = ExponentialTimeTokenizer(**tokenizer_parameters)
     dataset_names = ["NextTokenDataset"]
 
     dataset_name = st.selectbox("midi dataset name", options=dataset_names)

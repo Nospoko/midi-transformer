@@ -12,8 +12,8 @@ import streamlit_pianoroll
 from omegaconf import OmegaConf
 from datasets import Dataset, load_dataset
 from midi_trainable_tokenizers import AwesomeMidiTokenizer
-from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
 from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
+from midi_tokenizers.no_loss_tokenizer import ExponentialTimeTokenizer
 
 from gpt2.model import GPT, GPTConfig
 from dashboards.common.components import download_button
@@ -63,10 +63,10 @@ def load_dataset_name_and_tokenizer(
             dataset_name = "OneTimeTokenDataset"
             dataset_config = OneTimeTokenDataset.builder_configs[config_name].builder_parameters
             tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
-        elif cfg.data.tokenizer == "NoLossTokenizer":
+        elif cfg.data.tokenizer == "ExponentialTimeTokenizer":
             dataset_name = "ExponentialTimeTokenDataset"
             dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name].builder_parameters
-            tokenizer = NoLossTokenizer(**dataset_config["tokenizer_parameters"])
+            tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
         elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
             dataset_name = "AwesomeTokensDataset"
             dataset_config = AwesomeTokensDataset.builder_configs[config_name].builder_parameters
@@ -79,9 +79,9 @@ def load_dataset_name_and_tokenizer(
         if cfg.data.tokenizer == "OneTimeTokenizer":
             dataset_name = "OneTimeTokenDataset"
             tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
-        elif cfg.data.tokenizer == "NoLossTokenizer":
+        elif cfg.data.tokenizer == "ExponentialTimeTokenizer":
             dataset_name = "ExponentialTimeTokenDataset"
-            tokenizer = NoLossTokenizer(**dataset_config["tokenizer_parameters"])
+            tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
         elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
             dataset_name = "AwesomeTokensDataset"
             min_time_unit = dataset_config["tokenizer_parameters"]["min_time_unit"]

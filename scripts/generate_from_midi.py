@@ -6,7 +6,7 @@ import pandas as pd
 import fortepyan as ff
 from omegaconf import OmegaConf, DictConfig
 from midi_trainable_tokenizers import AwesomeMidiTokenizer
-from midi_tokenizers import MidiTokenizer, NoLossTokenizer, OneTimeTokenizer
+from midi_tokenizers import MidiTokenizer, OneTimeTokenizer, ExponentialTimeTokenizer
 
 from gpt2.model import GPT, GPTConfig
 from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, ExponentialTimeTokenDataset
@@ -22,9 +22,9 @@ def load_model_and_tokenizer(checkpoint_path: str, device: torch.device) -> tupl
         if cfg.data.tokenizer == "OneTimeTokenizer":
             dataset_config = OneTimeTokenDataset.builder_configs[config_name].builder_parameters
             tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
-        elif cfg.data.tokenizer == "NoLossTokenizer":
+        elif cfg.data.tokenizer == "ExponentialTimeTokenizer":
             dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name].builder_parameters
-            tokenizer = NoLossTokenizer(**dataset_config["tokenizer_parameters"])
+            tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
         elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
             dataset_config = AwesomeTokensDataset.builder_configs[config_name].builder_parameters
             min_time_unit = dataset_config["tokenizer_parameters"]["min_time_unit"]
@@ -35,8 +35,8 @@ def load_model_and_tokenizer(checkpoint_path: str, device: torch.device) -> tupl
         dataset_config = cfg.dataset
         if cfg.data.tokenizer == "OneTimeTokenizer":
             tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
-        elif cfg.data.tokenizer == "NoLossTokenizer":
-            tokenizer = NoLossTokenizer(**dataset_config["tokenizer_parameters"])
+        elif cfg.data.tokenizer == "ExponentialTimeTokenizer":
+            tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
         elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
             min_time_unit = dataset_config["tokenizer_parameters"]["min_time_unit"]
             n_velocity_bins = dataset_config["tokenizer_parameters"]["n_velocity_bins"]

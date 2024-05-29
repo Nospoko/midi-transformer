@@ -3,7 +3,7 @@ import streamlit as st
 import streamlit_pianoroll
 from datasets import load_dataset
 from midi_trainable_tokenizers import AwesomeMidiTokenizer
-from midi_tokenizers import NoLossTokenizer, OneTimeTokenizer
+from midi_tokenizers import OneTimeTokenizer, ExponentialTimeTokenizer
 
 from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, ExponentialTimeTokenDataset
 
@@ -46,7 +46,7 @@ def main():
 
     elif dataset_name == "ExponentialTimeTokenDataset":
         config = ExponentialTimeTokenDataset.builder_configs[config_name]
-        tokenizer = NoLossTokenizer(**config.tokenizer_parameters)
+        tokenizer = ExponentialTimeTokenizer(**config.tokenizer_parameters)
 
     elif dataset_name == "AwesomeTokensDataset":
         config = AwesomeTokensDataset.builder_configs[config_name]
