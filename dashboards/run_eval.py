@@ -41,8 +41,7 @@ def main():
         dataset_config = OneTimeTokenDataset.builder_configs[config_name]
         tokenizer = OneTimeTokenizer(**dataset_config.tokenizer_parameters)
 
-    # NoLossTokenizer for backward - compatibility
-    elif cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTimeTokenizer":
+    elif cfg.data.tokenizer == "ExponentialTimeTokenizer":
         dataset_name = "ExponentialTimeTokenDataset"
         dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name]
         tokenizer = ExponentialTimeTokenizer(**dataset_config.tokenizer_parameters)
