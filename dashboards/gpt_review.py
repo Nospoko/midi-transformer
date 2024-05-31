@@ -69,7 +69,6 @@ def load_dataset_name_and_tokenizer(
     train_config = checkpoint["config"]
     cfg = OmegaConf.create(train_config)
     dataset_config = cfg.dataset
-    print(cfg.data.tokenizer)
     if cfg.data.tokenizer == "OneTimeTokenizer":
         dataset_name = "OneTimeTokenDataset"
         tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
