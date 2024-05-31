@@ -76,7 +76,8 @@ def load_dataset_name_and_tokenizer(
             dataset_name = "OneTimeTokenDataset"
             dataset_config = OneTimeTokenDataset.builder_configs[config_name].builder_parameters
             tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
-        elif cfg.data.tokenizer == "ExponentialTimeTokenizer":
+            # NoLossTokenizer for backward - compatibility
+        elif cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTimeTokenizer":
             dataset_name = "ExponentialTimeTokenDataset"
             dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name].builder_parameters
             tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
@@ -92,7 +93,8 @@ def load_dataset_name_and_tokenizer(
         if cfg.data.tokenizer == "OneTimeTokenizer":
             dataset_name = "OneTimeTokenDataset"
             tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
-        elif cfg.data.tokenizer == "ExponentialTimeTokenizer":
+        # NoLossTokenizer for backward - compatibility
+        elif cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTimeTokenizer":
             dataset_name = "ExponentialTimeTokenDataset"
             tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
         elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
