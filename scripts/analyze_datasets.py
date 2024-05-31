@@ -10,8 +10,16 @@ from data.masked_midi_dataset import special_tokens
 
 awesome_tokenzier_path = "pretrained/awesome_tokenizers/awesome-tokenizer-0.01-32.json"
 dataset_to_tokenizer_map: dict[str, MidiTokenizer] = {
-    "ExponentialTimeTokenDataset": ExponentialTimeTokenizer(min_time_unit=0.01, n_velocity_bins=32),
-    "OneTimeTokenDataset": OneTimeTokenizer(min_time_unit=0.01, n_velocity_bins=32),
+    "ExponentialTimeTokenDataset": ExponentialTimeTokenizer(
+        min_time_unit=0.01,
+        n_velocity_bins=32,
+        special_tokens=special_tokens,
+    ),
+    "OneTimeTokenDataset": OneTimeTokenizer(
+        min_time_unit=0.01,
+        n_velocity_bins=32,
+        special_tokens=special_tokens,
+    ),
     "AwesomeTokensDataset": AwesomeMidiTokenizer.from_file(path=awesome_tokenzier_path),
 }
 
