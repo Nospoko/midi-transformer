@@ -17,7 +17,6 @@ from midi_tokenizers.no_loss_tokenizer import ExponentialTimeTokenizer
 
 from gpt2.model import GPT, GPTConfig
 from dashboards.common.components import download_button
-from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, ExponentialTimeTokenDataset
 
 
 def select_part_dataset(midi_dataset: Dataset) -> Dataset:
@@ -69,40 +68,21 @@ def load_dataset_name_and_tokenizer(
     """
     train_config = checkpoint["config"]
     cfg = OmegaConf.create(train_config)
-
-    if "dataset_name" in train_config["data"]:
-        config_name = cfg.data.dataset_name
-        if cfg.data.tokenizer == "OneTimeTokenizer":
-            dataset_name = "OneTimeTokenDataset"
-            dataset_config = OneTimeTokenDataset.builder_configs[config_name].builder_parameters
-            tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
-            # NoLossTokenizer for backward - compatibility
-        elif cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTimeTokenizer":
-            dataset_name = "ExponentialTimeTokenDataset"
-            dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name].builder_parameters
-            tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
-        elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
-            dataset_name = "AwesomeTokensDataset"
-            dataset_config = AwesomeTokensDataset.builder_configs[config_name].builder_parameters
-            min_time_unit = dataset_config["tokenizer_parameters"]["min_time_unit"]
-            n_velocity_bins = dataset_config["tokenizer_parameters"]["n_velocity_bins"]
-            tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
-            tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
-    else:
-        dataset_config = cfg.dataset
-        if cfg.data.tokenizer == "OneTimeTokenizer":
-            dataset_name = "OneTimeTokenDataset"
-            tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
-        # NoLossTokenizer for backward - compatibility
-        elif cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTimeTokenizer":
-            dataset_name = "ExponentialTimeTokenDataset"
-            tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
-        elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
-            dataset_name = "AwesomeTokensDataset"
-            min_time_unit = dataset_config["tokenizer_parameters"]["min_time_unit"]
-            n_velocity_bins = dataset_config["tokenizer_parameters"]["n_velocity_bins"]
-            tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
-            tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
+    dataset_config = cfg.dataset
+    print(cfg.data.tokenizer)
+    if cfg.data.tokenizer == "OneTimeTokenizer":
+        dataset_name = "OneTimeTokenDataset"
+        tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
+    # NoLossTokenizer for backward-compatibility
+    elif cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTokenizer":
+        dataset_name = "ExponentialTimeTokenDataset"
+        tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
+    elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
+        dataset_name = "AwesomeTokensDataset"
+        min_time_unit = dataset_config["tokenizer_parameters"]["min_time_unit"]
+        n_velocity_bins = dataset_config["tokenizer_parameters"]["n_velocity_bins"]
+        tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
+        tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
 
     return cfg, dataset_config, dataset_name, tokenizer
 

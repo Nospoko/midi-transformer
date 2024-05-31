@@ -13,7 +13,6 @@ from midi_tokenizers.no_loss_tokenizer import ExponentialTimeTokenizer
 
 from gpt2.model import GPT, GPTConfig
 from data.next_token_dataset import NextTokenDataset
-from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, ExponentialTimeTokenDataset
 
 
 def main():
@@ -36,22 +35,20 @@ def main():
         ptdtype = {"float32": torch.float32, "bfloat16": torch.float16, "float16": torch.float16}[cfg.system.dtype]
         ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
 
+    dataset_config = cfg.dataset
     if cfg.data.tokenizer == "OneTimeTokenizer":
         dataset_name = "OneTimeTokenDataset"
-        dataset_config = OneTimeTokenDataset.builder_configs[config_name]
-        tokenizer = OneTimeTokenizer(**dataset_config.tokenizer_parameters)
-
-    # NoLossTokenizer for backward - compatibility
-    elif cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTimeTokenizer":
+        tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
+    elif cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTokenizer":
         dataset_name = "ExponentialTimeTokenDataset"
-        dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name]
-        tokenizer = ExponentialTimeTokenizer(**dataset_config.tokenizer_parameters)
-
-    elif cfg.data.tokenizer == "AwesomeTokensDataset":
-        tokenizer_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
+        tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
+    elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
         dataset_name = "AwesomeTokensDataset"
-        dataset_config = AwesomeTokensDataset.builder_configs[config_name]
+        min_time_unit = dataset_config["tokenizer_parameters"]["min_time_unit"]
+        n_velocity_bins = dataset_config["tokenizer_parameters"]["n_velocity_bins"]
+        tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
         tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
+
     dataset_split = st.text_input(label="split", value="validation+test")
 
     dataset = load_dataset(

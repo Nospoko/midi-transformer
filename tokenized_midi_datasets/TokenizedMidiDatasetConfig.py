@@ -15,8 +15,7 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
         sequence_step (int): Step size between sequences.
         pause_detection_threshold (int): Threshold for detecting pauses.
         tokenizer_parameters (dict): Parameters for the tokenizer.
-        augmentation_probability (float): Probability of applying augmentation.
-        augmentation_repetitions (int): Number of augmentation repetitions.
+        augmentation (dict): Parameters for augmentation
     """
 
     def __init__(
@@ -27,8 +26,10 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
         sequence_step: int = 42,
         pause_detection_threshold: int = 4,
         tokenizer_parameters: dict = {"min_time_unit": 0.01, "n_velocity_bins": 32, "special_tokens": special_tokens},
-        augmentation_probability: float = 0.0,
-        augmentation_repetitions: int = 0,
+        augmentation: dict = {
+            "speed_change_factors": None,
+            "max_pitch_shift": 0,
+        },
         **kwargs,
     ):
         """
@@ -41,8 +42,7 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
             sequence_step (int): Step size between sequences.
             pause_detection_threshold (int): Threshold for detecting pauses.
             tokenizer_parameters (dict): Parameters for the tokenizer.
-            augmentation_probability (float): Probability of applying augmentation.
-            augmentation_repetitions (int): Number of augmentation repetitions.
+            augmentation (dict): Parameters for augmentation (max_pitch_shift, speed_change_factors))
             **kwargs: Additional keyword arguments.
         """
         # Initialize the version and other parameters
@@ -55,8 +55,7 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
         self.sequence_step: int = sequence_step
         self.tokenizer_parameters = tokenizer_parameters
         self.pause_detection_threshold = pause_detection_threshold
-        self.augmentation_probability = augmentation_probability
-        self.augmentation_repetitions = augmentation_repetitions
+        self.augmentation = augmentation
 
     @property
     def builder_parameters(self):
@@ -73,15 +72,17 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
             "sequence_step": self.sequence_step,
             "tokenizer_parameters": self.tokenizer_parameters,
             "pause_detection_threshold": self.pause_detection_threshold,
-            "augmentation_probability": self.augmentation_probability,
-            "augmentation_repetitions": self.augmentation_repetitions,
+            "augmentation": self.augmentation,
         }
 
 
 # Define coarse tokenizer parameters for future pre-training on coarse datasets
 coarse_tokenizer_parameters = {"min_time_unit": 0.01, "n_velocity_bins": 32, "special_tokens": special_tokens}
-
-# List of configurations for different datasets
+augmentation_parameters = {
+    "speed_change_factors": [0.95, 0.975, 1.05, 1.025],
+    "max_pitch_shift": 5,
+}
+# List of configurations for different datasets for debugging
 BUILDER_CONFIGS = [
     # Default
     TokenizedMidiDatasetConfig(
@@ -92,43 +93,6 @@ BUILDER_CONFIGS = [
         pause_detection_threshold=4,
         tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
         name="basic",
-    ),
-    # High resolution datasets - no augmentation
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=["roszcz/giant-midi-sustain-v2"],
-        sequence_length=512,
-        sequence_step=64,
-        pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
-        name="giant-mid",
-    ),
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=[],
-        sequence_length=512,
-        sequence_step=64,
-        pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
-        name="basic-mid",
-    ),
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=["roszcz/giant-midi-sustain-v2"],
-        sequence_length=1024,
-        sequence_step=128,
-        pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
-        name="giant-long",
-    ),
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=[],
-        sequence_length=1024,
-        sequence_step=128,
-        pause_detection_threshold=4,
-        tokenizer_parameters={"min_time_unit": 0.001, "n_velocity_bins": 32},
-        name="basic-long",
     ),
     # Non-overlapping coarse datasets
     TokenizedMidiDatasetConfig(
@@ -157,8 +121,7 @@ BUILDER_CONFIGS = [
         sequence_step=512,
         pause_detection_threshold=4,
         tokenizer_parameters=coarse_tokenizer_parameters,
-        augmentation_probability=0.2,
-        augmentation_repetitions=5,
+        augmentation=augmentation_parameters,
         name="basic-no-overlap-augmented",
     ),
     TokenizedMidiDatasetConfig(
@@ -168,69 +131,8 @@ BUILDER_CONFIGS = [
         sequence_step=512,
         pause_detection_threshold=4,
         tokenizer_parameters=coarse_tokenizer_parameters,
-        augmentation_probability=0.2,
-        augmentation_repetitions=5,
+        augmentation=augmentation_parameters,
         name="giant-no-overlap-augmented",
-    ),
-    # Coarse datasets
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=["roszcz/giant-midi-sustain-v2"],
-        sequence_length=512,
-        sequence_step=64,
-        pause_detection_threshold=4,
-        tokenizer_parameters=coarse_tokenizer_parameters,
-        name="giant-mid-coarse",
-    ),
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=[],
-        sequence_length=512,
-        sequence_step=64,
-        pause_detection_threshold=4,
-        tokenizer_parameters=coarse_tokenizer_parameters,
-        name="basic-mid-coarse",
-    ),
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=["roszcz/giant-midi-sustain-v2"],
-        sequence_length=1024,
-        sequence_step=128,
-        pause_detection_threshold=4,
-        tokenizer_parameters=coarse_tokenizer_parameters,
-        name="giant-long-coarse",
-    ),
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=[],
-        sequence_length=1024,
-        sequence_step=128,
-        pause_detection_threshold=4,
-        tokenizer_parameters=coarse_tokenizer_parameters,
-        name="basic-long-coarse",
-    ),
-    # Augmented coarse datasets
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=["roszcz/giant-midi-sustain-v2"],
-        sequence_length=512,
-        sequence_step=64,
-        pause_detection_threshold=4,
-        tokenizer_parameters=coarse_tokenizer_parameters,
-        augmentation_probability=0.2,
-        augmentation_repetitions=5,
-        name="giant-mid-coarse-augmented",
-    ),
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=["roszcz/giant-midi-sustain-v2"],
-        sequence_length=1024,
-        sequence_step=128,
-        pause_detection_threshold=4,
-        tokenizer_parameters=coarse_tokenizer_parameters,
-        augmentation_probability=0.2,
-        augmentation_repetitions=5,
-        name="giant-long-coarse-augmented",
     ),
     # Colossal datasets
     TokenizedMidiDatasetConfig(
@@ -241,27 +143,5 @@ BUILDER_CONFIGS = [
         pause_detection_threshold=4,
         tokenizer_parameters=coarse_tokenizer_parameters,
         name="colossal-no-overlap",
-    ),
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=["roszcz/giant-midi-sustain-v2", "roszcz/pianofor-ai-sustain-v2"],
-        sequence_length=512,
-        sequence_step=64,
-        pause_detection_threshold=4,
-        tokenizer_parameters=coarse_tokenizer_parameters,
-        augmentation_probability=0.2,
-        augmentation_repetitions=5,
-        name="colossal-mid-coarse-augmented",
-    ),
-    TokenizedMidiDatasetConfig(
-        base_dataset_name="roszcz/maestro-sustain-v2",
-        extra_datasets=["roszcz/giant-midi-sustain-v2", "roszcz/pianofor-ai-sustain-v2"],
-        sequence_length=1024,
-        sequence_step=128,
-        pause_detection_threshold=4,
-        tokenizer_parameters=coarse_tokenizer_parameters,
-        augmentation_probability=0.2,
-        augmentation_repetitions=5,
-        name="colossal-long-coarse-augmented",
     ),
 ]

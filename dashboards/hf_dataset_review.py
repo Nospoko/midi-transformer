@@ -16,30 +16,17 @@ def main():
     ]
     dataset_name = st.selectbox(label="dataset", options=dataset_names)
     configs = [
-        # Non-overlapping coarse
         "basic-no-overlap",
         "giant-no-overlap",
         "basic-no-overlap-augmented",
         "giant-no-overlap-augmented",
-        # High-res datasets
-        "giant-mid",
-        "basic-mid",
-        "giant-long",
-        "basic-long",
-        # Coarse Datasets
-        "giant-mid-coarse",
-        "basic-mid-coarse",
-        "giant-long-coarse",
-        "basic-long-coarse",
         # Colossal Datasets
         "colossal-no-overlap",
-        "colossal-mid-coarse-augmented",
-        "colossal-long-coarse-augmented",
     ]
 
     config_name = st.selectbox(label="config name", options=configs)
 
-    # Another way of accessing configs without storing metadata
+    # Way of accessing configs without storing metadata
     if dataset_name == "OneTimeTokenDataset":
         config = OneTimeTokenDataset.builder_configs[config_name]
         tokenizer = OneTimeTokenizer(**config.tokenizer_parameters)

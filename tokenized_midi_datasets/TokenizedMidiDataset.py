@@ -49,8 +49,8 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
         dataset = datasets.concatenate_datasets(other_datasets)
         dataset = augment_dataset(
             dataset=dataset,
-            augmentation_probability=self.config.augmentation_probability,
-            augmentation_repetitions=self.config.augmentation_repetitions,
+            max_pitch_shift=self.config.augmentation["max_pitch_shift"],
+            speed_change_factors=self.config.augmentation["speed_change_factors"],
         )
 
         # Enable multiprocessing by splitting the dataset into shards
