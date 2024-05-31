@@ -23,6 +23,12 @@ from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, E
 def select_part_dataset(midi_dataset: Dataset) -> Dataset:
     """
     Allows the user to select a part of the dataset based on composer and title.
+
+    Parameters:
+        midi_dataset (Dataset): The MIDI dataset to select from.
+
+    Returns:
+        Dataset: The selected part of the dataset.
     """
     source_df = midi_dataset.to_pandas()
     source_df["source"] = source_df["source"].map(lambda source: yaml.safe_load(source))
@@ -53,6 +59,13 @@ def load_dataset_name_and_tokenizer(
 ) -> Tuple[OmegaConf, dict, object]:
     """
     Loads the model configuration, dataset configuration, and tokenizer based on the checkpoint path.
+
+    Parameters:
+        checkpoint (str): Path to the model checkpoint.
+        device (torch.device): Device to load the model on.
+
+    Returns:
+        Tuple[OmegaConf, dict, object]: The configuration, dataset configuration, dataset name, and tokenizer.
     """
     train_config = checkpoint["config"]
     cfg = OmegaConf.create(train_config)
@@ -100,6 +113,15 @@ def initialize_model(
 ) -> GPT:
     """
     Initializes the GPT model using the given configurations and checkpoint.
+
+    Parameters:
+        cfg (OmegaConf): The configuration object.
+        dataset_config (dict): The dataset configuration.
+        checkpoint (dict): The model checkpoint.
+        device (torch.device): The device to load the model on.
+
+    Returns:
+        GPT: The initialized GPT model.
     """
     model_args = {
         "n_layer": cfg.model.n_layer,
