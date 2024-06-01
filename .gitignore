@@ -1,6 +1,7 @@
 tmp/*
 *__pycache__*
 outputs
+wandb
 venv
 checkpoints*
 pretrained*

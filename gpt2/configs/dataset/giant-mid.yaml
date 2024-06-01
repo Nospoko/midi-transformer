@@ -6,4 +6,3 @@ pause_detection_threshold: 4
 tokenizer_parameters:
   min_time_unit: 0.001
   n_velocity_bins: 32
-name: "giant-mid"

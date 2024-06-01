@@ -83,6 +83,16 @@ coarse_tokenizer_parameters = {"min_time_unit": 0.01, "n_velocity_bins": 32, "sp
 
 # List of configurations for different datasets
 BUILDER_CONFIGS = [
+    # Default
+    TokenizedMidiDatasetConfig(
+        base_dataset_name="roszcz/maestro-sustain-v2",
+        extra_datasets=[],
+        sequence_length=512,
+        sequence_step=64,
+        pause_detection_threshold=4,
+        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        name="basic",
+    ),
     # High resolution datasets - no augmentation
     TokenizedMidiDatasetConfig(
         base_dataset_name="roszcz/maestro-sustain-v2",

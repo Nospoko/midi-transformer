@@ -23,7 +23,6 @@ from contextlib import nullcontext
 
 import hydra
 import torch
-import wandb
 import numpy as np
 from dotenv import load_dotenv
 from datasets import load_dataset
@@ -34,6 +33,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
 
+import wandb
 from gpt2.model import GPT, GPTConfig
 from data.next_token_dataset import NextTokenDataset
 
@@ -45,7 +45,7 @@ tokenizer_name_to_dataset_map: dict[str, str] = {
 }
 
 
-@hydra.main(config_path="configs", config_name="gpt2_noloss_pretraining")
+@hydra.main(config_path="configs", config_name="gpt2_pretraining", version_base=None)
 def main(cfg: DictConfig):
     out_dir = to_absolute_path(cfg.out_dir)
     if cfg.task == "pretraining":
@@ -57,6 +57,8 @@ def main(cfg: DictConfig):
     dataset_name = tokenizer_name_to_dataset_map[cfg.data.tokenizer]
     dataset_config = cfg.dataset
     tokenizer_parameters = dataset_config.tokenizer_parameters
+    # We have to use dict so that HuggingFace can serialize the configuration and cache the dataset
+    dataset_parameters = OmegaConf.to_container(dataset_config)
 
     # Hydra changes paths - we have to change them back
     # Load the suitable dataset
@@ -65,7 +67,7 @@ def main(cfg: DictConfig):
         dataset_path,
         num_proc=8,
         trust_remote_code=True,
-        **dataset_config,
+        **dataset_parameters,
     )
     total_tokens = dataset_config.sequence_length * dataset["train"].num_rows
     print(f"tokens in a training dataset: {total_tokens}")
@@ -307,17 +309,15 @@ def main(cfg: DictConfig):
     local_iter_num = 0  # number of iterations in the lifetime of this process
     raw_model = model.module if ddp else model  # unwrap DDP container if needed
     running_mfu = -1.0
-    iter_num = 1
+    iter_num = 0
     while True:
-        current_tokens = X.numel()
-        # total_tokens += current_tokens
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if cfg.lr.decay_lr else cfg.optimizer.learning_rate
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
         # evaluate the loss on train/val sets and write checkpoints
-        if iter_num % cfg.eval_interval == 0 and master_process:
+        if iter_num % cfg.eval_interval == 1 and master_process:
             losses = estimate_loss()
             print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
             if cfg.logging.wandb_log:
@@ -391,9 +391,6 @@ def main(cfg: DictConfig):
                 mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
                 running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
 
-            # I'm not sure about this
-            tokens_per_second = current_tokens / dt
-
             # Here's my version
             tps = n_iter_tokens / t_forward_backward
             wandb.log(
@@ -404,14 +401,10 @@ def main(cfg: DictConfig):
                     "mfu": running_mfu * 100,  # convert to percentage
                     "total_tokens": total_tokens,
                     "tps": tps,
-                    "tokens_per_second": tokens_per_second,
                 }
             )
             print(
-                f"iter {iter_num}: loss {lossf:.4f}, "
-                + f"time {dt:.2f}s, mfu {running_mfu*100:.2f}%, "
-                + f"tokens_per_second {tokens_per_second:.2f} "
-                + f"tps {tps:.2f}"
+                f"iter {iter_num}: loss {lossf:.4f}, time {dt:.2f}s, mfu {running_mfu*100:.2f}%, tps {tps:.2f}",
             )
         iter_num += 1
         local_iter_num += 1

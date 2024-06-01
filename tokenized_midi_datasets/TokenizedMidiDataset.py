@@ -37,7 +37,7 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
     # Define the configuration class and available configurations
     BUILDER_CONFIG_CLASS = TokenizedMidiDatasetConfig
     BUILDER_CONFIGS = BUILDER_CONFIGS
-    DEFAULT_CONFIG_NAME = "basic-mid"
+    DEFAULT_CONFIG_NAME = "basic"
 
     def _split_generators(self, dl_manager: datasets.DownloadManager) -> list[datasets.SplitGenerator]:
         # Load the base dataset and additional datasets
