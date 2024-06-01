@@ -82,7 +82,7 @@ python -m scripts.train_awesome_tokenizer
 This creates a pre-trained tokenizer JSON in the `pretrained/awesome_tokenizers` directory.
 
 ### Augmentation
-We use pitch_shift and change_speed augmentation techniques. sequentially (pitch_shift, then change_speed). This results in a dataset approximately four times larger.
+We use pitch_shift and change_speed augmentation techniques, sequentially (pitch_shift, then change_speed).
 
 ---
 
