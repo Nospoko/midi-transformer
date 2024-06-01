@@ -309,7 +309,7 @@ def main(cfg: DictConfig):
     local_iter_num = 0  # number of iterations in the lifetime of this process
     raw_model = model.module if ddp else model  # unwrap DDP container if needed
     running_mfu = -1.0
-    iter_num = 0
+    iter_num = 1
     while True:
         # determine and set the learning rate for this iteration
         lr = get_lr(iter_num) if cfg.lr.decay_lr else cfg.optimizer.learning_rate
@@ -317,7 +317,7 @@ def main(cfg: DictConfig):
             param_group["lr"] = lr
 
         # evaluate the loss on train/val sets and write checkpoints
-        if iter_num % cfg.eval_interval == 1 and master_process:
+        if iter_num % cfg.eval_interval == 0 and master_process:
             losses = estimate_loss()
             print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
             if cfg.logging.wandb_log:
@@ -383,7 +383,7 @@ def main(cfg: DictConfig):
         t1 = time.time()
         dt = t1 - t0
         t0 = t1
-        if iter_num % cfg.logging.log_interval == 0 and master_process:
+        if iter_num % cfg.logging.log_interval == 1 and master_process:
             # get loss as float. note: this is a CPU-GPU sync point
             # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
             lossf = loss.item() * cfg.data.gradient_accumulation_steps
@@ -391,7 +391,6 @@ def main(cfg: DictConfig):
                 mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
                 running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
 
-            # Here's my version
             tps = n_iter_tokens / t_forward_backward
             wandb.log(
                 {
