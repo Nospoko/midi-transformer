@@ -40,7 +40,7 @@ def check_pitch_shift(df: pd.DataFrame, pitch_shift: int) -> bool:
 
     is_ok = ok_low & ok_high
 
-    return is_ok
+    return is_ok & pitch_shift != 0
 
 
 def pitch_shift(df: pd.DataFrame, shift: int = 5) -> tuple[pd.DataFrame, int]:
