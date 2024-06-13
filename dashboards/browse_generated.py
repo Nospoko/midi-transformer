@@ -10,7 +10,8 @@ from dashboards.common.components import download_button
 
 
 def main():
-    model = "midi-gpt2-302M-pretraining-2024-04-30-05-26"
+    models = ["midi-gpt2-302M-pretraining-2024-04-30-05-26", "midi-gpt2-333M-pretraining-2024-04-30-14-59"]
+    model = st.selectbox(options=models, label="model")
     directory = f"tmp/{model}"
     with open(f"{directory}/file_descriptors.json", "r+") as file:
         file_descriptors = json.load(file)

@@ -24,7 +24,7 @@ def list_files_in_directory(directory):
 
 def main():
     device = "cuda:0"
-    run_name = "midi-gpt2-302M-pretraining-2024-04-30-05-26"
+    run_name = "midi-gpt2-333M-pretraining-2024-04-30-14-59"
 
     checkpoint_path = f"checkpoints/pretrained/{run_name}.pt"
     if not os.path.exists(f"tmp/{run_name}"):
@@ -141,9 +141,11 @@ def main():
     # Generate parameters
     temperature = 1.0
     max_new_tokens = dataset_config.sequence_length
-
-    with open(f"tmp/{run_name}/file_descriptors.json", "r+") as file:
-        file_descriptors = json.load(file)
+    if os.path.exists(f"tmp/{run_name}/file_descriptors.json"):
+        with open(f"tmp/{run_name}/file_descriptors.json", "r+") as file:
+            file_descriptors = json.load(file)
+    else:
+        file_descriptors = {}
     try:
         piece_counter = {}
         file_paths = os.listdir(f"tmp/{run_name}")
@@ -162,7 +164,7 @@ def main():
             source["original end"] = notes.end.max()
 
             idx = piece_counter[piece_name]
-            if idx >= 4:
+            if idx >= 2:
                 continue
 
             filename = f"full__variations_on_{piece_name}_{idx}.mid".replace('"', "")
