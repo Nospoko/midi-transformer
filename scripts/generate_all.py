@@ -9,8 +9,8 @@ from tqdm import tqdm
 from omegaconf import OmegaConf
 from datasets import load_dataset
 from midi_trainable_tokenizers import AwesomeMidiTokenizer
-from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
 from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
+from midi_tokenizers.no_loss_tokenizer import ExponentialTimeTokenizer
 
 from gpt2.model import GPT, GPTConfig
 from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, ExponentialTimeTokenDataset
@@ -54,12 +54,12 @@ def main():
 
             tokenizer = OneTimeTokenizer(**dataset_config.tokenizer_parameters)
 
-        elif cfg.data.tokenizer == "NoLossTokenizer":
+        elif cfg.data.tokenizer == "ExponentialTimeTokenizer":
             dataset_name = "ExponentialTimeTokenDataset"
             dataset_config = ExponentialTimeTokenDataset.builder_configs[config_name].builder_parameters
             dataset_config = OmegaConf.create(dataset_config)
 
-            tokenizer = NoLossTokenizer(**dataset_config.tokenizer_parameters)
+            tokenizer = ExponentialTimeTokenizer(**dataset_config.tokenizer_parameters)
 
         elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
             dataset_name = "AwesomeTokensDataset"
@@ -78,9 +78,9 @@ def main():
             dataset_name = "OneTimeTokenDataset"
             tokenizer = OneTimeTokenizer(**dataset_config.tokenizer_parameters)
 
-        elif cfg.data.tokenizer == "NoLossTokenizer":
+        elif cfg.data.tokenizer == "ExponentialTimeTokenizer":
             dataset_name = "ExponentialTimeTokenDataset"
-            tokenizer = NoLossTokenizer(**dataset_config.tokenizer_parameters)
+            tokenizer = ExponentialTimeTokenizer(**dataset_config.tokenizer_parameters)
 
         elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
             tokenizer_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"

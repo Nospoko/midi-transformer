@@ -8,6 +8,17 @@ from datasets import Dataset
 
 
 def change_speed(df: pd.DataFrame, factor: float = None) -> tuple[pd.DataFrame, float]:
+    """
+    Change the speed of the MIDI notes in the DataFrame by a given factor.
+    If no factor is provided, a random factor within a specified range is used.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame containing MIDI notes.
+        factor (float, optional): Factor by which to change the speed. Defaults to None.
+
+    Returns:
+        tuple[pd.DataFrame, float]: The modified DataFrame and the factor used.
+    """
     if not factor:
         slow = 0.8
         change_range = 0.4
@@ -20,7 +31,16 @@ def change_speed(df: pd.DataFrame, factor: float = None) -> tuple[pd.DataFrame, 
 
 
 def pitch_shift(df: pd.DataFrame, shift_threshold: int = 5) -> tuple[pd.DataFrame, int]:
-    # No more than given number of steps
+    """
+    Shift the pitch of the MIDI notes in the DataFrame by a random amount within the given threshold.
+
+    Parameters:
+        df (pd.DataFrame): DataFrame containing MIDI notes.
+        shift_threshold (int): Maximum number of semitones to shift.
+
+    Returns:
+        tuple[pd.DataFrame, int]: The modified DataFrame and the shift amount used.
+    """
     PITCH_LOW = 21
     PITCH_HI = 108
     low_shift = -min(shift_threshold, df.pitch.min() - PITCH_LOW)
@@ -35,9 +55,17 @@ def pitch_shift(df: pd.DataFrame, shift_threshold: int = 5) -> tuple[pd.DataFram
     return df, shift
 
 
-def apply_pitch_shift(batch: dict, augmentation_probability: float, augmentation_repetitions: int):
+def apply_pitch_shift(batch: dict, augmentation_probability: float, augmentation_repetitions: int) -> dict:
     """
-    Takes a batch of size 1 and applies augmentation - to use with dataset.map
+    Apply pitch shift augmentation to a batch of MIDI notes with a given probability.
+
+    Parameters:
+        batch (dict): Batch of MIDI notes.
+        augmentation_probability (float): Probability of applying augmentation.
+        augmentation_repetitions (int): Number of times to repeat the augmentation.
+
+    Returns:
+        dict: Augmented batch of MIDI notes.
     """
     assert len(batch["notes"]) == 1
     source = json.loads(batch["source"][0])
@@ -52,9 +80,17 @@ def apply_pitch_shift(batch: dict, augmentation_probability: float, augmentation
     return batch
 
 
-def apply_speed_change(batch: dict, augmentation_probability: float, augmentation_repetitions: int):
+def apply_speed_change(batch: dict, augmentation_probability: float, augmentation_repetitions: int) -> dict:
     """
-    Takes a batch of size 1 and applies augmentation - to use with dataset.map
+    Apply speed change augmentation to a batch of MIDI notes with a given probability.
+
+    Parameters:
+        batch (dict): Batch of MIDI notes.
+        augmentation_probability (float): Probability of applying augmentation.
+        augmentation_repetitions (int): Number of times to repeat the augmentation.
+
+    Returns:
+        dict: Augmented batch of MIDI notes.
     """
     assert len(batch["notes"]) == 1
     source = json.loads(batch["source"][0])
@@ -69,16 +105,22 @@ def apply_speed_change(batch: dict, augmentation_probability: float, augmentatio
     return batch
 
 
-def augment_dataset(dataset: Dataset, augmentation_probability: float, augmentation_repetitions: int = 0):
+def augment_dataset(dataset: Dataset, augmentation_probability: float, augmentation_repetitions: int = 0) -> Dataset:
     """
-    Augment the dataset with dataset.map method using all cpus.
+    Augment the dataset by applying pitch shift and speed change augmentations using all available CPUs.
 
-    If augmentation_cfg.repetitions is 0, will output a copy of the dataset.
+    Parameters:
+        dataset (Dataset): Dataset to augment.
+        augmentation_probability (float): Probability of applying augmentation.
+        augmentation_repetitions (int, optional): Number of times to repeat the augmentation. Defaults to 0.
+
+    Returns:
+        Dataset: Augmented dataset.
     """
     if augmentation_repetitions == 0:
         return dataset
 
-    num_cpus = cpu_count() - 4
+    num_cpus = cpu_count() - 4  # Use all CPUs except 4
 
     augmentation_arguments = {
         "augmentation_probability": augmentation_probability,

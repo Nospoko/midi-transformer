@@ -5,9 +5,23 @@ from data.masked_midi_dataset import special_tokens
 
 
 class TokenizedMidiDatasetConfig(BuilderConfig):
+    """
+    Configuration class for creating a tokenized MIDI dataset.
+
+    Attributes:
+        base_dataset_name (str): Name of the base dataset.
+        extra_datasets (list[str]): List of additional datasets.
+        sequence_length (int): Length of the sequences.
+        sequence_step (int): Step size between sequences.
+        pause_detection_threshold (int): Threshold for detecting pauses.
+        tokenizer_parameters (dict): Parameters for the tokenizer.
+        augmentation_probability (float): Probability of applying augmentation.
+        augmentation_repetitions (int): Number of augmentation repetitions.
+    """
+
     def __init__(
         self,
-        base_dataset_name: str = "roszcz/maestro-v1-sustain",
+        base_dataset_name: str = "roszcz/maestro-sustain-v2",
         extra_datasets: list[str] = [],
         sequence_length: int = 64,
         sequence_step: int = 42,
@@ -17,9 +31,24 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
         augmentation_repetitions: int = 0,
         **kwargs,
     ):
-        # Version history:
+        """
+        Initialize the TokenizedMidiDatasetConfig.
+
+        Parameters:
+            base_dataset_name (str): Name of the base dataset.
+            extra_datasets (list[str]): List of additional datasets.
+            sequence_length (int): Length of the sequences.
+            sequence_step (int): Step size between sequences.
+            pause_detection_threshold (int): Threshold for detecting pauses.
+            tokenizer_parameters (dict): Parameters for the tokenizer.
+            augmentation_probability (float): Probability of applying augmentation.
+            augmentation_repetitions (int): Number of augmentation repetitions.
+            **kwargs: Additional keyword arguments.
+        """
+        # Initialize the version and other parameters
         super().__init__(version=datasets.Version("0.0.1"), **kwargs)
 
+        # Assign the provided arguments to the class attributes
         self.base_dataset_name: str = base_dataset_name
         self.extra_datasets: list[str] = extra_datasets
         self.sequence_length: int = sequence_length
@@ -31,6 +60,12 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
 
     @property
     def builder_parameters(self):
+        """
+        Returns the builder parameters as a dictionary.
+
+        Returns:
+            dict: Builder parameters.
+        """
         return {
             "base_dataset_name": self.base_dataset_name,
             "extra_datasets": self.extra_datasets,
@@ -43,12 +78,21 @@ class TokenizedMidiDatasetConfig(BuilderConfig):
         }
 
 
-# For the future pre-training I plan on using coarse datasets,
-# so high-resolution tokenizers can remain the same -
-# it will allow our first models to work properly on this branch.
-
+# Define coarse tokenizer parameters for future pre-training on coarse datasets
 coarse_tokenizer_parameters = {"min_time_unit": 0.01, "n_velocity_bins": 32, "special_tokens": special_tokens}
+
+# List of configurations for different datasets
 BUILDER_CONFIGS = [
+    # Default
+    TokenizedMidiDatasetConfig(
+        base_dataset_name="roszcz/maestro-sustain-v2",
+        extra_datasets=[],
+        sequence_length=512,
+        sequence_step=64,
+        pause_detection_threshold=4,
+        tokenizer_parameters={"min_time_unit": 0.01, "n_velocity_bins": 32},
+        name="basic",
+    ),
     # High resolution datasets - no augmentation
     TokenizedMidiDatasetConfig(
         base_dataset_name="roszcz/maestro-sustain-v2",

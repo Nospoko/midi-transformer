@@ -1,4 +1,5 @@
 # For the future
+placeholder_tokens = ["<SENTINEL_{idx}>" for idx in range(100)]
 special_tokens = [
     "<CLS>",
     "<EOS>",

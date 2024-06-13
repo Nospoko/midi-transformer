@@ -2,14 +2,24 @@ import re
 
 from datasets import Dataset, load_dataset
 from midi_tokenizers.midi_tokenizer import MidiTokenizer
-from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
 from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
+from midi_tokenizers.no_loss_tokenizer import ExponentialTimeTokenizer
 from midi_trainable_tokenizers.awesome_midi_tokenzier import AwesomeMidiTokenizer
 
-awesome_tokenzier_path = "pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json"
+from data.masked_midi_dataset import special_tokens
+
+awesome_tokenzier_path = "pretrained/awesome_tokenizers/awesome-tokenizer-0.01-32.json"
 dataset_to_tokenizer_map: dict[str, MidiTokenizer] = {
-    "ExponentialTimeTokenDataset": NoLossTokenizer(min_time_unit=0.01, n_velocity_bins=32),
-    "OneTimeTokenDataset": OneTimeTokenizer(min_time_unit=0.01, n_velocity_bins=32),
+    "ExponentialTimeTokenDataset": ExponentialTimeTokenizer(
+        min_time_unit=0.01,
+        n_velocity_bins=32,
+        special_tokens=special_tokens,
+    ),
+    "OneTimeTokenDataset": OneTimeTokenizer(
+        min_time_unit=0.01,
+        n_velocity_bins=32,
+        special_tokens=special_tokens,
+    ),
     "AwesomeTokensDataset": AwesomeMidiTokenizer.from_file(path=awesome_tokenzier_path),
 }
 
@@ -45,6 +55,8 @@ def print_num_tokens(dataset_name: str):
     print(f"Basic {dataset_name} augmented dataset tokens:")
     print(f"\ttrain: {num_tokens_basic}\n\ttest: {num_tokens__test}\n\tvalidation:{num_tokens_val}")
     print(f"Giant {dataset_name} dataset tokens:")
+    print(f"\ttrain: {num_tokens_giant}\n\ttest: {num_tokens__test}\n\tvalidation:{num_tokens_val}")
+    print(f"Colossal {dataset_name} dataset tokens:")
     print(f"\ttrain: {num_tokens_giant}\n\ttest: {num_tokens__test}\n\tvalidation:{num_tokens_val}")
     # Ratio the same as in base_tokenzizer inside
     if dataset_name == "AwesomeTokensDataset":

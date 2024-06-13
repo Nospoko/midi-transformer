@@ -4,6 +4,7 @@ defaults:
   - dataset: giant-mid-coarse-augmented
   - logging: pretraining
   - lr: pretraining-large
+  - _self_
 
 out_dir: 'checkpoints'
 eval_interval: 100
