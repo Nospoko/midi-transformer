@@ -298,8 +298,8 @@ def main(cfg: DictConfig):
         # define our custom x axis metric
         wandb.define_metric("total_tokens")
         # define which metrics will be plotted against it
-        wandb.define_metric("train_batch/loss", step_metric="total_tokens")
-        wandb.define_metric("val_batch/loss", step_metric="total_tokens")
+        wandb.define_metric("train/loss_batch", step_metric="total_tokens")
+        wandb.define_metric("val/loss_batch", step_metric="total_tokens")
         wandb.define_metric("train/loss", step_metric="total_tokens")
 
     total_tokens = 0
@@ -324,8 +324,8 @@ def main(cfg: DictConfig):
                 wandb.log(
                     {
                         "iter": iter_num,
-                        "train_batch/loss": losses["train"],
-                        "val_batch/loss": losses["val"],
+                        "train/loss_batch": losses["train"],
+                        "val/loss_batch": losses["val"],
                         "total_tokens": total_tokens,
                     }
                 )
