@@ -16,8 +16,6 @@ class BassExtractedDataset(SubSequenceDataset):
         return DatasetInfo(description=_DESC)
 
     def create_record(self, piece: ff.MidiPiece):
-        piece.source |= {"extracted": ["bass"]}
-
         notes = piece.df
         bass_ids = notes.pitch < 48
         src_notes = notes[~bass_ids]
@@ -26,6 +24,7 @@ class BassExtractedDataset(SubSequenceDataset):
         record = {
             "src_notes": src_notes,
             "tgt_notes": tgt_notes,
+            "extracted": ["bass"],
             "source": json.dumps(piece.source),
         }
         return record

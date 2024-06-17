@@ -6,7 +6,7 @@ from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
 from midi_tokenizers.no_loss_tokenizer import ExponentialTimeTokenizer
 from midi_trainable_tokenizers.awesome_midi_tokenzier import AwesomeMidiTokenizer
 
-from data.masked_midi_dataset import special_tokens
+from data.subsequence_dataset import special_tokens
 
 awesome_tokenzier_path = "pretrained/awesome_tokenizers/awesome-tokenizer-0.01-32.json"
 dataset_to_tokenizer_map: dict[str, MidiTokenizer] = {

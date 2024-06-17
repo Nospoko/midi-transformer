@@ -1,7 +1,7 @@
 import datasets
 from datasets import BuilderConfig
 
-from data.masked_midi_dataset import special_tokens
+from data.subsequence_dataset import special_tokens
 
 
 class TokenizedMidiDatasetConfig(BuilderConfig):
