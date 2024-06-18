@@ -74,14 +74,14 @@ class SubSequenceDataset(GeneratorBasedBuilder):
         """
         rs = np.random.RandomState(np.random.MT19937(np.random.SeedSequence(4)))
         n_notes = len(piece.df.pitch)
-        n_samples = 1 + (n_notes - self.config.sequence_length) // self.config.sequence_step
-        piece_idxs = range(n_notes - self.config.sequence_length)
+        n_samples = 1 + (n_notes - self.config.notes_per_record) // self.config.sequence_step
+        piece_idxs = range(n_notes - self.config.notes_per_record)
         start_points = rs.choice(piece_idxs, size=n_samples, replace=False)
 
         prepared_records = []
         for start in start_points:
             start = int(start)
-            finish = start + self.config.sequence_length
+            finish = start + self.config.notes_per_record
             part = piece[start:finish]
             record = self.create_record(part)
             prepared_records.append(record)
@@ -101,6 +101,8 @@ class SubSequenceDataset(GeneratorBasedBuilder):
         next_start = piece.df.start.shift(-1)
         silent_distance = next_start - piece.df.end
         ids = silent_distance > self.config.pause_detection_threshold
+        if ids.sum() == 0:
+            return [piece]
         break_idxs = np.where(ids)[0]
 
         pieces = []
@@ -108,7 +110,7 @@ class SubSequenceDataset(GeneratorBasedBuilder):
         for break_idx in break_idxs:
             finish = break_idx.item() + 1
             piece_part = piece[start:finish]
-            if piece_part.size <= self.config.sequence_length:
+            if piece_part.size <= self.config.notes_per_record:
                 continue
             pieces.append(piece_part)
             start = finish
@@ -128,7 +130,7 @@ class SubSequenceDataset(GeneratorBasedBuilder):
         for shard_id, dataset in enumerate(dataset_shards):
             for it, record in enumerate(dataset):
                 piece = ff.MidiPiece.from_huggingface(dict(record))
-                pieces = self.filter_pauses(piece)
+                pieces = [piece]  # self.filter_pauses(piece)
                 all_records = sum([self.piece_to_records(piece) for piece in pieces], [])
                 for jt, sequence in enumerate(all_records):
                     key = f"{it}_{jt}_{shard_id}"

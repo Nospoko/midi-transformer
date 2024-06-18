@@ -1,10 +1,8 @@
+import pandas as pd
 import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
 from datasets import load_dataset
-from midi_tokenizers import ExponentialTimeTokenizer
-
-from data.subsequence_dataset import SubSequenceMidiDataset, special_tokens
 
 
 def main():
@@ -19,13 +17,6 @@ def main():
         notes_per_record = st.number_input(label="notes_per_record", min_value=1, value=512)
         sequence_step = st.number_input(label="sequence_step", min_value=1, value=512)
         pause_detection_threshold = st.number_input(label="pause_detection_threshold", value=4)
-        sequence_length = st.number_input(label="sequence_length", min_value=1, value=5000, step=500)
-
-        st.form_submit_button(label="Submit")
-
-    with st.form(key="tokenizer_form"):
-        min_time_unit = st.number_input(label="min_time_unit", min_value=0.01, value=0.01, step=0.01, format="%.2f")
-        n_velocity_bins = st.number_input(label="n_velocity_bins", min_value=1, value=32, step=1)
 
         st.form_submit_button(label="Submit")
 
@@ -39,14 +30,6 @@ def main():
         "pause_detection_threshold": pause_detection_threshold,
     }
 
-    tokenizer_parameters = {
-        "min_time_unit": min_time_unit,
-        "n_velocity_bins": n_velocity_bins,
-        "special_tokens": special_tokens,
-    }
-
-    tokenizer = ExponentialTimeTokenizer(**tokenizer_parameters)
-
     dataset = load_dataset(
         f"downstream_task_datasets/{dataset_name}",
         split=dataset_split,
@@ -54,11 +37,7 @@ def main():
         num_proc=8,
         **config,
     )
-    midi_dataset = SubSequenceMidiDataset(
-        dataset=dataset,
-        tokenizer=tokenizer,
-        sequence_length=sequence_length,
-    )
+
     total_tokens = config["notes_per_record"] * dataset.num_rows
     st.write(f"rows: {dataset.num_rows}")
     st.write(f"total notes: {total_tokens}")
@@ -66,29 +45,15 @@ def main():
         st.write(config)
 
     idx = st.number_input(label="record_id", value=0, max_value=len(dataset))
-    record = midi_dataset[idx]
+    record = dataset[idx]
 
     with st.expander(label="source"):
         st.json(record["source"])
 
-    extracted = record["extracted"]
-    st.write(f"Extracted: {extracted}")
-
-    src_token_ids = record["source_token_ids"]
-    tgt_token_ids = record["target_token_ids"]
-
-    src_tokens = [midi_dataset.tokenizer.vocab[token_id] for token_id in src_token_ids]
-    tgt_tokens = [midi_dataset.tokenizer.vocab[token_id] for token_id in tgt_token_ids]
-
-    src_notes = midi_dataset.tokenizer.untokenize(src_tokens)
-    tgt_notes = midi_dataset.tokenizer.untokenize(tgt_tokens)
-
-    src_piece = ff.MidiPiece(src_notes)
-    tgt_piece = ff.MidiPiece(tgt_notes)
-
-    token_columns = st.columns(2)
-    token_columns[0].write(src_tokens)
-    token_columns[1].write(tgt_tokens)
+    src_notes = pd.DataFrame(record["src_notes"])
+    tgt_notes = pd.DataFrame(record["tgt_notes"])
+    src_piece = ff.MidiPiece(src_notes, source=record["source"])
+    tgt_piece = ff.MidiPiece(tgt_notes, source=record["source"])
     st.write("#### Together:")
     streamlit_pianoroll.from_fortepyan(piece=src_piece, secondary_piece=tgt_piece)
     st.write("#### Prompt:")

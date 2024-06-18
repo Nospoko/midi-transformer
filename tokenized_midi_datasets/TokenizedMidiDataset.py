@@ -132,7 +132,7 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
         for break_idx in break_idxs:
             finish = break_idx.item() + 1
             piece_part = piece[start:finish]
-            if piece_part.size <= self.config.sequence_length:
+            if piece_part.size <= self.config.sequence_length // 4:
                 continue
             pieces.append(piece_part)
             start = finish
@@ -154,7 +154,7 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
         for shard_id, dataset in enumerate(dataset_shards):
             for it, record in enumerate(dataset):
                 piece = ff.MidiPiece.from_huggingface(dict(record))
-                pieces = self.filter_pauses(piece)
+                pieces = [piece]  # self.filter_pauses(piece)
                 chopped_sequences = sum([self.piece_to_records(piece) for piece in pieces], [])
                 for jt, sequence in enumerate(chopped_sequences):
                     key = f"{it}_{jt}_{shard_id}"
