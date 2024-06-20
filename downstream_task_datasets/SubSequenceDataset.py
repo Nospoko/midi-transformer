@@ -12,7 +12,7 @@ from downstream_task_datasets.SubSequenceDatasetConfig import BUILDER_CONFIGS, S
 # at ~/.cache/huggingface/ to rebuild the datasets
 
 _DESC = """
-Dataset with MIDI files, divided into src_notes and tgt_notes with equal sum of notes.
+Dataset with MIDI files, divided into source_notes and target_notes with equal sum of notes.
 """
 
 
@@ -87,6 +87,8 @@ class SubSequenceDataset(GeneratorBasedBuilder):
             finish = start + self.config.notes_per_record
             part = piece[start:finish]
             record = self.create_record(part)
+            if len(record["source_notes"]["pitch"]) == 0 or len(record["target_notes"]["pitch"]) == 0:
+                continue
             prepared_records.append(record)
 
         return prepared_records

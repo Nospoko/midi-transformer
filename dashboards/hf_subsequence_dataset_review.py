@@ -50,10 +50,10 @@ def main():
     with st.expander(label="source"):
         st.json(record["source"])
 
-    src_notes = pd.DataFrame(record["src_notes"])
-    tgt_notes = pd.DataFrame(record["tgt_notes"])
-    src_piece = ff.MidiPiece(src_notes, source=record["source"])
-    tgt_piece = ff.MidiPiece(tgt_notes, source=record["source"])
+    source_notes = pd.DataFrame(record["source_notes"])
+    target_notes = pd.DataFrame(record["target_notes"])
+    src_piece = ff.MidiPiece(source_notes, source=record["source"])
+    tgt_piece = ff.MidiPiece(target_notes, source=record["source"])
     st.write("#### Together:")
     streamlit_pianoroll.from_fortepyan(piece=src_piece, secondary_piece=tgt_piece)
     st.write("#### Prompt:")

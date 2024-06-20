@@ -80,11 +80,11 @@ def main():
     src_tokens = [midi_dataset.tokenizer.vocab[token_id] for token_id in src_token_ids]
     tgt_tokens = [midi_dataset.tokenizer.vocab[token_id] for token_id in tgt_token_ids]
 
-    src_notes = midi_dataset.tokenizer.untokenize(src_tokens)
-    tgt_notes = midi_dataset.tokenizer.untokenize(tgt_tokens)
+    source_notes = midi_dataset.tokenizer.untokenize(src_tokens)
+    target_notes = midi_dataset.tokenizer.untokenize(tgt_tokens)
 
-    src_piece = ff.MidiPiece(src_notes)
-    tgt_piece = ff.MidiPiece(tgt_notes)
+    src_piece = ff.MidiPiece(source_notes)
+    tgt_piece = ff.MidiPiece(target_notes)
 
     token_columns = st.columns(2)
     token_columns[0].write(src_tokens)
