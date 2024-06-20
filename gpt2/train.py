@@ -34,8 +34,10 @@ from torch.distributed import init_process_group, destroy_process_group
 from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
 
 import wandb
+from artifacts import special_tokens
 from gpt2.model import GPT, GPTConfig
 from data.next_token_dataset import NextTokenDataset
+from data.subsequence_dataset import SubSequenceMidiDataset
 
 load_dotenv()
 tokenizer_name_to_dataset_map: dict[str, str] = {
@@ -45,23 +47,16 @@ tokenizer_name_to_dataset_map: dict[str, str] = {
 }
 
 
-@hydra.main(config_path="configs", config_name="gpt2_pretraining", version_base=None)
-def main(cfg: DictConfig):
-    out_dir = to_absolute_path(cfg.out_dir)
-    if cfg.task == "pretraining":
-        out_dir = os.path.join(
-            out_dir,
-            "pretraining",
-        )
-    # Get the right data for the tokenizer specified in config
-    dataset_name = tokenizer_name_to_dataset_map[cfg.data.tokenizer]
+def prepare_next_token_dataset(cfg: DictConfig):
     dataset_config = cfg.dataset
-    tokenizer_parameters = dataset_config.tokenizer_parameters
+    tokenizer_parameters = OmegaConf.to_container(dataset_config.tokenizer_parameters)
+    tokenizer_parameters |= {"special_tokens": special_tokens}
     # We have to use dict so that HuggingFace can serialize the configuration and cache the dataset
     dataset_parameters = OmegaConf.to_container(dataset_config)
 
-    # Hydra changes paths - we have to change them back
     # Load the suitable dataset
+    # Get the right data for the tokenizer specified in config
+    dataset_name = tokenizer_name_to_dataset_map[cfg.data.tokenizer]
     dataset_path = to_absolute_path(f"./tokenized_midi_datasets/{dataset_name}")
     dataset = load_dataset(
         dataset_path,
@@ -71,17 +66,88 @@ def main(cfg: DictConfig):
     )
     total_tokens = dataset_config.sequence_length * dataset["train"].num_rows
     print(f"tokens in a training dataset: {total_tokens}")
-
-    # Keep config as a dict as well for logging at wandb and for checkpoints
-    config = OmegaConf.to_container(cfg)
     if cfg.data.tokenizer == "AwesomeMidiTokenizer":
         tokenizer_path = to_absolute_path("pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json")
         tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
     else:
         tokenizer = generate_tokenizer(name=cfg.data.tokenizer, parameters=tokenizer_parameters)
 
-    train_dataset = NextTokenDataset(dataset=dataset["train"], tokenizer=tokenizer)
-    val_dataset = NextTokenDataset(dataset=dataset["validation"], tokenizer=tokenizer)
+    train_dataset = NextTokenDataset(
+        dataset=dataset["train"],
+        tokenizer=tokenizer,
+    )
+    val_dataset = NextTokenDataset(
+        dataset=dataset["validation"],
+        tokenizer=tokenizer,
+    )
+
+    return train_dataset, val_dataset
+
+
+def prepare_subsequence_datasets(cfg: DictConfig):
+    dataset_config = cfg.dataset
+    tokenizer_parameters = OmegaConf.to_container(dataset_config.tokenizer_parameters)
+    tokenizer_parameters |= {"special_tokens": special_tokens}
+    # We have to use dict so that HuggingFace can serialize the configuration and cache the dataset ...
+    dataset_parameters = OmegaConf.to_container(dataset_config)
+    # Pop keys that are used for Tokenized Datasets and not for SubSequence
+    # TODO: make the datasets use the same logic
+    dataset_parameters.pop("tokenizer_parameters")
+    dataset_parameters.pop("sequence_length")
+
+    # Load the suitable dataset
+    # Get the right data for the tokenizer specified in config
+    dataset_name = "BassExtractedDataset"
+    dataset_path = to_absolute_path(f"./downstream_task_datasets/{dataset_name}")
+    dataset = load_dataset(
+        dataset_path,
+        num_proc=8,
+        trust_remote_code=True,
+        **dataset_parameters,
+    )
+    total_tokens = dataset_config.sequence_length * dataset["train"].num_rows
+    print(f"tokens in a training dataset: {total_tokens}")
+    if cfg.data.tokenizer == "AwesomeMidiTokenizer":
+        tokenizer_path = to_absolute_path("pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json")
+        tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
+    else:
+        tokenizer = generate_tokenizer(name=cfg.data.tokenizer, parameters=tokenizer_parameters)
+
+    train_dataset = SubSequenceMidiDataset(
+        dataset=dataset["train"],
+        tokenizer=tokenizer,
+        sequence_length=cfg.dataset.sequence_length,
+    )
+    val_dataset = SubSequenceMidiDataset(
+        dataset=dataset["validation"],
+        tokenizer=tokenizer,
+        sequence_length=cfg.dataset.sequence_length,
+    )
+
+    return train_dataset, val_dataset
+
+
+@hydra.main(config_path="configs", config_name="gpt2_pretraining", version_base=None)
+def main(cfg: DictConfig):
+    if cfg.task == "pretraining":
+        out_dir = to_absolute_path(cfg.out_dir)
+        out_dir = os.path.join(
+            out_dir,
+            "pretraining",
+        )
+        train_dataset, val_dataset = prepare_next_token_dataset(cfg=cfg)
+
+    else:
+        out_dir = to_absolute_path(cfg.out_dir)
+        out_dir = os.path.join(
+            out_dir,
+            "subsequence",
+        )
+        train_dataset, val_dataset = prepare_subsequence_datasets(cfg=cfg)
+
+    dataset_config = cfg.dataset
+    tokenizer = train_dataset.tokenizer
+    config = OmegaConf.to_container(cfg=cfg)
 
     device = cfg.system.device
 

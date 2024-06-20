@@ -2,7 +2,7 @@ from datasets import load_dataset
 from midi_tokenizers.one_time_tokenizer import ExponentialTimeTokenizer
 from midi_trainable_tokenizers.awesome_midi_tokenzier import AwesomeMidiTokenizer
 
-from data.subsequence_dataset import special_tokens
+from artifacts import special_tokens
 
 # This is a script for training an AwesomeMidiTokenizer
 

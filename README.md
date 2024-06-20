@@ -12,6 +12,7 @@
    - [Train the Model](#train-the-model)
    - [Use AwesomeTokensDataset](#use-awesometokensdataset)
    - [Augmentation](#augmentation)
+8. [Dataset Sizes](#dataset-sizes)
 8. [Important Links](#important-links)
 9. [Code Style](#code-style)
 
@@ -83,6 +84,15 @@ This creates a pre-trained tokenizer JSON in the `pretrained/awesome_tokenizers`
 
 ### Augmentation
 We use pitch_shift and change_speed augmentation techniques, sequentially (pitch_shift, then change_speed).
+
+### Dataset Sizes
+
+| Dataset                        | Train tokens | Test tokens | Validation tokens |
+|--------------------------------|--------------|-------------|-------------------|
+| Basic AwesomeTokensDataset     | 9,674,752   | 1,347,584  | 1,110,528        |
+| Giant AwesomeTokensDataset     | 78,107,136   | 1,347,584  | 1,110,528          |
+| Basic ExponentialTimeTokenDataset |    25,981,952 |     3,607,040  | 2,966,016   |
+| Giant ExponentialTimeTokenDataset |   206,0451,84 |    3,607,040  | 2,966,016   |
 
 ---
 
