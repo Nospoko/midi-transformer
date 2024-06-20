@@ -93,6 +93,10 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
         """
         tokenized_record = self.tokenize_piece(piece)
         n_tokens = len(tokenized_record["note_token_ids"])
+        # Some sequences might be too short
+        if n_tokens <= self.config.sequence_length:
+            return []
+
         rs = np.random.RandomState(np.random.MT19937(np.random.SeedSequence(4)))
 
         n_samples = 1 + (n_tokens - self.config.sequence_length) // self.config.sequence_step
@@ -126,14 +130,14 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
         silent_distance = next_start - piece.df.end
         ids = silent_distance > self.config.pause_detection_threshold
         break_idxs = np.where(ids)[0]
+        if len(break_idxs) == 0:
+            return [piece]
 
         pieces = []
         start = 0
         for break_idx in break_idxs:
             finish = break_idx.item() + 1
             piece_part = piece[start:finish]
-            if piece_part.size <= self.config.sequence_length // 4:
-                continue
             pieces.append(piece_part)
             start = finish
 
@@ -154,7 +158,7 @@ class TokenizedMidiDataset(GeneratorBasedBuilder):
         for shard_id, dataset in enumerate(dataset_shards):
             for it, record in enumerate(dataset):
                 piece = ff.MidiPiece.from_huggingface(dict(record))
-                pieces = [piece]  # self.filter_pauses(piece)
+                pieces = self.filter_pauses(piece)
                 chopped_sequences = sum([self.piece_to_records(piece) for piece in pieces], [])
                 for jt, sequence in enumerate(chopped_sequences):
                     key = f"{it}_{jt}_{shard_id}"

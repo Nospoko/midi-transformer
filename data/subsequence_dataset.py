@@ -52,7 +52,7 @@ extraction_type_to_token_pair = {
     "f": ("<F>", "<NO_F>"),
 }
 
-mask_type_to_range = {
+extraction_type_to_range = {
     "bass": (21, 48),
     "tenor": (43, 81),
     "alto": (53, 84),
@@ -84,8 +84,8 @@ class SubSequenceMidiDataset(MidiDataset):
         """Append prefixes and suffixes (padding) for source and target"""
         prefix_tokens = [extraction_type_to_token_pair[extraction_type] for extraction_type in extracted]
 
-        src_prefix = [self.tokenizer.token_to_id[prefix_token[0]] for prefix_token in prefix_tokens]
-        tgt_prefix = [self.tokenizer.token_to_id[prefix_token[1]] for prefix_token in prefix_tokens]
+        src_prefix = [self.tokenizer.token_to_id[prefix_token[1]] for prefix_token in prefix_tokens]
+        tgt_prefix = [self.tokenizer.token_to_id[prefix_token[0]] for prefix_token in prefix_tokens]
 
         src_pad_size = self.sequence_length - len(source_token_ids) - len(src_prefix)
         tgt_pad_size = self.sequence_length - len(target_token_ids) - len(tgt_prefix)

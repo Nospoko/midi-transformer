@@ -74,6 +74,9 @@ class SubSequenceDataset(GeneratorBasedBuilder):
         """
         rs = np.random.RandomState(np.random.MT19937(np.random.SeedSequence(4)))
         n_notes = len(piece.df.pitch)
+        # Some sequences might be too short
+        if n_notes < self.config.notes_per_record:
+            return []
         n_samples = 1 + (n_notes - self.config.notes_per_record) // self.config.sequence_step
         piece_idxs = range(n_notes - self.config.notes_per_record)
         start_points = rs.choice(piece_idxs, size=n_samples, replace=False)
@@ -101,17 +104,15 @@ class SubSequenceDataset(GeneratorBasedBuilder):
         next_start = piece.df.start.shift(-1)
         silent_distance = next_start - piece.df.end
         ids = silent_distance > self.config.pause_detection_threshold
-        if ids.sum() == 0:
-            return [piece]
         break_idxs = np.where(ids)[0]
+        if len(break_idxs) == 0:
+            return [piece]
 
         pieces = []
         start = 0
         for break_idx in break_idxs:
             finish = break_idx.item() + 1
             piece_part = piece[start:finish]
-            if piece_part.size <= self.config.notes_per_record:
-                continue
             pieces.append(piece_part)
             start = finish
 
@@ -130,7 +131,7 @@ class SubSequenceDataset(GeneratorBasedBuilder):
         for shard_id, dataset in enumerate(dataset_shards):
             for it, record in enumerate(dataset):
                 piece = ff.MidiPiece.from_huggingface(dict(record))
-                pieces = [piece]  # self.filter_pauses(piece)
+                pieces = self.filter_pauses(piece)
                 all_records = sum([self.piece_to_records(piece) for piece in pieces], [])
                 for jt, sequence in enumerate(all_records):
                     key = f"{it}_{jt}_{shard_id}"
