@@ -4,7 +4,8 @@ import streamlit_pianoroll
 from datasets import load_dataset
 from midi_tokenizers import ExponentialTimeTokenizer
 
-from data.subsequence_dataset import SubSequenceMidiDataset, special_tokens
+from artifacts import special_tokens
+from data.subsequence_dataset import SubSequenceMidiDataset
 
 
 def main():
