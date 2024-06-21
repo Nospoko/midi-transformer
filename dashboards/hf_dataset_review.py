@@ -2,16 +2,40 @@ import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
 from datasets import load_dataset
-from midi_tokenizers.no_loss_tokenizer import NoLossTokenizer
-from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
+from midi_trainable_tokenizers import AwesomeMidiTokenizer
+from midi_tokenizers import OneTimeTokenizer, ExponentialTimeTokenizer
 
-from tokenized_midi_datasets import OneTimeTokenDataset, ExponentialTimeTokenDataset
+from tokenized_midi_datasets import OneTimeTokenDataset, AwesomeTokensDataset, ExponentialTimeTokenDataset
 
 
 def main():
-    dataset_names = ["ExponentialTimeTokenDataset", "OneTimeTokenDataset"]
+    dataset_names = [
+        "AwesomeTokensDataset",
+        "ExponentialTimeTokenDataset",
+        "OneTimeTokenDataset",
+    ]
     dataset_name = st.selectbox(label="dataset", options=dataset_names)
-    configs = ["debugging", "giant-short", "basic-short", "giant-mid", "basic-mid", "giant-long", "basic-long"]
+    configs = [
+        # Non-overlapping coarse
+        "basic-no-overlap",
+        "giant-no-overlap",
+        "basic-no-overlap-augmented",
+        "giant-no-overlap-augmented",
+        # High-res datasets
+        "giant-mid",
+        "basic-mid",
+        "giant-long",
+        "basic-long",
+        # Coarse Datasets
+        "giant-mid-coarse",
+        "basic-mid-coarse",
+        "giant-long-coarse",
+        "basic-long-coarse",
+        # Colossal Datasets
+        "colossal-no-overlap",
+        "colossal-mid-coarse-augmented",
+        "colossal-long-coarse-augmented",
+    ]
 
     config_name = st.selectbox(label="config name", options=configs)
 
@@ -22,7 +46,14 @@ def main():
 
     elif dataset_name == "ExponentialTimeTokenDataset":
         config = ExponentialTimeTokenDataset.builder_configs[config_name]
-        tokenizer = NoLossTokenizer(**config.tokenizer_parameters)
+        tokenizer = ExponentialTimeTokenizer(**config.tokenizer_parameters)
+
+    elif dataset_name == "AwesomeTokensDataset":
+        config = AwesomeTokensDataset.builder_configs[config_name]
+        min_time_unit = config.tokenizer_parameters["min_time_unit"]
+        n_velocity_bins = config.tokenizer_parameters["n_velocity_bins"]
+        tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
+        tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
     dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
 
     dataset = load_dataset(
@@ -44,18 +75,17 @@ def main():
     with st.expander(label="source"):
         st.json(record["source"])
 
-    notes = tokenizer.untokenize(record["note_tokens"])
+    notes = tokenizer.decode(record["note_token_ids"])
     piece = ff.MidiPiece(notes, source=record["source"])
     st.write(
         """
-        If the tokenizer sees unmatched NOTE_OFF or NOTE_ON events
-        it will treat them as if the notes were playing on the edges of the recording.
+        If the tokenizer sees unmatched NOTE_OFF events, it will ignore them.
         """
     )
     streamlit_pianoroll.from_fortepyan(piece=piece)
 
     with st.expander(label="tokens"):
-        st.write(record["note_tokens"])
+        st.write([tokenizer.vocab[token_id] for token_id in record["note_token_ids"]])
 
 
 if __name__ == "__main__":
