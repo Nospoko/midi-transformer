@@ -6,6 +6,7 @@ from contextlib import nullcontext
 
 import yaml
 import torch
+import pandas as pd
 import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
@@ -52,10 +53,10 @@ def select_part_dataset(midi_dataset: Dataset) -> Dataset:
     return part_dataset
 
 
-def load_dataset_name_and_tokenizer(
+def load_tokenizer(
     checkpoint: str,
     device: torch.device,
-) -> Tuple[OmegaConf, dict, object]:
+) -> Tuple[OmegaConf, dict, AwesomeMidiTokenizer | ExponentialTimeTokenizer]:
     """
     Loads the model configuration, dataset configuration, and tokenizer based on the checkpoint path.
 
@@ -70,20 +71,17 @@ def load_dataset_name_and_tokenizer(
     cfg = OmegaConf.create(train_config)
     dataset_config = cfg.dataset
     if cfg.data.tokenizer == "OneTimeTokenizer":
-        dataset_name = "OneTimeTokenDataset"
         tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
     # NoLossTokenizer for backward-compatibility
     elif cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTokenizer":
-        dataset_name = "ExponentialTimeTokenDataset"
         tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
     elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
-        dataset_name = "AwesomeTokensDataset"
         min_time_unit = dataset_config["tokenizer_parameters"]["min_time_unit"]
         n_velocity_bins = dataset_config["tokenizer_parameters"]["n_velocity_bins"]
         tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
         tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
 
-    return cfg, dataset_config, dataset_name, tokenizer
+    return cfg, dataset_config, tokenizer
 
 
 def initialize_model(
@@ -157,7 +155,7 @@ def main():
 
         # Load model, tokenizer, and configurations
         checkpoint = torch.load(checkpoint_path, map_location=device)
-        cfg, dataset_config, dataset_name, tokenizer = load_dataset_name_and_tokenizer(checkpoint, device)
+        cfg, dataset_config, tokenizer = load_tokenizer(checkpoint, device)
         model = initialize_model(cfg, dataset_config, checkpoint=checkpoint, device=device)
 
     base_dataset_path = st.text_input("base dataset", value="roszcz/maestro-sustain-v2")
@@ -168,7 +166,7 @@ def main():
     dataset_config["augmentation_repetitions"] = 0
 
     dataset = load_dataset(
-        f"tokenized_midi_datasets/{dataset_name}",
+        "tokenized_midi_datasets/MidiSequenceDataset",
         split=dataset_split,
         trust_remote_code=True,
         num_proc=8,
@@ -184,7 +182,7 @@ def main():
     source = json.loads(record["source"])
 
     # Decode and display the original piece
-    notes = tokenizer.decode(record["note_token_ids"])
+    notes = pd.DataFrame(record["notes"])
     piece = ff.MidiPiece(notes, source=source)
 
     with st.form("generate parameters"):
@@ -196,7 +194,8 @@ def main():
         return
 
     # Generate new tokens and create the generated piece
-    input_sequence = torch.tensor([record["note_token_ids"]], device=device)
+    note_token_ids = tokenizer.encode(notes)
+    input_sequence = torch.tensor(note_token_ids, device=device)
     with torch.no_grad():
         with ctx:
             output = model.generate(input_sequence, max_new_tokens=max_new_tokens, temperature=temperature)

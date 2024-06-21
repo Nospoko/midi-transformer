@@ -18,7 +18,7 @@ def main():
         base_dataset_name = st.text_input(label="base_dataset_name", value="roszcz/maestro-sustain-v2")
         extra_datasets = st.text_input(label="extra_datasets (comma separated)", value="")
         notes_per_record = st.number_input(label="notes_per_record", min_value=1, value=512)
-        sequence_step = st.number_input(label="sequence_step", min_value=1, value=512)
+        step = st.number_input(label="step", min_value=1, value=512)
         pause_detection_threshold = st.number_input(label="pause_detection_threshold", value=4)
         sequence_length = st.number_input(label="sequence_length", min_value=1, value=5000, step=500)
 
@@ -36,7 +36,7 @@ def main():
         "base_dataset_name": base_dataset_name,
         "extra_datasets": extra_datasets_list,
         "notes_per_record": notes_per_record,
-        "sequence_step": sequence_step,
+        "step": step,
         "pause_detection_threshold": pause_detection_threshold,
     }
 
@@ -49,7 +49,7 @@ def main():
     tokenizer = ExponentialTimeTokenizer(**tokenizer_parameters)
 
     dataset = load_dataset(
-        f"downstream_task_datasets/{dataset_name}",
+        f"midi_datasets/{dataset_name}",
         split=dataset_split,
         trust_remote_code=True,
         num_proc=8,

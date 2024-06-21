@@ -9,11 +9,11 @@ def main():
     """Test the speed of encoding step in tokenizer"""
     tokenizer = ExponentialTimeTokenizer()
     dataset = load_dataset("roszcz/maestro-sustain-v2", split="test+train+validation")
-    pieces = [pd.DataFrame(record["notes"]) for record in dataset]
     tokens_total = 0
     print("starting")
     t0 = time.time()
-    for notes in pieces:
+    for record in dataset:
+        notes = pd.DataFrame(record["notes"])
         tokens = tokenizer.encode(notes=notes)
         tokens_total += len(tokens)
     t_total = time.time() - t0

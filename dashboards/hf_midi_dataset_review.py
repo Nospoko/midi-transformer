@@ -7,7 +7,7 @@ from datasets import load_dataset
 
 def main():
     dataset_names = [
-        "BassExtractedDataset",
+        "MidiSequenceDataset"
     ]
     dataset_name = st.selectbox(label="dataset", options=dataset_names)
     dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
@@ -50,16 +50,9 @@ def main():
     with st.expander(label="source"):
         st.json(record["source"])
 
-    source_notes = pd.DataFrame(record["source_notes"])
-    target_notes = pd.DataFrame(record["target_notes"])
-    src_piece = ff.MidiPiece(source_notes, source=record["source"])
-    tgt_piece = ff.MidiPiece(target_notes, source=record["source"])
-    st.write("#### Together:")
-    streamlit_pianoroll.from_fortepyan(piece=src_piece, secondary_piece=tgt_piece)
-    st.write("#### Prompt:")
-    streamlit_pianoroll.from_fortepyan(piece=src_piece)
-    st.write("#### Target:")
-    streamlit_pianoroll.from_fortepyan(piece=tgt_piece)
+    source_notes = pd.DataFrame(record["notes"])
+    piece = ff.MidiPiece(source_notes, source=record["source"])
+    streamlit_pianoroll.from_fortepyan(piece=piece)
 
 
 if __name__ == "__main__":

@@ -40,32 +40,26 @@ from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
 
 load_dotenv()
-tokenizer_name_to_dataset_map: dict[str, str] = {
-    "ExponentialTimeTokenizer": "ExponentialTimeTokenDataset",
-    "OneTimeTokenizer": "OneTimeTokenDataset",
-    "AwesomeMidiTokenizer": "AwesomeTokensDataset",
-}
 
 
 def prepare_next_token_dataset(cfg: DictConfig):
     dataset_config = cfg.dataset
-    tokenizer_parameters = OmegaConf.to_container(dataset_config.tokenizer_parameters)
+    tokenizer_parameters = OmegaConf.to_container(cfg.data.tokenizer_parameters)
     tokenizer_parameters |= {"special_tokens": special_tokens}
     # We have to use dict so that HuggingFace can serialize the configuration and cache the dataset
     dataset_parameters = OmegaConf.to_container(dataset_config)
 
     # Load the suitable dataset
     # Get the right data for the tokenizer specified in config
-    dataset_name = tokenizer_name_to_dataset_map[cfg.data.tokenizer]
-    dataset_path = to_absolute_path(f"./tokenized_midi_datasets/{dataset_name}")
+    dataset_path = to_absolute_path("./midi_datasets/MidiSequenceDataset")
     dataset = load_dataset(
         dataset_path,
         num_proc=8,
         trust_remote_code=True,
         **dataset_parameters,
     )
-    total_tokens = dataset_config.sequence_length * dataset["train"].num_rows
-    print(f"tokens in a training dataset: {total_tokens}")
+    total_tokens = cfg.data.sequence_length * dataset["train"].num_rows
+    print(f"tokens (with padding) in a training dataset: {total_tokens}")
     if cfg.data.tokenizer == "AwesomeMidiTokenizer":
         tokenizer_path = to_absolute_path("pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json")
         tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
@@ -75,10 +69,12 @@ def prepare_next_token_dataset(cfg: DictConfig):
     train_dataset = NextTokenDataset(
         dataset=dataset["train"],
         tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
     )
     val_dataset = NextTokenDataset(
         dataset=dataset["validation"],
         tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
     )
 
     return train_dataset, val_dataset
@@ -86,27 +82,23 @@ def prepare_next_token_dataset(cfg: DictConfig):
 
 def prepare_subsequence_datasets(cfg: DictConfig):
     dataset_config = cfg.dataset
-    tokenizer_parameters = OmegaConf.to_container(dataset_config.tokenizer_parameters)
+    tokenizer_parameters = OmegaConf.to_container(cfg.data.tokenizer_parameters)
     tokenizer_parameters |= {"special_tokens": special_tokens}
     # We have to use dict so that HuggingFace can serialize the configuration and cache the dataset ...
     dataset_parameters = OmegaConf.to_container(dataset_config)
     # Pop keys that are used for Tokenized Datasets and not for SubSequence
-    # TODO: make the datasets use the same logic
-    dataset_parameters.pop("tokenizer_parameters")
-    dataset_parameters.pop("sequence_length")
 
     # Load the suitable dataset
-    # Get the right data for the tokenizer specified in config
     dataset_name = "BassExtractedDataset"
-    dataset_path = to_absolute_path(f"./downstream_task_datasets/{dataset_name}")
+    dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
     dataset = load_dataset(
         dataset_path,
         num_proc=8,
         trust_remote_code=True,
         **dataset_parameters,
     )
-    total_tokens = dataset_config.sequence_length * dataset["train"].num_rows
-    print(f"tokens in a training dataset: {total_tokens}")
+    total_tokens = cfg.data.sequence_length * dataset["train"].num_rows
+    print(f"tokens (with padding) in a training dataset: {total_tokens}")
     if cfg.data.tokenizer == "AwesomeMidiTokenizer":
         tokenizer_path = to_absolute_path("pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json")
         tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
@@ -116,12 +108,12 @@ def prepare_subsequence_datasets(cfg: DictConfig):
     train_dataset = SubSequenceMidiDataset(
         dataset=dataset["train"],
         tokenizer=tokenizer,
-        sequence_length=cfg.dataset.sequence_length,
+        sequence_length=cfg.data.sequence_length,
     )
     val_dataset = SubSequenceMidiDataset(
         dataset=dataset["validation"],
         tokenizer=tokenizer,
-        sequence_length=cfg.dataset.sequence_length,
+        sequence_length=cfg.data.sequence_length,
     )
 
     return train_dataset, val_dataset
@@ -145,7 +137,6 @@ def main(cfg: DictConfig):
         )
         train_dataset, val_dataset = prepare_subsequence_datasets(cfg=cfg)
 
-    dataset_config = cfg.dataset
     tokenizer = train_dataset.tokenizer
     pad_token_id = tokenizer.token_to_id["<PAD>"]
     config = OmegaConf.to_container(cfg=cfg)
@@ -179,7 +170,7 @@ def main(cfg: DictConfig):
         seed_offset = 0
         ddp_world_size = 1
 
-    tokens_per_batch = cfg.data.batch_size * dataset_config.sequence_length
+    tokens_per_batch = cfg.data.batch_size * cfg.data.sequence_length
     tokens_per_iter = cfg.data.gradient_accumulation_steps * ddp_world_size * tokens_per_batch
     print(f"tokens per iteration will be: {tokens_per_iter:,}")
 
@@ -225,7 +216,7 @@ def main(cfg: DictConfig):
         n_layer=cfg.model.n_layer,
         n_head=cfg.model.n_head,
         n_embd=cfg.model.n_embd,
-        block_size=dataset_config.sequence_length,
+        block_size=cfg.data.sequence_length,
         bias=cfg.model.bias,
         vocab_size=None,
         dropout=cfg.model.dropout,
@@ -294,9 +285,9 @@ def main(cfg: DictConfig):
         model.load_state_dict(state_dict)
 
     # crop down the model block size if desired, using model surgery
-    if dataset_config.sequence_length < model.config.block_size:
-        model.crop_block_size(dataset_config.sequence_length)
-        model_args["block_size"] = dataset_config.sequence_length  # so that the checkpoint will have the right value
+    if cfg.data.sequence_length < model.config.block_size:
+        model.crop_block_size(cfg.data.sequence_length)
+        model_args["block_size"] = cfg.data.sequence_length  # so that the checkpoint will have the right value
     model.to(device)
 
     # initialize a GradScaler. If enabled=False scaler is a no-op
