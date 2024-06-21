@@ -147,6 +147,7 @@ def main(cfg: DictConfig):
 
     dataset_config = cfg.dataset
     tokenizer = train_dataset.tokenizer
+    pad_token_id = tokenizer.token_to_id["<PAD>"]
     config = OmegaConf.to_container(cfg=cfg)
 
     device = cfg.system.device
@@ -236,7 +237,7 @@ def main(cfg: DictConfig):
         # determine the vocab size we'll use for from-scratch training
         model_args["vocab_size"] = meta_vocab_size
         gptconf = GPTConfig(**model_args)
-        model = GPT(gptconf)
+        model = GPT(config=gptconf, pad_token_id=pad_token_id)
 
     elif cfg.init_from == "resume":
         print(f"Resuming training from {out_dir}")
@@ -253,7 +254,7 @@ def main(cfg: DictConfig):
 
         # create the model
         gptconf = GPTConfig(**model_args)
-        model = GPT(gptconf)
+        model = GPT(config=gptconf, pad_token_id=pad_token_id)
         state_dict = checkpoint["model"]
 
         # fix the keys of the state dictionary :(
@@ -280,7 +281,7 @@ def main(cfg: DictConfig):
 
         # create the model
         gptconf = GPTConfig(**model_args)
-        model = GPT(gptconf)
+        model = GPT(config=gptconf, pad_token_id=pad_token_id)
         state_dict = checkpoint["model"]
 
         # fix the keys of the state dictionary :(
@@ -453,9 +454,8 @@ def main(cfg: DictConfig):
             # get loss as float. note: this is a CPU-GPU sync point
             # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
             lossf = loss.item() * cfg.data.gradient_accumulation_steps
-            if local_iter_num >= 5:  # let the training loop settle a bit
-                mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
-                running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
+            mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
+            running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
 
             tps = n_iter_tokens / t_forward_backward
             wandb.log(

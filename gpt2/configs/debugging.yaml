@@ -3,7 +3,7 @@ defaults:
   - data: exponential-colossal
   - dataset: bassextracted
   - logging: subsequence
-  - lr: finetuning
+  - lr: pretraining-small
   - _self_
 
 out_dir: 'checkpoints'
@@ -30,3 +30,14 @@ system:
   device: 'cuda'  # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1' etc., or try 'mps' on macbooks
   dtype: 'float16'  # 'float32', 'bfloat16', or 'float16', the latter will auto implement a GradScaler
   compile: true  # use PyTorch 2.0 to compile the model to be faster
+
+model:
+  n_layer: 1
+  n_embd: 50
+  n_head: 1
+
+dataset:
+  extra_datasets: []
+  augmentation:
+    max_pitch_shift: 0
+    speed_change_factors: []
