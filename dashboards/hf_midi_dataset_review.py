@@ -6,9 +6,7 @@ from datasets import load_dataset
 
 
 def main():
-    dataset_names = [
-        "MidiSequenceDataset"
-    ]
+    dataset_names = ["MidiSequenceDataset"]
     dataset_name = st.selectbox(label="dataset", options=dataset_names)
     dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
     with st.form(key="config_form"):
