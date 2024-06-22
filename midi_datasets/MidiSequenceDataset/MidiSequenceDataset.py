@@ -75,7 +75,7 @@ class MidiSequenceDataset(GeneratorBasedBuilder):
         rs = np.random.RandomState(np.random.MT19937(np.random.SeedSequence(4)))
         n_notes = len(piece.df.pitch)
         # Some sequences might be too short
-        if n_notes < self.config.notes_per_record:
+        if n_notes <= self.config.notes_per_record:
             return []
         n_samples = 1 + (n_notes - self.config.notes_per_record) // self.config.step
         piece_idxs = range(n_notes - self.config.notes_per_record)
