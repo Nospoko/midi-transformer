@@ -125,7 +125,11 @@ def augment_dataset(dataset: Dataset, speed_change_factors: list[float] = None, 
     if max_pitch_shift == 0 and (speed_change_factors is None or len(speed_change_factors) == 0):
         return dataset
 
-    num_cpus = cpu_count() - 4  # Use all CPUs except 4
+    num_cpus = cpu_count()
+    if num_cpus > 8:
+        num_cpus -= 4  # Use all CPUs except 4
+    else:
+        num_cpus -= 1
 
     pitch_shift_args = {
         "max_pitch_shift": max_pitch_shift,
