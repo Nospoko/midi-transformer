@@ -47,8 +47,8 @@ class SubSequenceMidiDataset(MidiDataset):
         )
 
         out = {
-            "source_token_ids": torch.tensor(source_token_ids, dtype=torch.int64),
-            "target_token_ids": torch.tensor(target_token_ids, dtype=torch.int64),
+            "source_token_ids": torch.tensor(source_token_ids[: self.sequence_length], dtype=torch.int64),
+            "target_token_ids": torch.tensor(target_token_ids[: self.sequence_length], dtype=torch.int64),
             "extracted": extracted,
             "source": record["source"],
         }
