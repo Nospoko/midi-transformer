@@ -1,9 +1,9 @@
 defaults:
-  - model: gpt2_small # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
-  - data: exponential-colossal
+  - model: gpt2 # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
+  - data: exponential-giant
   - dataset: bassextracted
   - logging: subsequence
-  - lr: finetuning
+  - lr: pretraining-large
   - _self_
 
 out_dir: 'checkpoints'
