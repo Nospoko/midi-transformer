@@ -29,7 +29,9 @@ class BassExtractedDataset(MidiSequenceDataset):
             "extracted": ["bass"],
             "source": json.dumps(piece.source),
         }
-        is_valid = False
-        if len(source_notes) > 0 and len(target_notes) > 0:
-            is_valid = True
-        return record, is_valid
+        return record
+
+    def validate_record(self, record: dict):
+        if len(record["source_notes"]) > 0 and len(record["target_notes"]) > 0:
+            return True
+        return False

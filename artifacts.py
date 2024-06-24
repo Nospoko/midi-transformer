@@ -5,7 +5,7 @@
     That is why in this file I will keep all the voice definitions, extraction type definitions etc.
     Let me know if that makes sense.
 """
-placeholder_tokens = ["<SENTINEL_{idx}>" for idx in range(100)]
+placeholder_tokens = [f"<SENTINEL_{idx}>" for idx in range(100)]
 special_tokens = [
     "<CLS>",
     "<EOS>",

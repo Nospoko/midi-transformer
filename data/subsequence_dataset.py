@@ -20,7 +20,7 @@ class SubSequenceMidiDataset(MidiDataset):
         )
         self.sequence_length = sequence_length
 
-    def post_process(self, source_token_ids: list[int], target_token_ids: list[int], extracted: str):
+    def post_process(self, source_token_ids: list[int], target_token_ids: list[int], extracted: list[str]):
         """Append prefixes and suffixes (padding) for source and target"""
         prefix_tokens = [extraction_type_to_token_pair[extraction_type] for extraction_type in extracted]
 

@@ -86,8 +86,8 @@ class MidiSequenceDataset(GeneratorBasedBuilder):
             start = int(start)
             finish = start + self.config.notes_per_record
             part = piece[start:finish]
-            record, is_valid = self.create_record(part)
-            if not is_valid:
+            record = self.create_record(part)
+            if not self.validate_record(record=record):
                 continue
             prepared_records.append(record)
 
@@ -139,6 +139,11 @@ class MidiSequenceDataset(GeneratorBasedBuilder):
                     key = f"{it}_{jt}_{shard_id}"
                     yield key, sequence
 
+    def validate_record(self, record: dict):
+        if len(record["notes"]) == self.config.notes_per_record:
+            return True
+        return False
+
     def create_record(self, piece: ff.MidiPiece) -> tuple[dict, bool]:
         """
         Method that defines a record in the dataset.
@@ -147,7 +152,5 @@ class MidiSequenceDataset(GeneratorBasedBuilder):
             "notes": piece.df,
             "source": json.dumps(piece.source),
         }
-        is_valid = False
-        if len(record["notes"]) > 0:
-            is_valid = True
-        return record, is_valid
+
+        return record

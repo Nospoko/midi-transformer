@@ -16,6 +16,7 @@ from midi_trainable_tokenizers import AwesomeMidiTokenizer
 from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
 from midi_tokenizers.no_loss_tokenizer import ExponentialTimeTokenizer
 
+from artifacts import special_tokens
 from gpt2.model import GPT, GPTConfig
 from dashboards.common.components import download_button
 
@@ -71,13 +72,13 @@ def load_tokenizer(
     cfg = OmegaConf.create(train_config)
     dataset_config = cfg.dataset
     if cfg.data.tokenizer == "OneTimeTokenizer":
-        tokenizer = OneTimeTokenizer(**dataset_config["tokenizer_parameters"])
+        tokenizer = OneTimeTokenizer(**cfg.data.tokenizer_parameters, special_tokens=special_tokens)
     # NoLossTokenizer for backward-compatibility
     elif cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTokenizer":
-        tokenizer = ExponentialTimeTokenizer(**dataset_config["tokenizer_parameters"])
+        tokenizer = ExponentialTimeTokenizer(**cfg.data.tokenizer_parameters, special_tokens=special_tokens)
     elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
-        min_time_unit = dataset_config["tokenizer_parameters"]["min_time_unit"]
-        n_velocity_bins = dataset_config["tokenizer_parameters"]["n_velocity_bins"]
+        min_time_unit = cfg.data.tokenizer_parameters["min_time_unit"]
+        n_velocity_bins = cfg.data.tokenizer_parameters["n_velocity_bins"]
         tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
         tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
 
@@ -86,7 +87,6 @@ def load_tokenizer(
 
 def initialize_model(
     cfg: OmegaConf,
-    dataset_config: dict,
     checkpoint: dict,
     device: torch.device,
 ) -> GPT:
@@ -106,7 +106,7 @@ def initialize_model(
         "n_layer": cfg.model.n_layer,
         "n_head": cfg.model.n_head,
         "n_embd": cfg.model.n_embd,
-        "block_size": dataset_config["sequence_length"],
+        "block_size": cfg.data.sequence_length,
         "bias": cfg.model.bias,
         "vocab_size": None,
         "dropout": cfg.model.dropout,
@@ -156,17 +156,18 @@ def main():
         # Load model, tokenizer, and configurations
         checkpoint = torch.load(checkpoint_path, map_location=device)
         cfg, dataset_config, tokenizer = load_tokenizer(checkpoint, device)
-        model = initialize_model(cfg, dataset_config, checkpoint=checkpoint, device=device)
+        model = initialize_model(cfg, checkpoint=checkpoint, device=device)
 
     base_dataset_path = st.text_input("base dataset", value="roszcz/maestro-sustain-v2")
     dataset_split = st.selectbox("split", options=["validation", "train", "test"])
 
     dataset_config["base_dataset_name"] = base_dataset_path
     dataset_config["extra_datasets"] = []
-    dataset_config["augmentation_repetitions"] = 0
+    dataset_config["augmentation"]["max_time_shift"] = 0
+    dataset_config["augmentation"]["speed_change_factors"] = []
 
     dataset = load_dataset(
-        "tokenized_midi_datasets/MidiSequenceDataset",
+        "midi_datasets/MidiSequenceDataset",
         split=dataset_split,
         trust_remote_code=True,
         num_proc=8,
@@ -187,7 +188,7 @@ def main():
 
     with st.form("generate parameters"):
         temperature = st.number_input("temperature", value=1.0)
-        max_new_tokens = st.number_input("max_new_tokens", value=dataset_config["sequence_length"])
+        max_new_tokens = st.number_input("max_new_tokens", value=cfg.data.sequence_length)
         run = st.form_submit_button("Generate")
 
     if not run:
@@ -195,7 +196,7 @@ def main():
 
     # Generate new tokens and create the generated piece
     note_token_ids = tokenizer.encode(notes)
-    input_sequence = torch.tensor(note_token_ids, device=device)
+    input_sequence = torch.tensor([note_token_ids], device=device)
     with torch.no_grad():
         with ctx:
             output = model.generate(input_sequence, max_new_tokens=max_new_tokens, temperature=temperature)
@@ -240,6 +241,9 @@ def main():
                 unsafe_allow_html=True,
             )
         os.unlink(midi_path)
+
+        with st.expander("Tokens"):
+            st.write(tokenizer.vocab[token_id] for token_id in output)
 
     st.write("whole model output")
     second_part = ff.MidiPiece(out_notes[piece.size :].copy())
