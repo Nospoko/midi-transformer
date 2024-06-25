@@ -11,8 +11,23 @@ import streamlit_pianoroll
 from datasets import load_dataset
 
 from dashboards.common.components import download_button
-from data.subsequence_dataset import SubSequenceMidiDataset
+from artifacts import get_voice_range, get_source_extraction_token
 from dashboards.common.utils import load_tokenizer, initialize_model, select_part_dataset
+
+
+def prepare_record(record: dict, extraction_type: str):
+    low, high = get_voice_range(voice=extraction_type)
+    start_end_columns = st.columns(2)
+    start_idx = start_end_columns[0].number_input(label="start idx", value=0)
+    end_idx = start_end_columns[1].number_input(label="end idx", value=60)
+
+    notes = pd.DataFrame(record["notes"])
+    notes = notes.iloc[start_idx:end_idx]
+    extracted_ids = (notes.pitch >= low) & (notes.pitch < high)
+    source_notes = notes[~extracted_ids]
+    target_notes = notes[extracted_ids]
+
+    return source_notes, target_notes
 
 
 def main():
@@ -38,47 +53,39 @@ def main():
 
         # Load model, tokenizer, and configurations
         checkpoint = torch.load(checkpoint_path, map_location=device)
-        cfg, dataset_config, tokenizer = load_tokenizer(checkpoint, device)
+        cfg, _, tokenizer = load_tokenizer(checkpoint, device)
         model = initialize_model(cfg, checkpoint=checkpoint, device=device)
 
-    base_dataset_path = st.text_input("base dataset", value="roszcz/maestro-sustain-v2")
+    dataset_path = st.text_input("dataset", value="roszcz/maestro-sustain-v2")
     dataset_split = st.selectbox("split", options=["validation", "train", "test"])
-
-    dataset_config["base_dataset_name"] = base_dataset_path
-    dataset_config["extra_datasets"] = []
-    dataset_config["augmentation"]["max_time_shift"] = 0
-    dataset_config["augmentation"]["speed_change_factors"] = []
+    extraction_type = st.selectbox("extraction type", options=["bass"])
 
     dataset = load_dataset(
-        "midi_datasets/BassExtractedDataset",
+        dataset_path,
         split=dataset_split,
         trust_remote_code=True,
         num_proc=8,
-        **dataset_config,
     )
 
     # Select part of the dataset
     dataset = select_part_dataset(midi_dataset=dataset)
 
-    dataset = SubSequenceMidiDataset(
-        dataset=dataset,
-        tokenizer=tokenizer,
-        sequence_length=cfg.data.sequence_length,
-    )
-
     # Get the record id from user input
     idx = st.number_input("record_id", value=0, max_value=len(dataset))
-    record = dataset.dataset[idx]
+    record = dataset[idx]
     source = json.loads(record["source"])
 
+    source_notes, target_notes = prepare_record(record=record, extraction_type=extraction_type)
+
     # Decode and display the original piece
-    source_notes = pd.DataFrame(record["source_notes"])
-    target_notes = pd.DataFrame(record["target_notes"])
-    notes = pd.concat([source_notes, target_notes])
+    notes = pd.concat([source_notes, target_notes], ignore_index=True)
+    notes = notes.sort_values(by="start").reset_index(drop=True)
 
-    source_piece = ff.MidiPiece(source_notes, source=source)
+    source_piece = ff.MidiPiece(source_notes)
+    target_piece = ff.MidiPiece(target_notes)
+
     piece = ff.MidiPiece(notes, source=source)
-
+    st.write(f"Model input size: {cfg.data.sequence_length}")
     with st.form("generate parameters"):
         temperature = st.number_input("temperature", value=1.0)
         max_new_tokens = st.number_input("max_new_tokens", value=cfg.data.sequence_length)
@@ -87,10 +94,16 @@ def main():
         return
 
     # Generate new tokens and create the generated piece
-    note_token_ids = dataset[idx]["source_token_ids"]
+    prefix_token = get_source_extraction_token(extraction_type=extraction_type)
+    note_token_ids = tokenizer.encode(
+        source_notes,
+        pad_to_size=cfg.data.sequence_length,
+        prefix_tokens=[prefix_token],
+    )
+
     with ctx:
         output = model.greedy_decode(
-            idx=note_token_ids,
+            idx=torch.tensor(note_token_ids),
             max_len=max_new_tokens,
             temperature=temperature,
             device=device,
@@ -105,7 +118,7 @@ def main():
     # Display and allow download of the original MIDI
     with io_columns[0]:
         st.write("original:")
-        streamlit_pianoroll.from_fortepyan(ff.MidiPiece(source_notes), secondary_piece=ff.MidiPiece(target_notes))
+        streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=target_piece)
         original_midi_path = f"tmp/fragment_of_{piece_name}_{idx}.mid"
         source_file = piece.to_midi()
         source_file.write(original_midi_path)
@@ -135,9 +148,10 @@ def main():
             st.write(tokenizer.vocab[token_id] for token_id in output)
 
     st.write("whole")
-    streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=generated_piece)
-    out_notes = pd.concat([source_notes, generated_notes])
+
+    out_notes = pd.concat([source_notes, generated_notes]).sort_values(by="start").reindex()
     out_piece = ff.MidiPiece(out_notes)
+    streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=generated_piece)
 
     # Allow download of the full MIDI with context
     full_midi_path = f"tmp/full_{milion_parameters}_variations_on_{piece_name}_{idx}.mid"

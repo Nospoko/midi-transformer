@@ -6,6 +6,7 @@ from dashboards.browse_generated import main as browse_generated
 from dashboards.augmentation_review import main as augmentation_review
 from dashboards.midi_dataset_review import main as midi_dataset_review
 from dashboards.hf_midi_dataset_review import main as hf_datasets_review
+from dashboards.extracted_voice_gpt_review import main as extracted_voice_gpt_review
 from dashboards.subsequence_dataset_review import main as subsequense_dataset_review
 from dashboards.hf_subsequence_dataset_review import main as hf_subsequence_dataset_review
 
@@ -16,6 +17,7 @@ def main():
     options = [
         "browse generated",
         "gpt_review",
+        "extracted_voice_gpt_review",
         "hf_midi_datasets_review",
         "hf_subsequence_datasets_review",
         "augmentation_review",
@@ -32,6 +34,8 @@ def main():
             hf_subsequence_dataset_review()
         case "gpt_review":
             gpt_review()
+        case "extracted_voice_gpt_review":
+            extracted_voice_gpt_review()
         case "augmentation_review":
             augmentation_review()
         case "midi_dataset_review":

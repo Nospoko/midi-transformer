@@ -14,6 +14,14 @@ from dashboards.common.components import download_button
 from dashboards.common.utils import load_tokenizer, initialize_model, select_part_dataset
 
 
+def prepare_record(record: dict):
+    start_idx = st.number_input(label="start idx", value=0)
+    end_idx = st.number_input(label="end idx", value=60)
+    notes = pd.DataFrame(record["notes"])
+    notes = notes[start_idx:end_idx]
+    return notes
+
+
 def main():
     with st.sidebar:
         # Select device and checkpoint path
@@ -37,23 +45,17 @@ def main():
 
         # Load model, tokenizer, and configurations
         checkpoint = torch.load(checkpoint_path, map_location=device)
-        cfg, dataset_config, tokenizer = load_tokenizer(checkpoint, device)
+        cfg, _, tokenizer = load_tokenizer(checkpoint, device)
         model = initialize_model(cfg, checkpoint=checkpoint, device=device)
 
-    base_dataset_path = st.text_input("base dataset", value="roszcz/maestro-sustain-v2")
+    dataset_path = st.text_input("dataset", value="roszcz/maestro-sustain-v2")
     dataset_split = st.selectbox("split", options=["validation", "train", "test"])
 
-    dataset_config["base_dataset_name"] = base_dataset_path
-    dataset_config["extra_datasets"] = []
-    dataset_config["augmentation"]["max_time_shift"] = 0
-    dataset_config["augmentation"]["speed_change_factors"] = []
-
     dataset = load_dataset(
-        "midi_datasets/MidiSequenceDataset",
+        dataset_path,
         split=dataset_split,
         trust_remote_code=True,
         num_proc=8,
-        **dataset_config,
     )
 
     # Select part of the dataset
@@ -65,7 +67,7 @@ def main():
     source = json.loads(record["source"])
 
     # Decode and display the original piece
-    notes = pd.DataFrame(record["notes"])
+    notes = prepare_record(record=record)
     piece = ff.MidiPiece(notes, source=source)
 
     with st.form("generate parameters"):
@@ -77,7 +79,10 @@ def main():
         return
 
     # Generate new tokens and create the generated piece
-    note_token_ids = tokenizer.encode(notes)
+    note_token_ids = tokenizer.encode(
+        notes=notes,
+        pad_to_size=cfg.data.sequence_length,
+    )
     input_sequence = torch.tensor([note_token_ids], device=device)
     with torch.no_grad():
         with ctx:

@@ -1,15 +1,8 @@
-"""
-    TBH, I think keeping ranges of voices and velocities as a dataset parameter and experimenting with
-    tiny variations is tragically boring. I would much prefer keeping voice definintions the same and experimenting
-    with various combinations of extraction types instead.
-    That is why in this file I will keep all the voice definitions, extraction type definitions etc.
-    Let me know if that makes sense.
-"""
 placeholder_tokens = [f"<SENTINEL_{idx}>" for idx in range(100)]
 special_tokens = [
+    "<PAD>",
     "<CLS>",
     "<EOS>",
-    "<PAD>",
     "<RANDOM>",
     "<PPP>",
     "<PP>",

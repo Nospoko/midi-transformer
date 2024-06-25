@@ -125,7 +125,7 @@ class GPTConfig:
 
 
 class GPT(nn.Module):
-    def __init__(self, config, pad_token_id: int = 2):
+    def __init__(self, config, pad_token_id: int = 0):
         super().__init__()
         assert config.vocab_size is not None
         assert config.block_size is not None
@@ -359,6 +359,7 @@ class GPT(nn.Module):
 
         # Initialize the parallel sequence with the same shape as input
         next_tokens = torch.zeros_like(idx)
+        next_tokens.fill_(self.pad_token_id)
 
         for i in range(max_len):
             # if the sequence context is growing too long we must crop it at block_size
