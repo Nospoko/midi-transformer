@@ -341,3 +341,44 @@ class GPT(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1)
 
         return idx
+
+    @torch.no_grad()
+    def greedy_decode(
+        self,
+        idx: torch.Tensor,
+        max_len: int,
+        device: str = "cpu",
+        temperature: float = 1.0,
+    ) -> torch.Tensor:
+        """
+        For each token in the input sequence, predict the next token to create a parallel sequence.
+        """
+        idx = idx.unsqueeze(0).to(device)
+        b, t = idx.size()
+        max_len = min(max_len, t)
+
+        # Initialize the parallel sequence with the same shape as input
+        next_tokens = torch.zeros_like(idx)
+
+        for i in range(max_len):
+            # if the sequence context is growing too long we must crop it at block_size
+            if (i + 1) <= self.config.block_size:
+                idx_cond = idx[:, : i + 1]
+            else:
+                idx_cond = idx[:, i + 1 - self.config.block_size : i + 1]
+            # forward the model to get the logits for the current position
+            logits, _ = self(idx_cond)
+            # pluck the logits at the final step
+            logits = logits[:, -1, :] / temperature
+            # apply softmax to convert logits to (normalized) probabilities
+            probs = F.softmax(logits, dim=-1)
+            # sample from the distribution
+            idx_next = torch.multinomial(probs, num_samples=1)
+
+            # # take the most likely token
+            # idx_next = torch.argmax(logits, dim=-1)
+
+            # add the next token to the parallel sequence
+            next_tokens[:, i] = idx_next
+
+        return next_tokens[0]
