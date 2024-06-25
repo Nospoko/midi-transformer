@@ -56,7 +56,7 @@ class NextTokenDataset(MidiDataset):
         """
         record = self.dataset[idx]
         notes = pd.DataFrame(record["notes"])
-        encoding = self.tokenizer.encode(notes=notes)
+        encoding = self.tokenizer.encode(notes=notes, pad_to_size=self.sequence_length)
 
         # The inputs to the transformer will be the offset sequence
         source_token_ids = encoding[:-1]

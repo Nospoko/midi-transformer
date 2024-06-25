@@ -2,9 +2,9 @@ import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
 from datasets import load_dataset
-from midi_tokenizers import ExponentialTimeTokenizer
 
 from artifacts import special_tokens
+from data.tokenizer import ExponentialTokenizer
 from data.subsequence_dataset import SubSequenceMidiDataset
 
 
@@ -46,7 +46,7 @@ def main():
         "special_tokens": special_tokens,
     }
 
-    tokenizer = ExponentialTimeTokenizer(**tokenizer_parameters)
+    tokenizer = ExponentialTokenizer(**tokenizer_parameters)
 
     dataset = load_dataset(
         f"midi_datasets/{dataset_name}",
@@ -72,7 +72,7 @@ def main():
     with st.expander(label="source"):
         st.json(record["source"])
 
-    extracted = record["extracted"]
+    extracted = record["extraction_type"]
     st.write(f"Extracted: {extracted}")
 
     src_token_ids = record["source_token_ids"]

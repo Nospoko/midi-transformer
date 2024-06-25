@@ -28,7 +28,6 @@ from dotenv import load_dotenv
 from datasets import load_dataset
 from hydra.utils import to_absolute_path
 from omegaconf import OmegaConf, DictConfig
-from midi_trainable_tokenizers import AwesomeMidiTokenizer
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
@@ -36,6 +35,7 @@ from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
 import wandb
 from artifacts import special_tokens
 from gpt2.model import GPT, GPTConfig
+from data.tokenizer import AwesomeTokenizer
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
 
@@ -50,8 +50,12 @@ def prepare_datasets(cfg: DictConfig):
     dataset_parameters = OmegaConf.to_container(dataset_config)
 
     if cfg.data.tokenizer == "AwesomeMidiTokenizer":
-        tokenizer_path = to_absolute_path("pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json")
-        tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
+        min_time_unit = tokenizer_parameters["min_time_unit"]
+        n_velocity_bins = tokenizer_parameters["n_velocity_bins"]
+        tokenizer_path = to_absolute_path(
+            f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
+        )
+        tokenizer = AwesomeTokenizer.from_file(tokenizer_path)
     else:
         tokenizer = generate_tokenizer(name=cfg.data.tokenizer, parameters=tokenizer_parameters)
 

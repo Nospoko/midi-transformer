@@ -36,7 +36,7 @@ special_tokens = [
     "<NO_TREBLE>",
 ] + placeholder_tokens
 
-pitch_types = ["bass", "tenor", "alto", "soprano", "treble"]
+
 extraction_type_to_token_pair = {
     "bass": ("<BASS>", "<NO_BASS>"),
     "tenor": ("<TENOR>", "<NO_TENOR>"),
@@ -51,12 +51,15 @@ extraction_type_to_token_pair = {
     "f": ("<F>", "<NO_F>"),
 }
 
-extraction_type_to_range = {
+voice_to_range = {
     "bass": (21, 48),
     "tenor": (43, 81),
     "alto": (53, 84),
     "soprano": (60, 96),
     "treble": (60, 108),
+}
+
+dynamic_to_range = {
     "ppp": (0, 30),
     "pp": (30, 50),
     "p": (50, 70),
@@ -64,3 +67,19 @@ extraction_type_to_range = {
     "mf": (90, 110),
     "f": (110, 127),
 }
+
+
+def get_source_extraction_token(extraction_type: str):
+    return extraction_type_to_token_pair[extraction_type][1]
+
+
+def get_target_extraction_token(extraction_type: str):
+    return extraction_type_to_token_pair[extraction_type][0]
+
+
+def get_voice_range(voice: str):
+    return voice_to_range[voice]
+
+
+def get_velocity_range(dynamic_instruction: str):
+    return dynamic_to_range[dynamic_instruction]

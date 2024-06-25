@@ -5,12 +5,10 @@ import torch
 import streamlit as st
 from datasets import Dataset
 from omegaconf import OmegaConf, DictConfig
-from midi_trainable_tokenizers import AwesomeMidiTokenizer
-from midi_tokenizers.one_time_tokenizer import OneTimeTokenizer
-from midi_tokenizers.no_loss_tokenizer import ExponentialTimeTokenizer
 
 from artifacts import special_tokens
 from gpt2.model import GPT, GPTConfig
+from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 
 
 def select_part_dataset(midi_dataset: Dataset) -> Dataset:
@@ -49,7 +47,7 @@ def select_part_dataset(midi_dataset: Dataset) -> Dataset:
 def load_tokenizer(
     checkpoint: str,
     device: torch.device,
-) -> Tuple[OmegaConf, dict, AwesomeMidiTokenizer | ExponentialTimeTokenizer]:
+) -> Tuple[OmegaConf, dict, AwesomeTokenizer | ExponentialTokenizer]:
     """
     Loads the model configuration, dataset configuration, and tokenizer based on the checkpoint path.
 
@@ -63,16 +61,14 @@ def load_tokenizer(
     train_config = checkpoint["config"]
     cfg = OmegaConf.create(train_config)
     dataset_config = cfg.dataset
-    if cfg.data.tokenizer == "OneTimeTokenizer":
-        tokenizer = OneTimeTokenizer(**cfg.data.tokenizer_parameters, special_tokens=special_tokens)
     # NoLossTokenizer for backward-compatibility
-    elif cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTokenizer":
-        tokenizer = ExponentialTimeTokenizer(**cfg.data.tokenizer_parameters, special_tokens=special_tokens)
+    if cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTokenizer":
+        tokenizer = ExponentialTokenizer(**cfg.data.tokenizer_parameters, special_tokens=special_tokens)
     elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
         min_time_unit = cfg.data.tokenizer_parameters["min_time_unit"]
         n_velocity_bins = cfg.data.tokenizer_parameters["n_velocity_bins"]
         tokenizer_path = f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
-        tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
+        tokenizer = AwesomeTokenizer.from_file(tokenizer_path)
 
     return cfg, dataset_config, tokenizer
 

@@ -33,7 +33,7 @@ system:
 
 model:
   n_layer: 1
-  n_embd: 50
+  n_embd: 10
   n_head: 1
 
 dataset:

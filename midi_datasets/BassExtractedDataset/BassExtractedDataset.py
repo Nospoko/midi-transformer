@@ -3,7 +3,7 @@ import json
 import fortepyan as ff
 from datasets import DatasetInfo
 
-from artifacts import extraction_type_to_range
+from artifacts import get_voice_range
 from midi_datasets.MidiSequenceDataset.MidiSequenceDataset import MidiSequenceDataset
 
 _DESC = """
@@ -18,7 +18,7 @@ class BassExtractedDataset(MidiSequenceDataset):
 
     def create_record(self, piece: ff.MidiPiece) -> tuple[dict, bool]:
         notes = piece.df
-        bass_range = extraction_type_to_range["bass"]
+        bass_range = get_voice_range("bass")
         bass_ids = (notes.pitch < bass_range[1]) & (notes.pitch > bass_range[0])
         source_notes = notes[~bass_ids]
         target_notes = notes[bass_ids]
@@ -26,7 +26,7 @@ class BassExtractedDataset(MidiSequenceDataset):
         record = {
             "source_notes": source_notes,
             "target_notes": target_notes,
-            "extracted": ["bass"],
+            "extraction_type": "bass",
             "source": json.dumps(piece.source),
         }
         return record
