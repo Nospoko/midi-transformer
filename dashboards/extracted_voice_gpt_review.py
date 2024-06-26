@@ -52,14 +52,6 @@ def main():
     cfg, _, tokenizer = dashboard_utils.load_tokenizer(checkpoint)
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
     ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
-    ctx = (
-        nullcontext()
-        if device_type == "cpu"
-        else torch.amp.autocast(
-            device_type=device_type,
-            dtype=torch.float32,
-        )
-    )
 
     dataset_path = st.text_input("dataset", value="roszcz/maestro-sustain-v2")
     dataset_split = st.selectbox("split", options=["validation", "train", "test"])
