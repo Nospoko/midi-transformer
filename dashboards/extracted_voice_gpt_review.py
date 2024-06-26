@@ -17,11 +17,11 @@ from artifacts import get_voice_range, get_source_extraction_token
 def prepare_record(record: dict, extraction_type: str):
     low, high = get_voice_range(voice=extraction_type)
     start_end_columns = st.columns(2)
-    start_idx = start_end_columns[0].number_input(label="start idx", value=0)
-    end_idx = start_end_columns[1].number_input(label="end idx", value=60)
+    start = start_end_columns[0].number_input(label="start second", value=0)
+    end = start_end_columns[1].number_input(label="end second", value=60)
 
     notes = pd.DataFrame(record["notes"])
-    notes = notes.iloc[start_idx:end_idx]
+    notes = notes[(notes.start > start) & (notes.end < end)]
     notes.end -= notes.start.min()
     notes.start -= notes.start.min()
     extracted_ids = (notes.pitch >= low) & (notes.pitch < high)

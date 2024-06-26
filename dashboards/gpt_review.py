@@ -17,7 +17,7 @@ def prepare_record(record: dict):
     start = st.number_input(label="start second", value=0.0)
     end = st.number_input(label="end second", value=60.0)
     notes = pd.DataFrame(record["notes"])
-    notes = notes[(notes.start > start) & (notes.start < end)]
+    notes = notes[(notes.start > start) & (notes.end < end)]
 
     notes.end -= notes.start.min()
     notes.start -= notes.start.min()
@@ -65,6 +65,7 @@ def main():
 
     # Decode and display the original piece
     notes = prepare_record(record=record)
+
     piece = ff.MidiPiece(notes, source=source)
 
     with st.form("generate parameters"):
@@ -81,6 +82,7 @@ def main():
     note_token_ids = tokenizer.encode(
         notes=notes,
     )
+
     input_sequence = torch.tensor([note_token_ids], device=device)
     with torch.no_grad():
         with ctx:
