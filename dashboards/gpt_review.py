@@ -18,6 +18,8 @@ def prepare_record(record: dict):
     end_idx = st.number_input(label="end idx", value=60)
     notes = pd.DataFrame(record["notes"])
     notes = notes[start_idx:end_idx]
+    notes.end -= notes.start.min()
+    notes.start -= notes.start.min()
     return notes
 
 

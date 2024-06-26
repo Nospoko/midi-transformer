@@ -22,6 +22,8 @@ def prepare_record(record: dict, extraction_type: str):
 
     notes = pd.DataFrame(record["notes"])
     notes = notes.iloc[start_idx:end_idx]
+    notes.end -= notes.start.min()
+    notes.start -= notes.start.min()
     extracted_ids = (notes.pitch >= low) & (notes.pitch < high)
     source_notes = notes[~extracted_ids]
     target_notes = notes[extracted_ids]
