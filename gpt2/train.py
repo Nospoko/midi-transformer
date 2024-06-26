@@ -61,7 +61,12 @@ def prepare_datasets(cfg: DictConfig):
     tokenizer = load_tokenizer(cfg)
     dataset_name = "MidiSequenceDataset" if cfg.task == "pretraining" else "BassExtractedDataset"
     dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
-    dataset = load_dataset(dataset_path, num_proc=8, trust_remote_code=True, **dataset_config)
+    dataset = load_dataset(
+        dataset_path,
+        num_proc=8,
+        trust_remote_code=True,
+        **dataset_config,
+    )
 
     dataset_class = NextTokenDataset if cfg.task == "pretraining" else SubSequenceMidiDataset
     train_dataset = dataset_class(
@@ -193,6 +198,7 @@ def main(cfg: DictConfig):
         # numpy to int :(
         x = torch.stack([data[int(i)]["source_token_ids"] for i in ix])
         y = torch.stack([data[int(i)]["target_token_ids"] for i in ix])
+        print(x)
         if device_type == "cuda":
             # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
             x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)

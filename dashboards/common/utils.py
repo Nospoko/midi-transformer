@@ -46,8 +46,7 @@ def select_part_dataset(midi_dataset: Dataset) -> Dataset:
 
 def load_tokenizer(
     checkpoint: str,
-    device: torch.device,
-) -> Tuple[OmegaConf, dict, AwesomeTokenizer | ExponentialTokenizer]:
+) -> Tuple[DictConfig, dict, AwesomeTokenizer | ExponentialTokenizer]:
     """
     Loads the model configuration, dataset configuration, and tokenizer based on the checkpoint path.
 
@@ -56,13 +55,13 @@ def load_tokenizer(
         device (torch.device): Device to load the model on.
 
     Returns:
-        Tuple[OmegaConf, dict, object]: The configuration, dataset configuration, dataset name, and tokenizer.
+        Tuple[DictConfig, dict, object]: The configuration, dataset configuration, dataset name, and tokenizer.
     """
     train_config = checkpoint["config"]
     cfg = OmegaConf.create(train_config)
     dataset_config = cfg.dataset
-    # NoLossTokenizer for backward-compatibility
-    if cfg.data.tokenizer == "ExponentialTimeTokenizer" or cfg.data.tokenizer == "NoLossTokenizer":
+
+    if cfg.data.tokenizer == "ExponentialTimeTokenizer":
         tokenizer = ExponentialTokenizer(**cfg.data.tokenizer_parameters, special_tokens=special_tokens)
     elif cfg.data.tokenizer == "AwesomeMidiTokenizer":
         min_time_unit = cfg.data.tokenizer_parameters["min_time_unit"]
