@@ -15,9 +15,9 @@ load_dotenv()
 
 def main():
     options = [
-        "browse generated",
         "gpt_review",
         "extracted_voice_gpt_review",
+        "browse generated",
         "hf_midi_datasets_review",
         "hf_subsequence_datasets_review",
         "augmentation_review",

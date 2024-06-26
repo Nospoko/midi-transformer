@@ -8,10 +8,9 @@ import pandas as pd
 import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
-from datasets import load_dataset
 
+import dashboards.common.utils as dashboard_utils
 from dashboards.common.components import download_button
-from dashboards.common.utils import load_tokenizer, initialize_model, select_part_dataset
 
 
 def prepare_record(record: dict):
@@ -43,23 +42,22 @@ def main():
             )
         )
 
-        # Load model, tokenizer, and configurations
-        checkpoint = torch.load(checkpoint_path, map_location=device)
-        cfg, _, tokenizer = load_tokenizer(checkpoint, device)
-        model = initialize_model(cfg, checkpoint=checkpoint, device=device)
+        checkpoint = dashboard_utils.load_checkpoint(
+            checkpoint_path=checkpoint_path,
+            device=device,
+        )
+        cfg, _, tokenizer = dashboard_utils.load_tokenizer(checkpoint, device)
 
     dataset_path = st.text_input("dataset", value="roszcz/maestro-sustain-v2")
     dataset_split = st.selectbox("split", options=["validation", "train", "test"])
 
-    dataset = load_dataset(
-        dataset_path,
-        split=dataset_split,
-        trust_remote_code=True,
-        num_proc=8,
+    dataset = dashboard_utils.load_hf_dataset(
+        dataset_path=dataset_path,
+        dataset_split=dataset_split,
     )
 
     # Select part of the dataset
-    dataset = select_part_dataset(midi_dataset=dataset)
+    dataset = dashboard_utils.select_part_dataset(midi_dataset=dataset)
 
     # Get the record id from user input
     idx = st.number_input("record_id", value=0, max_value=len(dataset))
@@ -78,6 +76,8 @@ def main():
     if not run:
         return
 
+    pad_token_id = tokenizer.token_to_id["<PAD>"]
+    model = dashboard_utils.initialize_model(cfg, checkpoint=checkpoint, device=device, pad_token_id=pad_token_id)
     # Generate new tokens and create the generated piece
     note_token_ids = tokenizer.encode(
         notes=notes,

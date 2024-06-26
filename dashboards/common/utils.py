@@ -3,7 +3,7 @@ from typing import Tuple
 import yaml
 import torch
 import streamlit as st
-from datasets import Dataset
+from datasets import Dataset, load_dataset
 from omegaconf import OmegaConf, DictConfig
 
 from artifacts import special_tokens
@@ -77,6 +77,7 @@ def initialize_model(
     cfg: DictConfig,
     checkpoint: dict,
     device: torch.device,
+    pad_token_id: int = 0,
 ) -> GPT:
     """
     Initializes the GPT model using the given configurations and checkpoint.
@@ -105,7 +106,7 @@ def initialize_model(
         model_args[k] = checkpoint_model_args[k]
 
     gptconf = GPTConfig(**model_args)
-    model = GPT(gptconf)
+    model = GPT(gptconf, pad_token_id=pad_token_id)
     state_dict = checkpoint["model"]
 
     unwanted_prefix = "_orig_mod."
@@ -118,3 +119,20 @@ def initialize_model(
     model.to(device)
 
     return model
+
+
+@st.cache_data
+def load_checkpoint(checkpoint_path: str, device: str):
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    return checkpoint
+
+
+@st.cache_data
+def load_hf_dataset(dataset_path: str, dataset_split: str):
+    dataset = load_dataset(
+        dataset_path,
+        split=dataset_split,
+        trust_remote_code=True,
+        num_proc=8,
+    )
+    return dataset

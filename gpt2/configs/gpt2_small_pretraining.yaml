@@ -6,7 +6,7 @@ defaults:
   - lr: pretraining-small
   - _self_
 
-out_dir: 'checkpoints'
+out_dir: 'checkpoints/pretraining'
 eval_interval: 100
 
 eval_iters: 100
