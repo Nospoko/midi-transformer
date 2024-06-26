@@ -95,7 +95,6 @@ def main():
     prefix_token = get_source_extraction_token(extraction_type=extraction_type)
     note_token_ids = tokenizer.encode(
         source_notes,
-        pad_to_size=cfg.data.sequence_length,
         prefix_tokens=[prefix_token],
     )
 

@@ -14,10 +14,11 @@ from dashboards.common.components import download_button
 
 
 def prepare_record(record: dict):
-    start_idx = st.number_input(label="start idx", value=0)
-    end_idx = st.number_input(label="end idx", value=60)
+    start = st.number_input(label="start second", value=0.0)
+    end = st.number_input(label="end second", value=60.0)
     notes = pd.DataFrame(record["notes"])
-    notes = notes[start_idx:end_idx]
+    notes = notes[(notes.start > start) & (notes.start < end)]
+
     notes.end -= notes.start.min()
     notes.start -= notes.start.min()
     return notes
@@ -76,10 +77,9 @@ def main():
 
     pad_token_id = tokenizer.token_to_id["<PAD>"]
     model = dashboard_utils.initialize_model(cfg, checkpoint=checkpoint, device=device, pad_token_id=pad_token_id)
-    # Generate new tokens and create the generated piece
+    # Generate new tokens and create the generated piece - generation does not require padding
     note_token_ids = tokenizer.encode(
         notes=notes,
-        pad_to_size=cfg.data.sequence_length,
     )
     input_sequence = torch.tensor([note_token_ids], device=device)
     with torch.no_grad():
