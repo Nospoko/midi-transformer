@@ -3,16 +3,15 @@ defaults:
   - data: exponential-colossal
   - dataset: bassextracted
   - logging: subsequence
-  - lr: pretraining-small
+  - lr: finetuning
   - _self_
 
 out_dir: 'checkpoints'
-eval_interval: 100
-
-eval_iters: 100
+eval_interval: 10
+eval_iters: 10
 eval_only: false  # if True, script exits right after the first eval
 always_save_checkpoint: false  # if True, always save a checkpoint after each eval
-init_from: 'scratch'  # 'scratch' or 'resume' or 'midi-gpt2*'
+init_from: 'midi-gpt2-0M-pretraining-2024-06-26-12-00.pt'  # 'scratch' or 'midi-gpt2*'
 task: subsequence
 
 optimizer:
@@ -32,7 +31,7 @@ system:
   compile: true  # use PyTorch 2.0 to compile the model to be faster
 
 model:
-  n_layer: 1
+  n_layer: 2
   n_embd: 10
   n_head: 1
 
@@ -41,3 +40,5 @@ dataset:
   augmentation:
     max_pitch_shift: 0
     speed_change_factors: []
+logging:
+  log_interval: 2

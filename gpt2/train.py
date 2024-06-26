@@ -41,103 +41,70 @@ from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 load_dotenv()
 
 
-def prepare_datasets(cfg: DictConfig):
-    dataset_config = cfg.dataset
+def load_tokenizer(cfg: DictConfig):
     tokenizer_parameters = OmegaConf.to_container(cfg.data.tokenizer_parameters)
     tokenizer_parameters |= {"special_tokens": special_tokens}
-    # We have to use dict so that HuggingFace can serialize the configuration and cache the dataset ...
-    dataset_parameters = OmegaConf.to_container(dataset_config)
 
     if cfg.data.tokenizer == "AwesomeMidiTokenizer":
         min_time_unit = tokenizer_parameters["min_time_unit"]
-        n_velocity_bins = tokenizer_parameters["n_velocity_bins"]
+        n_velocity_bins = tokenizer_parameters["min_velocity_bins"]
         tokenizer_path = to_absolute_path(
             f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
         )
-        tokenizer = AwesomeTokenizer.from_file(tokenizer_path)
+        return AwesomeTokenizer.from_file(tokenizer_path)
     else:
-        tokenizer = ExponentialTokenizer(**tokenizer_parameters)
+        return ExponentialTokenizer(**tokenizer_parameters)
 
-    if cfg.task == "pretraining":
-        out_dir = to_absolute_path(cfg.out_dir)
-        out_dir = os.path.join(
-            out_dir,
-            "pretraining",
-        )
-        # Load the suitable dataset
-        dataset_name = "MidiSequenceDataset"
-        dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
-        dataset = load_dataset(
-            dataset_path,
-            num_proc=8,
-            trust_remote_code=True,
-            **dataset_parameters,
-        )
-        train_dataset = NextTokenDataset(
-            dataset=dataset["train"],
-            tokenizer=tokenizer,
-            sequence_length=cfg.data.sequence_length,
-        )
-        val_dataset = NextTokenDataset(
-            dataset=dataset["validation"],
-            tokenizer=tokenizer,
-            sequence_length=cfg.data.sequence_length,
-        )
-    else:
-        out_dir = to_absolute_path(cfg.out_dir)
-        out_dir = os.path.join(
-            out_dir,
-            "subsequence",
-        )
-        # Load the suitable dataset
-        dataset_name = "BassExtractedDataset"
-        dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
-        dataset = load_dataset(
-            dataset_path,
-            num_proc=8,
-            trust_remote_code=True,
-            **dataset_parameters,
-        )
-        train_dataset = SubSequenceMidiDataset(
-            dataset=dataset["train"],
-            tokenizer=tokenizer,
-            sequence_length=cfg.data.sequence_length,
-        )
-        val_dataset = SubSequenceMidiDataset(
-            dataset=dataset["validation"],
-            tokenizer=tokenizer,
-            sequence_length=cfg.data.sequence_length,
-        )
 
-    total_tokens = cfg.data.sequence_length * dataset["train"].num_rows
-    print(f"total tokens: {total_tokens}")
+def prepare_datasets(cfg: DictConfig):
+    dataset_config = OmegaConf.to_container(cfg.dataset)
+    tokenizer = load_tokenizer(cfg)
+    dataset_name = "MidiSequenceDataset" if cfg.task == "pretraining" else "BassExtractedDataset"
+    dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
+    dataset = load_dataset(dataset_path, num_proc=8, trust_remote_code=True, **dataset_config)
 
-    return train_dataset, val_dataset, out_dir
+    dataset_class = NextTokenDataset if cfg.task == "pretraining" else SubSequenceMidiDataset
+    train_dataset = dataset_class(
+        dataset=dataset["train"],
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+    )
+    val_dataset = dataset_class(
+        dataset=dataset["validation"],
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+    )
+
+    return train_dataset, val_dataset, to_absolute_path(cfg.out_dir)
+
+
+def setup_device(cfg: DictConfig):
+    if int(os.environ.get("RANK", -1)) != -1:
+        init_process_group(backend=cfg.ddp.backend)
+        local_rank = int(os.environ["LOCAL_RANK"])
+        torch.cuda.set_device(local_rank)
+        return f"cuda:{local_rank}", True
+    return cfg.system.device, False
 
 
 @hydra.main(config_path="configs", config_name="gpt2_pretraining", version_base=None)
 def main(cfg: DictConfig):
-    train_dataset, val_dataset, out_dir = prepare_datasets(cfg=cfg)
-    tokenizer = train_dataset.tokenizer
-    pad_token_id = tokenizer.token_to_id["<PAD>"]
-    config = OmegaConf.to_container(cfg=cfg)
+    model_args = dict(
+        n_layer=cfg.model.n_layer,
+        n_head=cfg.model.n_head,
+        n_embd=cfg.model.n_embd,
+        block_size=cfg.data.sequence_length,
+        bias=cfg.model.bias,
+        vocab_size=None,
+        dropout=cfg.model.dropout,
+    )  # start with model_args from command line
 
-    device = cfg.system.device
-
-    # Various inits, derived attributes, I/O setup
-    ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
+    device, ddp = setup_device(cfg=cfg)
     if ddp:
-        init_process_group(backend=cfg.ddp.backend)
-
         ddp_rank = int(os.environ["RANK"])
         ddp_local_rank = int(os.environ["LOCAL_RANK"])
         ddp_world_size = int(os.environ["WORLD_SIZE"])
-
-        device = f"cuda:{ddp_local_rank}"
-        torch.cuda.set_device(device)
-
         master_process = ddp_rank == 0  # this process will do logging, checkpointing etc.
-
         seed_offset = ddp_rank  # each process gets a different seed
 
         # World_size number of processes will be training simultaneously, so we can scale
@@ -150,6 +117,56 @@ def main(cfg: DictConfig):
         master_process = True
         seed_offset = 0
         ddp_world_size = 1
+
+    # First load checkpoint if init_from midi_gpt2*
+    if cfg.init_from.startswith("midi-gpt2"):
+        # resume training from a checkpoint.
+        ckpt_path = os.path.join("checkpoints/pretraining", cfg.init_from)
+        checkpoint = torch.load(ckpt_path, map_location=device)
+        checkpoint_model_args = checkpoint["model_args"]
+        checkpoint_cfg = OmegaConf.create(checkpoint["config"])
+
+        cfg.model = checkpoint_cfg.model
+        cfg.data = checkpoint_cfg.data
+        cfg.system.dtype = checkpoint_cfg.system.dtype
+
+        train_dataset, val_dataset, out_dir = prepare_datasets(cfg=cfg)
+        tokenizer = train_dataset.tokenizer
+        pad_token_id = tokenizer.token_to_id["<PAD>"]
+        config = OmegaConf.to_container(cfg=cfg)
+        # model init
+
+        # force these config attributes to be equal otherwise we can't even resume training
+        # the rest of the attributes (e.g. dropout) can stay as desired from config
+        for k in ["n_layer", "n_head", "n_embd", "block_size", "bias", "vocab_size"]:
+            model_args[k] = checkpoint_model_args[k]
+
+        # create the model
+        gptconf = GPTConfig(**model_args)
+        model = GPT(config=gptconf, pad_token_id=pad_token_id)
+        state_dict = checkpoint["model"]
+        checkpoint = None  # free up memory
+
+        # fix the keys of the state dictionary :(
+        # honestly no idea how checkpoints sometimes get this prefix, have to debug more
+        unwanted_prefix = "_orig_mod."
+        for k, v in list(state_dict.items()):
+            if k.startswith(unwanted_prefix):
+                state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
+
+        model.load_state_dict(state_dict)
+
+    elif cfg.init_from == "scratch":
+        train_dataset, val_dataset, out_dir = prepare_datasets(cfg=cfg)
+        tokenizer = train_dataset.tokenizer
+        pad_token_id = tokenizer.token_to_id["<PAD>"]
+        config = OmegaConf.to_container(cfg=cfg)
+        # init a new model from scratch
+        print("Initializing a new model from scratch")
+        # determine the vocab size we'll use for from-scratch training
+        model_args["vocab_size"] = tokenizer.vocab_size
+        gptconf = GPTConfig(**model_args)
+        model = GPT(config=gptconf, pad_token_id=pad_token_id)
 
     tokens_per_batch = cfg.data.batch_size * cfg.data.sequence_length
     tokens_per_iter = cfg.data.gradient_accumulation_steps * ddp_world_size * tokens_per_batch
@@ -192,79 +209,6 @@ def main(cfg: DictConfig):
 
     print(f"found vocab_size = {meta_vocab_size} (inside {tokenizer.name})")
 
-    # model init
-    model_args = dict(
-        n_layer=cfg.model.n_layer,
-        n_head=cfg.model.n_head,
-        n_embd=cfg.model.n_embd,
-        block_size=cfg.data.sequence_length,
-        bias=cfg.model.bias,
-        vocab_size=None,
-        dropout=cfg.model.dropout,
-    )  # start with model_args from command line
-
-    if cfg.init_from == "scratch":
-        # init a new model from scratch
-        print("Initializing a new model from scratch")
-        # determine the vocab size we'll use for from-scratch training
-        model_args["vocab_size"] = meta_vocab_size
-        gptconf = GPTConfig(**model_args)
-        model = GPT(config=gptconf, pad_token_id=pad_token_id)
-
-    elif cfg.init_from == "resume":
-        print(f"Resuming training from {out_dir}")
-
-        # resume training from a checkpoint.
-        ckpt_path = os.path.join(out_dir, "ckpt.pt")
-        checkpoint = torch.load(ckpt_path, map_location=device)
-        checkpoint_model_args = checkpoint["model_args"]
-
-        # force these config attributes to be equal otherwise we can't even resume training
-        # the rest of the attributes (e.g. dropout) can stay as desired from command line
-        for k in ["n_layer", "n_head", "n_embd", "block_size", "bias", "vocab_size"]:
-            model_args[k] = checkpoint_model_args[k]
-
-        # create the model
-        gptconf = GPTConfig(**model_args)
-        model = GPT(config=gptconf, pad_token_id=pad_token_id)
-        state_dict = checkpoint["model"]
-
-        # fix the keys of the state dictionary :(
-        # honestly no idea how checkpoints sometimes get this prefix, have to debug more
-        unwanted_prefix = "_orig_mod."
-        for k, v in list(state_dict.items()):
-            if k.startswith(unwanted_prefix):
-                state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
-
-        model.load_state_dict(state_dict)
-        iter_num = checkpoint["iter_num"]
-        best_val_loss = checkpoint["best_val_loss"]
-
-    elif cfg.init_from.startswith("midi-gpt2"):
-        # resume training from a checkpoint.
-        ckpt_path = os.path.join(out_dir, f"pretrained/{cfg.init_from}")
-        checkpoint = torch.load(ckpt_path, map_location=device)
-        checkpoint_model_args = checkpoint["model_args"]
-
-        # force these config attributes to be equal otherwise we can't even resume training
-        # the rest of the attributes (e.g. dropout) can stay as desired from command line
-        for k in ["n_layer", "n_head", "n_embd", "block_size", "bias", "vocab_size"]:
-            model_args[k] = checkpoint_model_args[k]
-
-        # create the model
-        gptconf = GPTConfig(**model_args)
-        model = GPT(config=gptconf, pad_token_id=pad_token_id)
-        state_dict = checkpoint["model"]
-
-        # fix the keys of the state dictionary :(
-        # honestly no idea how checkpoints sometimes get this prefix, have to debug more
-        unwanted_prefix = "_orig_mod."
-        for k, v in list(state_dict.items()):
-            if k.startswith(unwanted_prefix):
-                state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
-
-        model.load_state_dict(state_dict)
-
     # crop down the model block size if desired, using model surgery
     if cfg.data.sequence_length < model.config.block_size:
         model.crop_block_size(cfg.data.sequence_length)
@@ -281,10 +225,6 @@ def main(cfg: DictConfig):
         betas=(cfg.optimizer.beta1, cfg.optimizer.beta2),
         device_type=device_type,
     )
-
-    if cfg.init_from == "resume":
-        optimizer.load_state_dict(checkpoint["optimizer"])
-    checkpoint = None  # free up memory
 
     # compile the model
     if cfg.system.compile:
