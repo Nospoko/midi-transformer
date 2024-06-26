@@ -1,9 +1,9 @@
 import torch
 import pandas as pd
 from datasets import Dataset as HuggingFaceDataset
-from midi_tokenizers.midi_tokenizer import MidiTokenizer
 
 from data.dataset import MidiDataset
+from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 
 
 class NextTokenDataset(MidiDataset):
@@ -18,7 +18,7 @@ class NextTokenDataset(MidiDataset):
     def __init__(
         self,
         dataset: HuggingFaceDataset,
-        tokenizer: MidiTokenizer,
+        tokenizer: ExponentialTokenizer | AwesomeTokenizer,
         sequence_length: int,
     ):
         """
