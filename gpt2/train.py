@@ -285,6 +285,7 @@ def main(cfg: DictConfig):
         wandb.define_metric("train/loss_batch", step_metric="total_tokens")
         wandb.define_metric("val/loss_batch", step_metric="total_tokens")
         wandb.define_metric("train/loss", step_metric="total_tokens")
+        wandb_link = wandb.run.get_url()
 
     total_tokens = 0
     # training loop
@@ -310,8 +311,8 @@ def main(cfg: DictConfig):
                         "iter": iter_num,
                         "train/loss_batch": losses["train"],
                         "val/loss_batch": losses["val"],
-                        "total_tokens": total_tokens,
-                    }
+                    },
+                    step=iter_num,
                 )
             if losses["val"] < best_val_loss or cfg.always_save_checkpoint:
                 best_val_loss = losses["val"]
@@ -322,6 +323,7 @@ def main(cfg: DictConfig):
                     "iter_num": iter_num,
                     "best_val_loss": best_val_loss,
                     "config": config,
+                    "wandb": wandb_link,
                 }
                 print(f"saving checkpoint to {out_dir}")
                 torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
@@ -383,7 +385,8 @@ def main(cfg: DictConfig):
                     "mfu": running_mfu * 100,  # convert to percentage
                     "total_tokens": total_tokens,
                     "tps": tps,
-                }
+                },
+                step=iter_num,
             )
             print(
                 f"iter {iter_num}: loss {lossf:.4f}, time {dt:.2f}s, mfu {running_mfu*100:.2f}%, tps {tps:.2f}",

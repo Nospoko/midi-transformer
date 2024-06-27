@@ -13,9 +13,7 @@ import dashboards.common.utils as dashboard_utils
 from dashboards.common.components import download_button
 
 
-def prepare_record(record: dict):
-    start = st.number_input(label="start second", value=0.0)
-    end = st.number_input(label="end second", value=60.0)
+def prepare_record(record: dict, start: float, end: float):
     notes = pd.DataFrame(record["notes"])
     notes = notes[(notes.start > start) & (notes.end < end)]
 
@@ -38,10 +36,14 @@ def main():
 
         device_type = "cuda" if "cuda" in device else "cpu"
 
-    checkpoint = dashboard_utils.load_checkpoint(
-        checkpoint_path=checkpoint_path,
-        device=device,
-    )
+        checkpoint = dashboard_utils.load_checkpoint(
+            checkpoint_path=checkpoint_path,
+            device=device,
+        )
+        best_val_loss = checkpoint["best_val_loss"]
+        st.write(f"Model best val loss: {best_val_loss:.4f}")
+        if "wandb" in dict(checkpoint).keys():
+            st.link_button(label="wandb run", url=checkpoint["wandb"])
 
     cfg, _, tokenizer = dashboard_utils.load_tokenizer(checkpoint)
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
@@ -64,7 +66,12 @@ def main():
     source = json.loads(record["source"])
 
     # Decode and display the original piece
-    notes = prepare_record(record=record)
+    start = st.number_input(label="start second", value=0.0)
+    end = st.number_input(label="end second", value=60.0)
+    notes = prepare_record(record=record, start=start, end=end)
+
+    notes_pressed_at_end = notes[(notes.start < end) & (notes.end > end)]
+    n_notes_pressed = notes_pressed_at_end.pitch.size
 
     piece = ff.MidiPiece(notes, source=source)
 
@@ -82,6 +89,9 @@ def main():
     note_token_ids = tokenizer.encode(
         notes=notes,
     )
+    # Cut the notes to end the sequence roughly at the exact timestamp.
+    # This should help with model performance and generate better sounding sequences
+    note_token_ids = note_token_ids[5 * n_notes_pressed]
 
     input_sequence = torch.tensor([note_token_ids], device=device)
     with torch.no_grad():

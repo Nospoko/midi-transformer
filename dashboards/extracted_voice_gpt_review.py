@@ -44,10 +44,14 @@ def main():
         torch.backends.cudnn.allow_tf32 = True
         device_type = "cuda" if "cuda" in device else "cpu"
 
-    checkpoint = dashboard_utils.load_checkpoint(
-        checkpoint_path=checkpoint_path,
-        device=device,
-    )
+        checkpoint = dashboard_utils.load_checkpoint(
+            checkpoint_path=checkpoint_path,
+            device=device,
+        )
+        best_val_loss = checkpoint["best_val_loss"]
+        st.write(f"Model best val loss: {best_val_loss:.4f}")
+        if "wandb" in dict(checkpoint).keys():
+            st.link_button(label="wandb run", url=checkpoint["wandb"])
 
     cfg, _, tokenizer = dashboard_utils.load_tokenizer(checkpoint)
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
