@@ -176,6 +176,8 @@ def main(cfg: DictConfig):
     tokens_per_batch = cfg.data.batch_size * cfg.data.sequence_length
     tokens_per_iter = cfg.data.gradient_accumulation_steps * ddp_world_size * tokens_per_batch
     print(f"tokens per iteration will be: {tokens_per_iter:,}")
+    tokens_in_dataset = train_dataset.dataset.num_rows * train_dataset.sequence_length
+    print(f"total tokens in the training dataset will be: {tokens_in_dataset:,}")
 
     if master_process:
         os.makedirs(out_dir, exist_ok=True)
