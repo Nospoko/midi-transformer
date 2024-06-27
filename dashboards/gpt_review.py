@@ -72,7 +72,6 @@ def main():
 
     notes_pressed_at_end = notes[(notes.start < end) & (notes.end > end)]
     n_notes_pressed = len(notes_pressed_at_end)
-    print(n_notes_pressed)
 
     piece = ff.MidiPiece(notes, source=source)
 
@@ -93,7 +92,7 @@ def main():
     # Cut the notes to end the sequence roughly at the exact timestamp.
     # This should help with model performance and generate better sounding sequences
     if n_notes_pressed > 0:
-        note_token_ids = note_token_ids[: -5 * n_notes_pressed]
+        note_token_ids = note_token_ids[: -3 * n_notes_pressed]
     input_sequence = torch.tensor([note_token_ids], device=device)
     with torch.no_grad():
         with ctx:
