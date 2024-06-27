@@ -15,7 +15,7 @@ from dashboards.common.components import download_button
 
 def prepare_record(record: dict, start: float, end: float):
     notes = pd.DataFrame(record["notes"])
-    notes = notes[(notes.start > start) & (notes.end < end)]
+    notes = notes[(notes.start > start) & (notes.start < end)]
 
     notes.end -= notes.start.min()
     notes.start -= notes.start.min()
@@ -71,7 +71,8 @@ def main():
     notes = prepare_record(record=record, start=start, end=end)
 
     notes_pressed_at_end = notes[(notes.start < end) & (notes.end > end)]
-    n_notes_pressed = notes_pressed_at_end.pitch.size
+    n_notes_pressed = len(notes_pressed_at_end)
+    print(n_notes_pressed)
 
     piece = ff.MidiPiece(notes, source=source)
 
@@ -91,8 +92,8 @@ def main():
     )
     # Cut the notes to end the sequence roughly at the exact timestamp.
     # This should help with model performance and generate better sounding sequences
-    note_token_ids = note_token_ids[: -5 * n_notes_pressed]
-
+    if n_notes_pressed > 0:
+        note_token_ids = note_token_ids[: -5 * n_notes_pressed]
     input_sequence = torch.tensor([note_token_ids], device=device)
     with torch.no_grad():
         with ctx:
@@ -140,7 +141,7 @@ def main():
         os.unlink(midi_path)
 
         with st.expander("Tokens"):
-            st.write(tokenizer.vocab[token_id] for token_id in output)
+            st.write(f"{tokenizer.vocab[token_id]} " for token_id in output)
 
     st.write("whole model output")
     second_part = ff.MidiPiece(out_notes[piece.size :].copy())
