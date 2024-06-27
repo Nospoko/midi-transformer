@@ -91,7 +91,7 @@ def main():
     )
     # Cut the notes to end the sequence roughly at the exact timestamp.
     # This should help with model performance and generate better sounding sequences
-    note_token_ids = note_token_ids[5 * n_notes_pressed]
+    note_token_ids = note_token_ids[: -5 * n_notes_pressed]
 
     input_sequence = torch.tensor([note_token_ids], device=device)
     with torch.no_grad():
