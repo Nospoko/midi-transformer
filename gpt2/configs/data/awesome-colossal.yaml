@@ -2,4 +2,8 @@ tokenizer: "AwesomeMidiTokenizer"
 gradient_accumulation_steps: 20  # used to simulate larger batch sizes
 # 32 * 1024 * 4 / 1000 ~= 131Mb
 batch_size: 32  # if gradient_accumulation_steps > 1, this is the micro-batch size
-max_iters: 20000 # total number of training iterations
+max_iters: 100000 # total number of training iterations
+tokenizer_parameters:
+  min_time_unit: 0.01
+  n_velocity_bins: 32
+sequence_length: 2048

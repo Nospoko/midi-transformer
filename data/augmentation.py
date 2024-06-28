@@ -1,5 +1,4 @@
 import json
-import random
 from os import cpu_count
 
 import numpy as np
@@ -30,39 +29,47 @@ def change_speed(df: pd.DataFrame, factor: float = None) -> tuple[pd.DataFrame, 
     return df, factor
 
 
-def pitch_shift(df: pd.DataFrame, shift_threshold: int = 5) -> tuple[pd.DataFrame, int]:
+def check_pitch_shift(df: pd.DataFrame, pitch_shift: int) -> bool:
+    PITCH_LOW = 21
+    PITCH_HIGH = 108
+    min_pitch = df.pitch.min()
+    max_pitch = df.pitch.max()
+
+    ok_low = min_pitch + pitch_shift >= PITCH_LOW
+    ok_high = max_pitch + pitch_shift <= PITCH_HIGH
+
+    is_ok = ok_low & ok_high
+
+    return is_ok & pitch_shift != 0
+
+
+def pitch_shift(df: pd.DataFrame, shift: int = 5) -> tuple[pd.DataFrame, int]:
     """
-    Shift the pitch of the MIDI notes in the DataFrame by a random amount within the given threshold.
+    Shift the pitch of the MIDI notes in the DataFrame.
 
     Parameters:
         df (pd.DataFrame): DataFrame containing MIDI notes.
-        shift_threshold (int): Maximum number of semitones to shift.
+        shift(int): Number of semitones to shift.
 
     Returns:
         tuple[pd.DataFrame, int]: The modified DataFrame and the shift amount used.
     """
-    PITCH_LOW = 21
-    PITCH_HI = 108
-    low_shift = -min(shift_threshold, df.pitch.min() - PITCH_LOW)
-    high_shift = min(shift_threshold, PITCH_HI - df.pitch.max())
-
-    if low_shift > high_shift:
-        shift = 0
-        print("Pitch shift edge case:", df.pitch.min(), df.pitch.max())
-    else:
-        shift = np.random.randint(low=low_shift, high=high_shift + 1)
+    if not check_pitch_shift(df, shift):
+        return None, None
     df.pitch += shift
     return df, shift
 
 
-def apply_pitch_shift(batch: dict, augmentation_probability: float, augmentation_repetitions: int) -> dict:
+def apply_pitch_shift(
+    batch: dict,
+    max_pitch_shift: int = 5,
+) -> dict:
     """
-    Apply pitch shift augmentation to a batch of MIDI notes with a given probability.
+    Apply pitch shift augmentation to a batch of MIDI notes.
 
     Parameters:
         batch (dict): Batch of MIDI notes.
-        augmentation_probability (float): Probability of applying augmentation.
-        augmentation_repetitions (int): Number of times to repeat the augmentation.
+        max_pitch_shift: Maximal pitch shift in both directions.
 
     Returns:
         dict: Augmented batch of MIDI notes.
@@ -71,23 +78,22 @@ def apply_pitch_shift(batch: dict, augmentation_probability: float, augmentation
     source = json.loads(batch["source"][0])
     notes = batch["notes"][0]
     df = pd.DataFrame(notes)
-    for _ in range(augmentation_repetitions):
-        if random.random() < augmentation_probability:
-            augmented, shift = pitch_shift(df=df.copy())
+    for shift in range(-max_pitch_shift, max_pitch_shift + 1):
+        augmented, shift = pitch_shift(df=df.copy(), shift=shift)
+        if augmented is not None:
             batch["notes"].append(augmented.to_dict(orient="series"))
             batch["source"].append(json.dumps(source | {"pitch_shift": shift}))
 
     return batch
 
 
-def apply_speed_change(batch: dict, augmentation_probability: float, augmentation_repetitions: int) -> dict:
+def apply_speed_change(batch: dict, speed_change_factors: list[float]) -> dict:
     """
-    Apply speed change augmentation to a batch of MIDI notes with a given probability.
+    Apply speed change augmentation to a batch of MIDI notes.
 
     Parameters:
         batch (dict): Batch of MIDI notes.
-        augmentation_probability (float): Probability of applying augmentation.
-        augmentation_repetitions (int): Number of times to repeat the augmentation.
+        speed_change_factors (list[float]): Speed change factors.
 
     Returns:
         dict: Augmented batch of MIDI notes.
@@ -96,46 +102,51 @@ def apply_speed_change(batch: dict, augmentation_probability: float, augmentatio
     source = json.loads(batch["source"][0])
     notes = batch["notes"][0]
     df = pd.DataFrame(notes)
-    for _ in range(augmentation_repetitions):
-        if random.random() < augmentation_probability:
-            augmented, factor = change_speed(df=df.copy())
-            batch["notes"].append(augmented.to_dict(orient="series"))
-            batch["source"].append(json.dumps(source | {"change_speed_factor": factor}))
+    for factor in speed_change_factors:
+        augmented, factor = change_speed(df=df.copy(), factor=factor)
+        batch["notes"].append(augmented.to_dict(orient="series"))
+        batch["source"].append(json.dumps(source | {"change_speed_factor": factor}))
 
     return batch
 
 
-def augment_dataset(dataset: Dataset, augmentation_probability: float, augmentation_repetitions: int = 0) -> Dataset:
+def augment_dataset(dataset: Dataset, speed_change_factors: list[float] = None, max_pitch_shift: int = 5) -> Dataset:
     """
     Augment the dataset by applying pitch shift and speed change augmentations using all available CPUs.
 
     Parameters:
         dataset (Dataset): Dataset to augment.
-        augmentation_probability (float): Probability of applying augmentation.
-        augmentation_repetitions (int, optional): Number of times to repeat the augmentation. Defaults to 0.
+        speed_change_factors (list[float]): Change speed factors.
+        max_pitch_shift (int): Maximal pitch shift in both directions.
 
     Returns:
         Dataset: Augmented dataset.
     """
-    if augmentation_repetitions == 0:
+    if max_pitch_shift == 0 and (speed_change_factors is None or len(speed_change_factors) == 0):
         return dataset
 
-    num_cpus = cpu_count() - 4  # Use all CPUs except 4
+    num_cpus = cpu_count()
+    if num_cpus > 8:
+        num_cpus -= 4  # Use all CPUs except 4
+    else:
+        num_cpus -= 1
 
-    augmentation_arguments = {
-        "augmentation_probability": augmentation_probability,
-        "augmentation_repetitions": augmentation_repetitions,
+    pitch_shift_args = {
+        "max_pitch_shift": max_pitch_shift,
+    }
+    change_speed_args = {
+        "speed_change_factors": speed_change_factors,
     }
     dataset = dataset.map(
         apply_pitch_shift,
-        fn_kwargs=augmentation_arguments,
+        fn_kwargs=pitch_shift_args,
         batched=True,
         batch_size=1,
         num_proc=num_cpus,
     )
     dataset = dataset.map(
         apply_speed_change,
-        fn_kwargs=augmentation_arguments,
+        fn_kwargs=change_speed_args,
         batched=True,
         batch_size=1,
         num_proc=num_cpus,

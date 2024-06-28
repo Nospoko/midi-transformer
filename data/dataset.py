@@ -2,7 +2,8 @@ from abc import abstractmethod
 
 from datasets import Dataset as HuggingFaceDataset
 from torch.utils.data import Dataset as TorchDataset
-from midi_tokenizers.midi_tokenizer import MidiTokenizer
+
+from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 
 
 class MidiDataset(TorchDataset):
@@ -17,7 +18,7 @@ class MidiDataset(TorchDataset):
     def __init__(
         self,
         dataset: HuggingFaceDataset,
-        tokenizer: MidiTokenizer,
+        tokenizer: ExponentialTokenizer | AwesomeTokenizer,
     ):
         """
         Initialize the MidiDataset.

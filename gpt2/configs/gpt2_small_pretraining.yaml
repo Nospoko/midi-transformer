@@ -1,12 +1,12 @@
 defaults:
-  - model: gpt2_scaled # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
+  - model: gpt2_small # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
   - data: exponential-giant
-  - dataset: giant-mid-coarse-augmented
+  - dataset: giant-mid
   - logging: pretraining
   - lr: pretraining-small
   - _self_
 
-out_dir: 'checkpoints'
+out_dir: 'checkpoints/pretraining'
 eval_interval: 100
 
 eval_iters: 100

@@ -1,22 +1,22 @@
 defaults:
   - model: gpt2 # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
   - data: exponential-giant
-  - dataset: giant-long
-  - logging: pretraining
+  - dataset: bassextracted
+  - logging: subsequence
   - lr: pretraining-large
   - _self_
 
-out_dir: 'checkpoints/pretraining'
+out_dir: 'checkpoints/subsequence'
 eval_interval: 100
 
 eval_iters: 100
 eval_only: false  # if True, script exits right after the first eval
 always_save_checkpoint: false  # if True, always save a checkpoint after each eval
 init_from: 'scratch'  # 'scratch' or 'resume' or 'midi-gpt2*'
-task: pretraining
+task: subsequence
 
 optimizer:
-  learning_rate: ${lr.learning_rate} # max learning rate
+  learning_rate: ${lr.learning_rate}
   weight_decay: 0.1
   max_iters: ${data.max_iters} # define max_iters in data but leave the parameter here as well
   beta1: 0.9

@@ -2,4 +2,8 @@ tokenizer: "ExponentialTimeTokenizer"
 gradient_accumulation_steps: 20  # used to simulate larger batch sizes
 # 32 * 1024 * 4 / 1000 ~= 131Mb
 batch_size: 32  # if gradient_accumulation_steps > 1, this is the micro-batch size
-max_iters: 12000  # total number of training iterations, ~8 times giant dataset augmented
+max_iters: 60000  # total number of training iterations, ~8 times giant dataset augmented
+tokenizer_parameters:
+  min_time_unit: 0.01
+  n_velocity_bins: 32
+sequence_length: 2048

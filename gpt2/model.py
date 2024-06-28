@@ -125,16 +125,16 @@ class GPTConfig:
 
 
 class GPT(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, pad_token_id: int = 0):
         super().__init__()
         assert config.vocab_size is not None
         assert config.block_size is not None
         self.config = config
-
+        self.pad_token_id = pad_token_id
         self.transformer = nn.ModuleDict(
             dict(
-                wte=nn.Embedding(config.vocab_size, config.n_embd),
-                wpe=nn.Embedding(config.block_size, config.n_embd),
+                wte=nn.Embedding(config.vocab_size, config.n_embd, padding_idx=self.pad_token_id),
+                wpe=nn.Embedding(config.block_size, config.n_embd, padding_idx=self.pad_token_id),
                 drop=nn.Dropout(config.dropout),
                 h=nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
                 ln_f=LayerNorm(config.n_embd, bias=config.bias),
@@ -196,7 +196,7 @@ class GPT(nn.Module):
         if targets is not None:
             # if we are given some desired targets also calculate the loss
             logits = self.lm_head(x)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=self.pad_token_id)
         else:
             # inference-time mini-optimization: only forward the lm_head on the very last position
             logits = self.lm_head(x[:, [-1], :])  # note: using list [-1] to preserve the time dim
@@ -341,3 +341,45 @@ class GPT(nn.Module):
             idx = torch.cat((idx, idx_next), dim=1)
 
         return idx
+
+    @torch.no_grad()
+    def greedy_decode(
+        self,
+        idx: torch.Tensor,
+        max_len: int,
+        device: str = "cpu",
+        temperature: float = 1.0,
+    ) -> torch.Tensor:
+        """
+        For each token in the input sequence, predict the next token to create a parallel sequence.
+        """
+        idx = idx.unsqueeze(0).to(device)
+        b, t = idx.size()
+        max_len = min(max_len, t)
+
+        # Initialize the parallel sequence with the same shape as input
+        next_tokens = torch.zeros_like(idx)
+        next_tokens.fill_(self.pad_token_id)
+
+        for i in range(max_len):
+            # if the sequence context is growing too long we must crop it at block_size
+            if (i + 1) <= self.config.block_size:
+                idx_cond = idx[:, : i + 1]
+            else:
+                idx_cond = idx[:, i + 1 - self.config.block_size : i + 1]
+            # forward the model to get the logits for the current position
+            logits, _ = self(idx_cond)
+            # pluck the logits at the final step
+            logits = logits[:, -1, :] / temperature
+            # apply softmax to convert logits to (normalized) probabilities
+            probs = F.softmax(logits, dim=-1)
+            # sample from the distribution
+            idx_next = torch.multinomial(probs, num_samples=1)
+
+            # # take the most likely token
+            # idx_next = torch.argmax(logits, dim=-1)
+
+            # add the next token to the parallel sequence
+            next_tokens[:, i] = idx_next
+
+        return next_tokens[0]

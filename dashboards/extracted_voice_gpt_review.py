@@ -11,15 +11,24 @@ import streamlit_pianoroll
 
 import dashboards.common.utils as dashboard_utils
 from dashboards.common.components import download_button
+from artifacts import get_voice_range, get_source_extraction_token
 
 
-def prepare_record(record: dict, start: float, end: float):
+def prepare_record(record: dict, extraction_type: str):
+    low, high = get_voice_range(voice=extraction_type)
+    start_end_columns = st.columns(2)
+    start = start_end_columns[0].number_input(label="start second", value=0)
+    end = start_end_columns[1].number_input(label="end second", value=60)
+
     notes = pd.DataFrame(record["notes"])
-    notes = notes[(notes.start > start) & (notes.start < end)]
-
+    notes = notes[(notes.start > start) & (notes.end < end)]
     notes.end -= notes.start.min()
     notes.start -= notes.start.min()
-    return notes
+    extracted_ids = (notes.pitch >= low) & (notes.pitch < high)
+    source_notes = notes[~extracted_ids]
+    target_notes = notes[extracted_ids]
+
+    return source_notes, target_notes
 
 
 def main():
@@ -33,7 +42,6 @@ def main():
         torch.cuda.manual_seed(4)
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
-
         device_type = "cuda" if "cuda" in device else "cpu"
 
         checkpoint = dashboard_utils.load_checkpoint(
@@ -51,6 +59,7 @@ def main():
 
     dataset_path = st.text_input("dataset", value="roszcz/maestro-sustain-v2")
     dataset_split = st.selectbox("split", options=["validation", "train", "test"])
+    extraction_type = st.selectbox("extraction type", options=["bass"])
 
     dataset = dashboard_utils.load_hf_dataset(
         dataset_path=dataset_path,
@@ -64,46 +73,44 @@ def main():
     idx = st.number_input("record_id", value=0, max_value=len(dataset))
     record = dataset[idx]
     source = json.loads(record["source"])
+    source_notes, target_notes = prepare_record(record=record, extraction_type=extraction_type)
 
-    # Decode and display the original piece
-    start = st.number_input(label="start second", value=0.0)
-    end = st.number_input(label="end second", value=60.0)
-    notes = prepare_record(record=record, start=start, end=end)
-
-    notes_pressed_at_end = notes[(notes.start < end) & (notes.end > end)]
-    n_notes_pressed = len(notes_pressed_at_end)
-
-    piece = ff.MidiPiece(notes, source=source)
-
+    st.write(f"Model input size: {cfg.data.sequence_length}")
     with st.form("generate parameters"):
         temperature = st.number_input("temperature", value=1.0)
         max_new_tokens = st.number_input("max_new_tokens", value=cfg.data.sequence_length)
         run = st.form_submit_button("Generate")
-
     if not run:
         return
 
+    # Decode and display the original piece
+    notes = pd.concat([source_notes, target_notes], ignore_index=True)
+    notes = notes.sort_values(by="start").reset_index(drop=True)
+
+    source_piece = ff.MidiPiece(source_notes)
+    target_piece = ff.MidiPiece(target_notes)
+
+    piece = ff.MidiPiece(notes, source=source)
+
     pad_token_id = tokenizer.token_to_id["<PAD>"]
     model = dashboard_utils.initialize_model(cfg, checkpoint=checkpoint, device=device, pad_token_id=pad_token_id)
-    # Generate new tokens and create the generated piece - generation does not require padding
-    note_token_ids = tokenizer.encode(
-        notes=notes,
-    )
-    # Cut the notes to end the sequence roughly at the exact timestamp.
-    # This should help with model performance and generate better sounding sequences
-    if n_notes_pressed > 0:
-        note_token_ids = note_token_ids[: -3 * n_notes_pressed]
-    input_sequence = torch.tensor([note_token_ids], device=device)
-    with torch.no_grad():
-        with ctx:
-            output = model.generate(input_sequence, max_new_tokens=max_new_tokens, temperature=temperature)
 
-    output = output[0].cpu().numpy()
-    out_notes = tokenizer.decode(output)
-    out_piece = ff.MidiPiece(out_notes)
-    generated_notes = out_notes.iloc[piece.size :].copy()
+    # Generate new tokens and create the generated piece
+    prefix_token = get_source_extraction_token(extraction_type=extraction_type)
+    note_token_ids = tokenizer.encode(
+        source_notes,
+        prefix_tokens=[prefix_token],
+    )
+
+    with ctx:
+        output = model.greedy_decode(
+            idx=torch.tensor(note_token_ids),
+            max_len=max_new_tokens,
+            temperature=temperature,
+            device=device,
+        )
+    generated_notes = tokenizer.decode(output)
     generated_piece = ff.MidiPiece(generated_notes)
-    generated_piece.time_shift(-generated_piece.df.start.min())
 
     io_columns = st.columns(2)
     title, composer = source["title"], source["composer"]
@@ -112,7 +119,7 @@ def main():
     # Display and allow download of the original MIDI
     with io_columns[0]:
         st.write("original:")
-        streamlit_pianoroll.from_fortepyan(piece=piece)
+        streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=target_piece)
         original_midi_path = f"tmp/fragment_of_{piece_name}_{idx}.mid"
         source_file = piece.to_midi()
         source_file.write(original_midi_path)
@@ -127,7 +134,6 @@ def main():
     with io_columns[1]:
         st.write("generated:")
         streamlit_pianoroll.from_fortepyan(piece=generated_piece)
-        output = output[input_sequence.shape[-1] :]
         milion_parameters = model.get_num_params() / 1e6
         midi_path = f"tmp/{milion_parameters:.0f}_variations_on_{piece_name}_{idx}.mid"
         generated_file = generated_piece.to_midi()
@@ -140,12 +146,13 @@ def main():
         os.unlink(midi_path)
 
         with st.expander("Tokens"):
-            st.write(f"{tokenizer.vocab[token_id]} " for token_id in output)
+            st.write(tokenizer.vocab[token_id] for token_id in output)
 
-    st.write("whole model output")
-    second_part = ff.MidiPiece(out_notes[piece.size :].copy())
-    expanded_piece = ff.MidiPiece(out_notes[: piece.size].copy())
-    streamlit_pianoroll.from_fortepyan(piece=expanded_piece, secondary_piece=second_part)
+    st.write("whole")
+
+    out_notes = pd.concat([source_notes, generated_notes]).sort_values(by="start").reindex()
+    out_piece = ff.MidiPiece(out_notes)
+    streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=generated_piece)
 
     # Allow download of the full MIDI with context
     full_midi_path = f"tmp/full_{milion_parameters}_variations_on_{piece_name}_{idx}.mid"

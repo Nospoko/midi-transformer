@@ -5,20 +5,20 @@ from datasets import load_dataset
 
 from artifacts import special_tokens
 from data.tokenizer import ExponentialTokenizer
-from data.next_token_dataset import NextTokenDataset
+from data.subsequence_dataset import SubSequenceMidiDataset
 
 
 def main():
     dataset_names = [
-        "MidiSequenceDataset",
+        "BassExtractedDataset",
     ]
     dataset_name = st.selectbox(label="dataset", options=dataset_names)
     dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
     with st.form(key="config_form"):
         base_dataset_name = st.text_input(label="base_dataset_name", value="roszcz/maestro-sustain-v2")
         extra_datasets = st.text_input(label="extra_datasets (comma separated)", value="")
-        notes_per_record = st.number_input(label="notes_per_record", min_value=1, value=60)
-        step = st.number_input(label="step", min_value=1, value=60)
+        notes_per_record = st.number_input(label="notes_per_record", min_value=1, value=512)
+        step = st.number_input(label="step", min_value=1, value=512)
         pause_detection_threshold = st.number_input(label="pause_detection_threshold", value=4)
         sequence_length = st.number_input(label="sequence_length", min_value=1, value=5000, step=500)
 
@@ -55,7 +55,7 @@ def main():
         num_proc=8,
         **config,
     )
-    midi_dataset = NextTokenDataset(
+    midi_dataset = SubSequenceMidiDataset(
         dataset=dataset,
         tokenizer=tokenizer,
         sequence_length=sequence_length,
@@ -72,6 +72,9 @@ def main():
     with st.expander(label="source"):
         st.json(record["source"])
 
+    extracted = record["extraction_type"]
+    st.write(f"Extracted: {extracted}")
+
     src_token_ids = record["source_token_ids"]
     tgt_token_ids = record["target_token_ids"]
 
@@ -87,6 +90,8 @@ def main():
     token_columns = st.columns(2)
     token_columns[0].write(src_tokens)
     token_columns[1].write(tgt_tokens)
+    st.write("#### Together:")
+    streamlit_pianoroll.from_fortepyan(piece=src_piece, secondary_piece=tgt_piece)
     st.write("#### Prompt:")
     streamlit_pianoroll.from_fortepyan(piece=src_piece)
     st.write("#### Target:")
