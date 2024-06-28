@@ -76,20 +76,19 @@ def main():
     st.write(f"Extracted: {extracted}")
 
     src_token_ids = record["source_token_ids"]
-    tgt_token_ids = record["target_token_ids"]
-
     src_tokens = [midi_dataset.tokenizer.vocab[token_id] for token_id in src_token_ids]
-    tgt_tokens = [midi_dataset.tokenizer.vocab[token_id] for token_id in tgt_token_ids]
 
-    source_notes = midi_dataset.tokenizer.untokenize(src_tokens)
-    target_notes = midi_dataset.tokenizer.untokenize(tgt_tokens)
+    bass_command_position = src_tokens.index("<BASS>")
+    prompt_tokens = src_tokens[:bass_command_position]
+    bass_tokens = src_tokens[bass_command_position:]
 
-    src_piece = ff.MidiPiece(source_notes)
-    tgt_piece = ff.MidiPiece(target_notes)
+    prompt_tokens = midi_dataset.tokenizer.untokenize(prompt_tokens)
+    bass_tokens = midi_dataset.tokenizer.untokenize(bass_tokens)
 
-    token_columns = st.columns(2)
-    token_columns[0].write(src_tokens)
-    token_columns[1].write(tgt_tokens)
+    src_piece = ff.MidiPiece(prompt_tokens)
+    tgt_piece = ff.MidiPiece(bass_tokens)
+
+    st.write(src_tokens)
     st.write("#### Together:")
     streamlit_pianoroll.from_fortepyan(piece=src_piece, secondary_piece=tgt_piece)
     st.write("#### Prompt:")

@@ -103,6 +103,7 @@ def main():
     )
 
     with ctx:
+        # TODO: should be model.generate
         output = model.greedy_decode(
             idx=torch.tensor(note_token_ids),
             max_len=max_new_tokens,
