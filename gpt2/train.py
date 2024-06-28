@@ -56,10 +56,42 @@ def load_tokenizer(cfg: DictConfig):
         return ExponentialTokenizer(**tokenizer_parameters)
 
 
-def prepare_datasets(cfg: DictConfig):
+def get_dataset_for_task(cfg: DictConfig):
+    if cfg.task == "pretraining":
+        return prepare_next_token_datasets(cfg)
+    if cfg.task == "subsequence":
+        return prepare_subsequence_datasets(cfg)
+
+
+def prepare_next_token_datasets(cfg: DictConfig):
     dataset_config = OmegaConf.to_container(cfg.dataset)
     tokenizer = load_tokenizer(cfg)
-    dataset_name = "MidiSequenceDataset" if cfg.task == "pretraining" else "BassExtractedDataset"
+    dataset_name = "MidiSequenceDataset"
+    dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
+    dataset = load_dataset(
+        dataset_path,
+        num_proc=8,
+        trust_remote_code=True,
+        **dataset_config,
+    )
+    train_dataset = NextTokenDataset(
+        dataset=dataset["train"],
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+    )
+    val_dataset = NextTokenDataset(
+        dataset=dataset["validation"],
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+    )
+
+    return train_dataset, val_dataset, to_absolute_path(cfg.out_dir)
+
+
+def prepare_subsequence_datasets(cfg: DictConfig):
+    dataset_config = OmegaConf.to_container(cfg.dataset)
+    tokenizer = load_tokenizer(cfg)
+    dataset_name = "BassExtractedDataset"
     dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
     dataset = load_dataset(
         dataset_path,
@@ -68,13 +100,12 @@ def prepare_datasets(cfg: DictConfig):
         **dataset_config,
     )
 
-    dataset_class = NextTokenDataset if cfg.task == "pretraining" else SubSequenceMidiDataset
-    train_dataset = dataset_class(
+    train_dataset = SubSequenceMidiDataset(
         dataset=dataset["train"],
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
     )
-    val_dataset = dataset_class(
+    val_dataset = SubSequenceMidiDataset(
         dataset=dataset["validation"],
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
@@ -135,7 +166,7 @@ def main(cfg: DictConfig):
         cfg.data = checkpoint_cfg.data
         cfg.system.dtype = checkpoint_cfg.system.dtype
 
-        train_dataset, val_dataset, out_dir = prepare_datasets(cfg=cfg)
+        train_dataset, val_dataset, out_dir = get_dataset_for_task(cfg=cfg)
         tokenizer = train_dataset.tokenizer
         pad_token_id = tokenizer.token_to_id["<PAD>"]
         config = OmegaConf.to_container(cfg=cfg)
@@ -162,7 +193,7 @@ def main(cfg: DictConfig):
         model.load_state_dict(state_dict)
 
     elif cfg.init_from == "scratch":
-        train_dataset, val_dataset, out_dir = prepare_datasets(cfg=cfg)
+        train_dataset, val_dataset, out_dir = get_dataset_for_task(cfg=cfg)
         tokenizer = train_dataset.tokenizer
         pad_token_id = tokenizer.token_to_id["<PAD>"]
         config = OmegaConf.to_container(cfg=cfg)
@@ -303,33 +334,6 @@ def main(cfg: DictConfig):
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
-        # evaluate the loss on train/val sets and write checkpoints
-        if iter_num % cfg.eval_interval == 0 and master_process:
-            losses = estimate_loss()
-            print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-            if cfg.logging.wandb_log:
-                wandb.log(
-                    {
-                        "iter": iter_num,
-                        "train/loss_batch": losses["train"],
-                        "val/loss_batch": losses["val"],
-                    },
-                    step=iter_num,
-                )
-            if losses["val"] < best_val_loss or cfg.always_save_checkpoint:
-                best_val_loss = losses["val"]
-                checkpoint = {
-                    "model": raw_model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "model_args": model_args,
-                    "iter_num": iter_num,
-                    "best_val_loss": best_val_loss,
-                    "config": config,
-                    "wandb": wandb_link,
-                }
-                print(f"saving checkpoint to {out_dir}")
-                torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
-
         # forward backward update, with optional gradient accumulation to simulate larger batch size
         # and using the GradScaler if data type is float16
         t00 = time.time()
@@ -371,6 +375,35 @@ def main(cfg: DictConfig):
         t1 = time.time()
         dt = t1 - t0
         t0 = t1
+
+        # evaluate the loss on train/val sets and write checkpoints
+        if iter_num % cfg.eval_interval == 0 and master_process:
+            losses = estimate_loss()
+            print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+            if cfg.logging.wandb_log:
+                wandb.log(
+                    {
+                        "iter": iter_num,
+                        "train/loss_batch": losses["train"],
+                        "val/loss_batch": losses["val"],
+                        "total_tokens": total_tokens,
+                    },
+                    step=iter_num,
+                )
+            if losses["val"] < best_val_loss or cfg.always_save_checkpoint:
+                best_val_loss = losses["val"]
+                checkpoint = {
+                    "model": raw_model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "model_args": model_args,
+                    "iter_num": iter_num,
+                    "best_val_loss": best_val_loss,
+                    "config": config,
+                    "wandb": wandb_link,
+                }
+                print(f"saving checkpoint to {out_dir}")
+                torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
+
         if iter_num % cfg.logging.log_interval == 1 and master_process:
             # get loss as float. note: this is a CPU-GPU sync point
             # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
