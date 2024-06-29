@@ -112,6 +112,7 @@ def main():
             temperature=temperature,
         )
 
+    output = output[0].cpu().numpy()
     out_tokens = [tokenizer.vocab[token_id] for token_id in output]
 
     bass_command_position = out_tokens.index("<BASS>")
