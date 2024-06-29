@@ -109,7 +109,6 @@ def main():
             idx=torch.tensor(note_token_ids),
             max_new_tokens=max_new_tokens,
             temperature=temperature,
-            device=device,
         )
 
     out_tokens = [tokenizer.vocab[token_id] for token_id in output]
