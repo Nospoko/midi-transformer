@@ -103,10 +103,11 @@ def main():
     )
     bass_token_id = tokenizer.token_to_id["<BASS>"]
     note_token_ids.append(bass_token_id)
+    input_sequence = torch.tensor([note_token_ids], device=device)
 
     with ctx:
         output = model.generate(
-            idx=torch.tensor(note_token_ids),
+            idx=input_sequence,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
         )

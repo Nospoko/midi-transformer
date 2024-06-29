@@ -96,7 +96,11 @@ def main():
     input_sequence = torch.tensor([note_token_ids], device=device)
     with torch.no_grad():
         with ctx:
-            output = model.generate(input_sequence, max_new_tokens=max_new_tokens, temperature=temperature)
+            output = model.generate(
+                input_sequence,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+            )
 
     output = output[0].cpu().numpy()
     out_notes = tokenizer.decode(output)
