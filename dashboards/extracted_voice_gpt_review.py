@@ -101,17 +101,25 @@ def main():
         source_notes,
         prefix_tokens=[prefix_token],
     )
+    bass_token_id = tokenizer.token_to_id["<BASS>"]
+    note_token_ids.append(bass_token_id)
 
     with ctx:
-        # TODO: should be model.generate
-        output = model.greedy_decode(
+        output = model.generate(
             idx=torch.tensor(note_token_ids),
-            max_len=max_new_tokens,
+            max_new_tokens=max_new_tokens,
             temperature=temperature,
             device=device,
         )
-    generated_notes = tokenizer.decode(output)
-    generated_piece = ff.MidiPiece(generated_notes)
+
+    out_tokens = [tokenizer.vocab[token_id] for token_id in output]
+
+    bass_command_position = out_tokens.index("<BASS>")
+    bass_tokens = out_tokens[bass_command_position:]
+
+    bass_notes = tokenizer.untokenize(bass_tokens)
+
+    bass_piece = ff.MidiPiece(bass_notes)
 
     io_columns = st.columns(2)
     title, composer = source["title"], source["composer"]
@@ -134,10 +142,10 @@ def main():
     # Display and allow download of the generated MIDI
     with io_columns[1]:
         st.write("generated:")
-        streamlit_pianoroll.from_fortepyan(piece=generated_piece)
+        streamlit_pianoroll.from_fortepyan(piece=bass_piece)
         milion_parameters = model.get_num_params() / 1e6
         midi_path = f"tmp/{milion_parameters:.0f}_variations_on_{piece_name}_{idx}.mid"
-        generated_file = generated_piece.to_midi()
+        generated_file = bass_piece.to_midi()
         generated_file.write(midi_path)
         with open(midi_path, "rb") as file:
             st.markdown(
@@ -151,9 +159,9 @@ def main():
 
     st.write("whole")
 
-    out_notes = pd.concat([source_notes, generated_notes]).sort_values(by="start").reindex()
+    out_notes = pd.concat([source_notes, bass_notes]).sort_values(by="start").reindex()
     out_piece = ff.MidiPiece(out_notes)
-    streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=generated_piece)
+    streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=bass_piece)
 
     # Allow download of the full MIDI with context
     full_midi_path = f"tmp/full_{milion_parameters}_variations_on_{piece_name}_{idx}.mid"

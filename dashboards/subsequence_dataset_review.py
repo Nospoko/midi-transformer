@@ -82,11 +82,11 @@ def main():
     prompt_tokens = src_tokens[:bass_command_position]
     bass_tokens = src_tokens[bass_command_position:]
 
-    prompt_tokens = midi_dataset.tokenizer.untokenize(prompt_tokens)
-    bass_tokens = midi_dataset.tokenizer.untokenize(bass_tokens)
+    prompt_notes = midi_dataset.tokenizer.untokenize(prompt_tokens)
+    bass_notes = midi_dataset.tokenizer.untokenize(bass_tokens)
 
-    src_piece = ff.MidiPiece(prompt_tokens)
-    tgt_piece = ff.MidiPiece(bass_tokens)
+    src_piece = ff.MidiPiece(prompt_notes)
+    tgt_piece = ff.MidiPiece(bass_notes)
 
     st.write(src_tokens)
     st.write("#### Together:")
