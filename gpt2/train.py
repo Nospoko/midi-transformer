@@ -259,7 +259,7 @@ def main(cfg: DictConfig):
     # optimizer
     optimizer = model.configure_optimizers(
         weight_decay=cfg.optimizer.weight_decay,
-        learning_rate=cfg.optimizer.learning_rate,
+        learning_rate=cfg.lr.learning_rate,
         betas=(cfg.optimizer.beta1, cfg.optimizer.beta2),
         device_type=device_type,
     )
@@ -296,7 +296,7 @@ def main(cfg: DictConfig):
     def get_lr(it):
         # 1) linear warmup for warmup_iters steps
         if it < cfg.lr.warmup_iters:
-            return cfg.optimizer.learning_rate * it / cfg.lr.warmup_iters
+            return cfg.lr.learning_rate * it / cfg.lr.warmup_iters
 
         # 2) if it > lr_decay_iters, return min learning rate
         if it > cfg.lr.lr_decay_iters:
@@ -306,7 +306,7 @@ def main(cfg: DictConfig):
         decay_ratio = (it - cfg.lr.warmup_iters) / (cfg.lr.lr_decay_iters - cfg.lr.warmup_iters)
         assert 0 <= decay_ratio <= 1
         coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
-        return cfg.lr.min_lr + coeff * (cfg.optimizer.learning_rate - cfg.lr.min_lr)
+        return cfg.lr.min_lr + coeff * (cfg.lr.learning_rate - cfg.lr.min_lr)
 
     run_name = f"midi-gpt2-{milion_params:.0f}M-" + cfg.logging.wandb_run_name_suffix
     # logging
@@ -330,7 +330,7 @@ def main(cfg: DictConfig):
     iter_num = 1
     while True:
         # determine and set the learning rate for this iteration
-        lr = get_lr(iter_num) if cfg.lr.decay_lr else cfg.optimizer.learning_rate
+        lr = get_lr(iter_num) if cfg.lr.decay_lr else cfg.lr.learning_rate
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
 
