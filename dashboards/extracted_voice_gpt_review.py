@@ -70,7 +70,6 @@ def generate_bass_iteratively(
         bass_prompt_piece = ff.MidiPiece(bass_prompt)
         source_piece = ff.MidiPiece(step_prompt_notes)
         prompt_pieces.append((source_piece, bass_prompt_piece))
-        st.write(step_bass_notes.start.min())
         step_bass_notes = step_bass_notes[(step_bass_notes.start > 0) & (step_bass_notes.end > 0)]
         # Tokenize the current step's prompt and target notes
         step_sequence = tokenizer.tokenize(step_prompt_notes)
@@ -84,7 +83,6 @@ def generate_bass_iteratively(
             device=device,
         )
         print(f"generating {time} - {time + prompt_context_duration} with {target_context_duration} target context")
-        st.write(input_sequence)
         # Generate new tokens using the model
         output = model.generate(
             idx=input_token_ids,
@@ -158,174 +156,230 @@ def prepare_record(record: dict, extraction_type: str):
 
 
 def main():
+    st.title("🎵 Bass Generation Dashboard")
+    st.markdown(
+        """
+    This dashboard allows you to generate bass lines for musical pieces using a GPT model.
+    Select your parameters, choose a piece, and let AI compose for you!
+    """
+    )
+
     with st.sidebar:
-        # Select device and checkpoint path
+        st.header("Model Configuration")
         devices = [f"cuda:{it}" for it in range(torch.cuda.device_count())] + ["cpu"]
-        device = st.selectbox("device", options=devices)
-        checkpoint_path = st.selectbox("checkpoint", options=glob("checkpoints/*/*.pt"))
-
-        torch.manual_seed(4)
-        torch.cuda.manual_seed(4)
-        torch.backends.cuda.matmul.allow_tf32 = True
-        torch.backends.cudnn.allow_tf32 = True
-        device_type = "cuda" if "cuda" in device else "cpu"
-
-        checkpoint = dashboard_utils.load_checkpoint(
-            checkpoint_path=checkpoint_path,
-            device=device,
+        device = st.selectbox("Select Device", options=devices, help="Choose the device to run the model on")
+        checkpoint_path = st.selectbox(
+            "Select Checkpoint",
+            options=glob("checkpoints/*/*.pt"),
+            help="Choose the model checkpoint to use",
         )
-        best_val_loss = checkpoint["best_val_loss"]
-        st.write(f"Model best val loss: {best_val_loss:.4f}")
+
+        with st.spinner("Loading checkpoint..."):
+            checkpoint = dashboard_utils.load_checkpoint(
+                checkpoint_path=checkpoint_path,
+                device=device,
+            )
+
+        st.success(f"Model loaded! Best validation loss: {checkpoint['best_val_loss']:.4f}")
         if "wandb" in dict(checkpoint).keys():
-            st.link_button(label="wandb run", url=checkpoint["wandb"])
+            st.link_button(label="View Training Run", url=checkpoint["wandb"])
 
     cfg, _, tokenizer = dashboard_utils.load_tokenizer(checkpoint)
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
-    ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
-
-    dataset_path = st.text_input("dataset", value="roszcz/maestro-sustain-v2")
-    dataset_split = st.selectbox("split", options=["validation", "train", "test"])
-    extraction_type = st.selectbox("extraction type", options=["bass"])
-
-    dataset = dashboard_utils.load_hf_dataset(
-        dataset_path=dataset_path,
-        dataset_split=dataset_split,
-    )
-
-    # Select part of the dataset
-    dataset = dashboard_utils.select_part_dataset(midi_dataset=dataset)
-
-    # Get the record id from user input
-    idx = st.number_input("record_id", value=0, max_value=len(dataset))
-    record = dataset[idx]
-    source = json.loads(record["source"])
-    source_notes, target_notes = prepare_record(record=record, extraction_type=extraction_type)
-
-    st.write(f"Model input size: {cfg.data.sequence_length}")
-
-    with st.form("generate parameters"):
-        temperature = st.number_input("temperature", value=1.0)
-        max_new_tokens = st.number_input("max_new_tokens", value=cfg.data.sequence_length)
-        prompt_context_duration = st.number_input("prompt_context_duration", value=10.0)
-        target_context_duration = st.number_input("target_contex_duration", value=0.0)
-        time_step = st.number_input("time_step", value=10.0)
-        run = st.form_submit_button("Generate")
-
-    if not run:
-        return
-
-    # Decode and display the original piece
-    notes = pd.concat([source_notes, target_notes], ignore_index=True)
-    notes = notes.sort_values(by="start").reset_index(drop=True)
-
-    bass_prompt = target_notes[target_notes.end < target_context_duration]
-    bass_prompt_piece = ff.MidiPiece(bass_prompt)
-
-    source_piece = ff.MidiPiece(source_notes)
-    target_piece = ff.MidiPiece(target_notes)
-
-    if source_piece.size == 0 and bass_prompt_piece.size == 0:
-        st.write("Warning: Empty prompt!")
-    else:
-        st.write("Prompt piece")
-        streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=bass_prompt_piece)
-
-    piece = ff.MidiPiece(notes, source=source)
-
-    pad_token_id = tokenizer.token_to_id["<PAD>"]
-    model = dashboard_utils.initialize_model(
-        cfg,
-        checkpoint=checkpoint,
-        device=device,
-        pad_token_id=pad_token_id,
-    )
-
-    # Generate new tokens and create the generated piece
-    prefix_token = get_source_extraction_token(extraction_type=extraction_type)
-    note_token_ids = tokenizer.encode(
-        source_notes,
-        prefix_tokens=[prefix_token],
-    )
-    bass_token_id = tokenizer.token_to_id["<BASS>"]
-    note_token_ids.append(bass_token_id)
-    st.write(f"Input sequence tokens size: {len(note_token_ids)}")
-
-    with ctx:
-        bass_notes, prompt_pieces = generate_bass_iteratively(
-            model=model,
-            tokenizer=tokenizer,
-            prompt_notes=source_notes,
-            target_notes=target_notes,
-            prompt_context_duration=prompt_context_duration,
-            target_context_duration=target_context_duration,
-            time_step=time_step,
-            device=device,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
+    device_type = "cuda" if "cuda" in device else "cpu"
+    ctx = (
+        nullcontext()
+        if device_type == "cpu"
+        else torch.amp.autocast(
+            device_type=device_type,
+            dtype=ptdtype,
         )
+    )
 
-    st.write("Prompt pieces")
-    for prompt_piece, bass_prompt_piece in prompt_pieces:
-        try:
-            streamlit_pianoroll.from_fortepyan(piece=prompt_piece, secondary_piece=bass_prompt_piece)
-        except DuplicateWidgetID:
-            st.write("Duplicate pianoroll")
-            pass
+    tab1, tab2, tab3 = st.tabs(["Dataset Selection", "Generation Parameters", "Results"])
 
-    st.write(bass_notes)
-    bass_piece = ff.MidiPiece(bass_notes)
-
-    io_columns = st.columns(2)
-    title, composer = source["title"], source["composer"]
-    piece_name = (title + composer).replace(" ", "_").casefold()
-
-    # Display and allow download of the original MIDI
-    with io_columns[0]:
-        st.write("original:")
-        streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=target_piece)
-        original_midi_path = f"tmp/fragment_of_{piece_name}_{idx}.mid"
-        source_file = piece.to_midi()
-        source_file.write(original_midi_path)
-        with open(original_midi_path, "rb") as file:
-            st.markdown(
-                download_button(file.read(), original_midi_path.split("/")[-1], "Download source midi"),
-                unsafe_allow_html=True,
+    with tab1:
+        st.header("Dataset Configuration")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            dataset_path = st.text_input(
+                "Dataset Path",
+                value="roszcz/maestro-sustain-v2",
+                help="Enter the path to the dataset",
             )
-        os.unlink(original_midi_path)
-
-    # Display and allow download of the generated MIDI
-    with io_columns[1]:
-        st.write("generated:")
-        streamlit_pianoroll.from_fortepyan(piece=bass_piece)
-        milion_parameters = model.get_num_params() / 1e6
-        midi_path = f"tmp/{milion_parameters:.0f}_variations_on_{piece_name}_{idx}.mid"
-        generated_file = bass_piece.to_midi()
-        generated_file.write(midi_path)
-        with open(midi_path, "rb") as file:
-            st.markdown(
-                download_button(file.read(), midi_path.split("/")[-1], "Download generated midi"),
-                unsafe_allow_html=True,
+        with col2:
+            dataset_split = st.selectbox(
+                "Dataset Split",
+                options=["validation", "train", "test"],
+                help="Choose the dataset split to use",
             )
-        os.unlink(midi_path)
+        with col3:
+            extraction_type = st.selectbox(
+                "Extraction Type",
+                options=["bass"],
+                help="Select the type of notes to extract",
+            )
 
-        # with st.expander("Tokens"):
-        #     st.write(tokenizer.vocab[token_id] for token_id in output)
+        with st.spinner("Loading dataset..."):
+            dataset = dashboard_utils.load_hf_dataset(
+                dataset_path=dataset_path,
+                dataset_split=dataset_split,
+            )
+            dataset = dashboard_utils.select_part_dataset(midi_dataset=dataset)
 
-    st.write("whole")
+        st.success(f"Dataset loaded! Total records: {len(dataset)}")
 
-    out_notes = pd.concat([source_notes, bass_notes]).sort_values(by="start").reindex()
-    out_piece = ff.MidiPiece(out_notes)
-    streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=bass_piece)
+        idx = st.number_input(
+            "Select Record ID",
+            value=0,
+            max_value=len(dataset) - 1,
+            help="Choose a specific record from the dataset",
+        )
+        record = dataset[idx]
+        source = json.loads(record["source"])
+        st.info(f"Selected piece: '{source['title']}' by {source['composer']}")
 
-    # Allow download of the full MIDI with context
-    full_midi_path = f"tmp/full_{milion_parameters}_variations_on_{piece_name}_{idx}.mid"
-    out_piece.to_midi().write(full_midi_path)
-    with open(full_midi_path, "rb") as file:
+    with tab2:
+        st.header("Generation Parameters")
+        with st.form("generate_parameters"):
+            col1, col2 = st.columns(2)
+            with col1:
+                temperature = st.slider(
+                    "Temperature",
+                    min_value=0.1,
+                    max_value=2.0,
+                    value=1.0,
+                    help="Controls randomness in generation",
+                )
+                max_new_tokens = st.number_input(
+                    "Max New Tokens",
+                    value=cfg.data.sequence_length,
+                    help="Maximum number of new tokens to generate",
+                )
+            with col2:
+                prompt_context_duration = st.slider(
+                    "Prompt Context Duration",
+                    min_value=1.0,
+                    max_value=30.0,
+                    value=10.0,
+                    help="Duration of the prompt context in seconds",
+                )
+                target_context_duration = st.slider(
+                    "Target Context Duration",
+                    min_value=0.0,
+                    max_value=30.0,
+                    value=0.0,
+                    help="Duration of the target context in seconds",
+                )
+                time_step = st.slider(
+                    "Time Step",
+                    min_value=1.0,
+                    max_value=30.0,
+                    value=10.0,
+                    help="Time step for generation in seconds",
+                )
+
+            run = st.form_submit_button("Generate Bass Line")
+
+    if run:
+        with tab3:
+            st.header("Generation Results")
+            with st.spinner("Preparing data..."):
+                source_notes, target_notes = prepare_record(record=record, extraction_type=extraction_type)
+                notes = pd.concat([source_notes, target_notes], ignore_index=True)
+                notes = notes.sort_values(by="start").reset_index(drop=True)
+                bass_prompt = target_notes[target_notes.end < target_context_duration]
+
+                source_piece = ff.MidiPiece(source_notes)
+                bass_prompt_piece = ff.MidiPiece(bass_prompt)
+
+            if source_piece.size == 0 and bass_prompt_piece.size == 0:
+                st.warning("Warning: Empty prompt! Generation may not produce meaningful results.")
+
+            st.subheader("Original Piece with Bass Prompt")
+            streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=bass_prompt_piece)
+
+            with st.spinner("Generating bass line..."):
+                pad_token_id = tokenizer.token_to_id["<PAD>"]
+                model = dashboard_utils.initialize_model(
+                    cfg,
+                    checkpoint=checkpoint,
+                    device=device,
+                    pad_token_id=pad_token_id,
+                )
+
+                prefix_token = get_source_extraction_token(extraction_type=extraction_type)
+                note_token_ids = tokenizer.encode(source_notes, prefix_tokens=[prefix_token])
+                note_token_ids.append(tokenizer.token_to_id["<BASS>"])
+
+                with ctx:
+                    bass_notes, prompt_pieces = generate_bass_iteratively(
+                        model=model,
+                        tokenizer=tokenizer,
+                        prompt_notes=source_notes,
+                        target_notes=target_notes,
+                        prompt_context_duration=prompt_context_duration,
+                        target_context_duration=target_context_duration,
+                        time_step=time_step,
+                        device=device,
+                        max_new_tokens=max_new_tokens,
+                        temperature=temperature,
+                    )
+
+            st.success("Bass line generated successfully!")
+
+            st.subheader("Generated Bass Line")
+            bass_piece = ff.MidiPiece(bass_notes)
+            streamlit_pianoroll.from_fortepyan(piece=bass_piece)
+
+            st.subheader("Combined Result")
+            out_notes = pd.concat([source_notes, bass_notes]).sort_values(by="start").reset_index(drop=True)
+            out_piece = ff.MidiPiece(out_notes)
+            streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=bass_piece)
+
+            # Download buttons
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                download_midi(
+                    source_piece,
+                    f"original_{source['title']}.mid",
+                    "Download Original MIDI",
+                )
+            with col2:
+                download_midi(
+                    bass_piece,
+                    f"generated_bass_{source['title']}.mid",
+                    "Download Generated Bass MIDI",
+                )
+            with col3:
+                download_midi(
+                    out_piece,
+                    f"combined_{source['title']}.mid",
+                    "Download Combined MIDI",
+                )
+
+            with st.expander("View Generation Details"):
+                st.write("Bass Notes:", bass_notes)
+                st.write("Prompt Pieces:")
+                for i, (prompt_piece, bass_prompt_piece) in enumerate(prompt_pieces):
+                    st.write(f"Step {i+1}")
+                    try:
+                        streamlit_pianoroll.from_fortepyan(
+                            piece=prompt_piece,
+                            secondary_piece=bass_prompt_piece,
+                        )
+                    except DuplicateWidgetID:
+                        st.write("Duplicate pianoroll")
+
+
+def download_midi(piece, filename, button_text):
+    piece.to_midi().write(filename)
+    with open(filename, "rb") as file:
         st.markdown(
-            download_button(file.read(), full_midi_path.split("/")[-1], "Download midi with context"),
+            download_button(file.read(), filename.split("/")[-1], "Download midi with context"),
             unsafe_allow_html=True,
         )
-    os.unlink(full_midi_path)
+    os.unlink(filename)
 
 
 if __name__ == "__main__":
