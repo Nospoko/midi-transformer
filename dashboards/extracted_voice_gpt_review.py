@@ -71,7 +71,6 @@ def generate_bass_iteratively(
 
         # Combine prompt, bass marker, and target into input sequence
         input_sequence = step_sequence + ["<BASS>"] + step_target
-        st.write(input_sequence)  # Display input sequence (for debugging)
 
         # Convert tokens to ids and prepare input tensor
         input_token_ids = torch.tensor(
@@ -89,7 +88,6 @@ def generate_bass_iteratively(
         # Convert output to numpy array and decode tokens
         output = output[0].cpu().numpy()
         out_tokens = [tokenizer.vocab[token_id] for token_id in output]
-        st.write(out_tokens)  # Display output tokens (for debugging)
 
         # Extract bass tokens (everything after the <BASS> marker)
         bass_command_position = out_tokens.index("<BASS>")
