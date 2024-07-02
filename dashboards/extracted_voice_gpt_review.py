@@ -47,34 +47,36 @@ def generate_bass_iteratively(
         DataFrame containing generated bass notes
     """
     # Initialize the first step with notes within the prompt and target context durations
-    step_prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration]
-    step_target_notes = target_notes[target_notes.end < target_context_duration]
+    step_prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration].copy()
+    step_bass_notes = target_notes[target_notes.end < target_context_duration].copy()
 
     # Initialize the list of all bass notes with the initial target notes
-    all_bass_notes = [step_target_notes]
+    all_bass_notes = [step_bass_notes]
     time = 0
     end = prompt_notes.end.max()
 
     # Handle the case where there's no target context
     if target_context_duration == 0:
-        step_target_notes = pd.DataFrame(columns=prompt_notes.columns)
+        step_bass_notes = pd.DataFrame(columns=prompt_notes.columns)
     prompt_pieces = []  # debugging
     # Iterate through the piece, generating bass notes in steps
     while time + time_step < end:
         # Calculate the start offset for the bass notes in this step
-        bass_start_offset = step_prompt_notes.start.min()
+        start_offset = step_prompt_notes.start.min()
+        step_prompt_notes.start -= start_offset
+        step_bass_notes.end -= start_offset
 
-        bass_prompt = step_target_notes
+        bass_prompt = step_bass_notes
         bass_prompt_piece = ff.MidiPiece(bass_prompt)
         source_piece = ff.MidiPiece(step_prompt_notes)
         prompt_pieces.append((source_piece, bass_prompt_piece))
 
         # Tokenize the current step's prompt and target notes
         step_sequence = tokenizer.tokenize(step_prompt_notes)
-        step_target = tokenizer.tokenize(step_target_notes)
+        step_bass = tokenizer.tokenize(step_bass_notes)
 
         # Combine prompt, bass marker, and target into input sequence
-        input_sequence = step_sequence + ["<BASS>"] + step_target
+        input_sequence = step_sequence + ["<BASS>"] + step_bass
 
         # Convert tokens to ids and prepare input tensor
         input_token_ids = torch.tensor(
@@ -104,11 +106,11 @@ def generate_bass_iteratively(
         notes_after_context = bass_notes.start > target_context_duration
         notes_within_step = bass_notes.end < target_context_duration + time_step
         valid_new_notes = notes_after_context & notes_within_step
-        bass_notes = bass_notes[valid_new_notes]
+        bass_notes = bass_notes[valid_new_notes].copy()
 
         # Adjust the start and end times of the bass notes
-        bass_notes.start += bass_start_offset
-        bass_notes.end += bass_start_offset
+        bass_notes.start += start_offset
+        bass_notes.end += start_offset
         bass_notes["duration"] = bass_notes.end - bass_notes.start
 
         # Add the generated bass notes to the collection
@@ -118,14 +120,14 @@ def generate_bass_iteratively(
         # Select the prompt notes for the next time step
         time = time + time_step
         prompt_selector = (prompt_notes.start > time) & (prompt_notes.end < time + prompt_context_duration)
-        step_prompt_notes = prompt_notes[prompt_selector]
+        step_prompt_notes = prompt_notes[prompt_selector].copy()
 
         st.write(bass_notes)
         # Use the generated bass notes as the new bass context
         notes_after_timestep = bass_notes.start > time
         notes_within_context = bass_notes.end < time + target_context_duration
         valid_bass_context_notes = notes_after_timestep & notes_within_context
-        step_target_notes = bass_notes[valid_bass_context_notes]
+        step_bass_notes = bass_notes[valid_bass_context_notes].copy()
 
     # Combine all generated bass notes and return
     return pd.concat(all_bass_notes), prompt_pieces
