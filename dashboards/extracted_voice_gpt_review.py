@@ -8,6 +8,7 @@ import pandas as pd
 import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
+from streamlit.errors import DuplicateWidgetID
 
 from gpt2.model import GPT
 import dashboards.common.utils as dashboard_utils
@@ -23,6 +24,7 @@ def generate_bass_iteratively(
     target_notes: pd.DataFrame,
     prompt_context_duration: float,
     target_context_duration: float,
+    time_step: float,
     device: torch.device,
     temperature: float = 1.0,
     max_new_tokens: int = 512,
@@ -56,14 +58,16 @@ def generate_bass_iteratively(
     # Handle the case where there's no target context
     if target_context_duration == 0:
         step_target_notes = pd.DataFrame(columns=prompt_notes.columns)
-        time_step = prompt_context_duration / 2  # Use half the prompt duration as time step
-    else:
-        time_step = target_context_duration
-
+    prompt_pieces = []  # debugging
     # Iterate through the piece, generating bass notes in steps
     while time + time_step < end:
         # Calculate the start offset for the bass notes in this step
         bass_start_offset = step_prompt_notes.start.min()
+
+        bass_prompt = step_target_notes
+        bass_prompt_piece = ff.MidiPiece(bass_prompt)
+        source_piece = ff.MidiPiece(step_prompt_notes)
+        prompt_pieces.append((source_piece, bass_prompt_piece))
 
         # Tokenize the current step's prompt and target notes
         step_sequence = tokenizer.tokenize(step_prompt_notes)
@@ -91,14 +95,16 @@ def generate_bass_iteratively(
 
         # Extract bass tokens (everything after the <BASS> marker)
         bass_command_position = out_tokens.index("<BASS>")
-        bass_tokens = out_tokens[bass_command_position:]
+        bass_tokens = out_tokens[bass_command_position:].copy()
 
         # Convert bass tokens back to notes
         bass_notes = tokenizer.untokenize(bass_tokens)
 
         # Select only the newly generated notes within the current time step
-        bass_selector = (bass_notes.start > target_context_duration) & (bass_notes.end < 2 * time_step)
-        bass_notes = bass_notes[bass_selector]
+        notes_after_context = bass_notes.start > target_context_duration
+        notes_within_step = bass_notes.end < target_context_duration + time_step
+        valid_new_notes = notes_after_context & notes_within_step
+        bass_notes = bass_notes[valid_new_notes]
 
         # Adjust the start and end times of the bass notes
         bass_notes.start += bass_start_offset
@@ -109,15 +115,20 @@ def generate_bass_iteratively(
         all_bass_notes.append(bass_notes)
 
         # Prepare for the next iteration:
-        # Use the generated bass notes as the new target
-        step_target_notes = bass_notes
         # Select the prompt notes for the next time step
         time = time + time_step
         prompt_selector = (prompt_notes.start > time) & (prompt_notes.end < time + prompt_context_duration)
         step_prompt_notes = prompt_notes[prompt_selector]
 
+        st.write(bass_notes)
+        # Use the generated bass notes as the new bass context
+        notes_after_timestep = bass_notes.start > time
+        notes_within_context = bass_notes.end < time + target_context_duration
+        valid_bass_context_notes = notes_after_timestep & notes_within_context
+        step_target_notes = bass_notes[valid_bass_context_notes]
+
     # Combine all generated bass notes and return
-    return pd.concat(all_bass_notes)
+    return pd.concat(all_bass_notes), prompt_pieces
 
 
 def prepare_record(record: dict, extraction_type: str):
@@ -198,6 +209,7 @@ def main():
         max_new_tokens = st.number_input("max_new_tokens", value=cfg.data.sequence_length)
         prompt_context_duration = st.number_input("prompt_context_duration", value=10.0)
         target_context_duration = st.number_input("target_contex_duration", value=0.0)
+        time_step = st.number_input("time_step", value=10.0)
         run = st.form_submit_button("Generate")
 
     if not run:
@@ -222,7 +234,12 @@ def main():
     piece = ff.MidiPiece(notes, source=source)
 
     pad_token_id = tokenizer.token_to_id["<PAD>"]
-    model = dashboard_utils.initialize_model(cfg, checkpoint=checkpoint, device=device, pad_token_id=pad_token_id)
+    model = dashboard_utils.initialize_model(
+        cfg,
+        checkpoint=checkpoint,
+        device=device,
+        pad_token_id=pad_token_id,
+    )
 
     # Generate new tokens and create the generated piece
     prefix_token = get_source_extraction_token(extraction_type=extraction_type)
@@ -235,17 +252,26 @@ def main():
     st.write(f"Input sequence tokens size: {len(note_token_ids)}")
 
     with ctx:
-        bass_notes = generate_bass_iteratively(
+        bass_notes, prompt_pieces = generate_bass_iteratively(
             model=model,
             tokenizer=tokenizer,
             prompt_notes=source_notes,
             target_notes=target_notes,
             prompt_context_duration=prompt_context_duration,
             target_context_duration=target_context_duration,
+            time_step=time_step,
             device=device,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
         )
+
+    st.write("Prompt pieces")
+    for prompt_piece, bass_prompt_piece in prompt_pieces:
+        try:
+            streamlit_pianoroll.from_fortepyan(piece=prompt_piece, secondary_piece=bass_prompt_piece)
+        except DuplicateWidgetID:
+            st.write("Duplicate pianoroll")
+            pass
 
     st.write(bass_notes)
     bass_piece = ff.MidiPiece(bass_notes)
