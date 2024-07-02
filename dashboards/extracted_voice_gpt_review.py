@@ -58,11 +58,11 @@ def generate_bass_iteratively(
     if target_context_duration == 0:
         step_bass_notes = pd.DataFrame(columns=prompt_notes.columns)
     prompt_pieces = []  # debugging
-
+    it = 0
     # Iterate through the piece, generating bass notes in steps
     while time + time_step < end:
         # Calculate the start offset for the bass notes in this step
-        start_offset = step_prompt_notes.start.min()
+        start_offset = it * time_step
         step_prompt_notes.start -= start_offset
         step_prompt_notes.end -= start_offset
 
@@ -105,7 +105,7 @@ def generate_bass_iteratively(
 
         # Select only the newly generated notes within the current time step
         notes_after_context = output_bass_notes.start > target_context_duration
-        notes_within_step = output_bass_notes.end < prompt_context_duration
+        notes_within_step = output_bass_notes.end < target_context_duration + time_step
         valid_new_notes = notes_after_context & notes_within_step
         bass_notes = output_bass_notes[valid_new_notes].copy()
         step_bass_notes = bass_notes.copy()
@@ -122,9 +122,9 @@ def generate_bass_iteratively(
         time = time + time_step
         prompt_selector = (prompt_notes.start > time) & (prompt_notes.end < time + prompt_context_duration)
         step_prompt_notes = prompt_notes[prompt_selector].copy()
-        step_bass_notes = step_bass_notes[step_bass_notes.start > prompt_context_duration - target_context_duration]
-        step_bass_notes.start -= prompt_context_duration - target_context_duration
-        step_bass_notes.end -= prompt_context_duration - target_context_duration
+        step_bass_notes = step_bass_notes[step_bass_notes.start > target_context_duration + time_step]
+        step_bass_notes.start -= target_context_duration + time_step
+        step_bass_notes.end -= target_context_duration + time_step
 
     # Combine all generated bass notes and return
     return pd.concat(all_bass_notes), prompt_pieces
