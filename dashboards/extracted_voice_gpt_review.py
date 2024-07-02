@@ -64,7 +64,7 @@ def generate_bass_iteratively(
         # Calculate the start offset for the bass notes in this step
         start_offset = step_prompt_notes.start.min()
         step_prompt_notes.start -= start_offset
-        step_bass_notes.end -= start_offset
+        step_prompt_notes.end -= start_offset
 
         bass_prompt = step_bass_notes
         bass_prompt_piece = ff.MidiPiece(bass_prompt)
