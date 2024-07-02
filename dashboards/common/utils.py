@@ -120,7 +120,6 @@ def initialize_model(
     return model
 
 
-@st.cache_data
 def load_checkpoint(checkpoint_path: str, device: str):
     checkpoint = torch.load(checkpoint_path, map_location=device)
     return checkpoint
