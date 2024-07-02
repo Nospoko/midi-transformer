@@ -376,7 +376,7 @@ def download_midi(piece, filename, button_text):
     piece.to_midi().write(filename)
     with open(filename, "rb") as file:
         st.markdown(
-            download_button(file.read(), filename.split("/")[-1], "Download midi with context"),
+            download_button(file.read(), filename.split("/")[-1], button_text),
             unsafe_allow_html=True,
         )
     os.unlink(filename)
