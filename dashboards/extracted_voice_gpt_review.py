@@ -61,7 +61,7 @@ def generate_bass_iteratively(
         time_step = target_context_duration
 
     # Iterate through the piece, generating bass notes in steps
-    while time < end:
+    while time + time_step < end:
         # Calculate the start offset for the bass notes in this step
         bass_start_offset = step_prompt_notes.start.min()
 
@@ -133,8 +133,8 @@ def prepare_record(record: dict, extraction_type: str):
     """
     low, high = get_voice_range(voice=extraction_type)
     start_end_columns = st.columns(2)
-    start = start_end_columns[0].number_input(label="start second", value=0)
-    end = start_end_columns[1].number_input(label="end second", value=60)
+    start = start_end_columns[0].number_input(label="start second", value=0.0)
+    end = start_end_columns[1].number_input(label="end second", value=60.0)
 
     notes = pd.DataFrame(record["notes"])
     notes = notes[(notes.start > start) & (notes.end < end)]
@@ -197,7 +197,7 @@ def main():
         temperature = st.number_input("temperature", value=1.0)
         max_new_tokens = st.number_input("max_new_tokens", value=cfg.data.sequence_length)
         prompt_context_duration = st.number_input("prompt_context_duration", value=10.0)
-        target_context_duration = st.number_input("target_contex_duration", value=0)
+        target_context_duration = st.number_input("target_contex_duration", value=0.0)
         run = st.form_submit_button("Generate")
 
     if not run:
@@ -207,8 +207,17 @@ def main():
     notes = pd.concat([source_notes, target_notes], ignore_index=True)
     notes = notes.sort_values(by="start").reset_index(drop=True)
 
+    bass_prompt = target_notes[target_notes.end < target_context_duration]
+    bass_prompt_piece = ff.MidiPiece(bass_prompt)
+
     source_piece = ff.MidiPiece(source_notes)
     target_piece = ff.MidiPiece(target_notes)
+
+    if source_piece.size == 0 and bass_prompt_piece.size == 0:
+        st.write("Warning: Empty prompt!")
+    else:
+        st.write("Prompt piece")
+        streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=bass_prompt_piece)
 
     piece = ff.MidiPiece(notes, source=source)
 
