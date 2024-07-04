@@ -14,9 +14,3 @@ services:
       POSTGRES_DB: midi_transformers
     ports:
       - "5432:5432"
-    networks:
-      - midi-modeling
-
-networks:
-  midi-modeling:
-    external: true
