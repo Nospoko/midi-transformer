@@ -63,6 +63,7 @@ def generate_bass_iteratively(
     while time + time_step < end:
         # Calculate the start offset for the bass notes in this step
         start_offset = it * time_step
+        it += 1
         step_prompt_notes.start -= start_offset
         step_prompt_notes.end -= start_offset
 
@@ -244,10 +245,8 @@ def main():
         with st.form("generate_parameters"):
             col1, col2 = st.columns(2)
             with col1:
-                temperature = st.slider(
+                temperature = st.number_input(
                     "Temperature",
-                    min_value=0.1,
-                    max_value=2.0,
                     value=1.0,
                     help="Controls randomness in generation",
                 )
@@ -269,7 +268,7 @@ def main():
                     min_value=0.0,
                     max_value=30.0,
                     value=0.0,
-                    help="Duration of the target context in seconds",
+                    help="Duration of the bass context in seconds",
                 )
                 time_step = st.slider(
                     "Time Step",
@@ -280,6 +279,7 @@ def main():
                 )
 
             run = st.form_submit_button("Generate Bass Line")
+        st.image("dashboards/img/iterative_generation.png")
 
     if run:
         with tab3:
@@ -335,7 +335,11 @@ def main():
             st.subheader("Combined Result")
             out_notes = pd.concat([source_notes, bass_notes]).sort_values(by="start").reset_index(drop=True)
             out_piece = ff.MidiPiece(out_notes)
-            streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=bass_piece)
+
+            try:
+                streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=bass_piece)
+            except DuplicateWidgetID:
+                st.write("Duplicate pianoroll")
 
             # Download buttons
             col1, col2, col3 = st.columns(3)

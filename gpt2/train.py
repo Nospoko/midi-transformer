@@ -387,6 +387,7 @@ def main(cfg: DictConfig):
                         "train/loss_batch": losses["train"],
                         "val/loss_batch": losses["val"],
                         "total_tokens": total_tokens,
+                        "best_val_loss": best_val_loss,
                     },
                     step=iter_num,
                 )
