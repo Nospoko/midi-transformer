@@ -1,5 +1,5 @@
 CREATE TABLE prompt_notes (
-    prompt_id SERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     start_time FLOAT,
     end_time FLOAT,
     composer VARCHAR(255) NULL,

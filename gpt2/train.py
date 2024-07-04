@@ -401,6 +401,7 @@ def main(cfg: DictConfig):
                     "best_val_loss": best_val_loss,
                     "config": config,
                     "wandb": wandb_link,
+                    "total_tokens": total_tokens,
                 }
                 print(f"saving checkpoint to {out_dir}")
                 torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
