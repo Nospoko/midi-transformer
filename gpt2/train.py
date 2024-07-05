@@ -248,11 +248,21 @@ def main(cfg: DictConfig):
 
     # Create the loaders
     train_loader = CyclicalDataLoader(
-        train_dataset, batch_size=cfg.data.batch_size, shuffle=True, pin_memory=device_type == "cuda", num_workers=4
+        train_dataset,
+        batch_size=cfg.data.batch_size,
+        shuffle=True,
+        pin_memory=device_type == "cuda",
+        num_workers=4,
+        device=device,
     )
 
     val_loader = CyclicalDataLoader(
-        val_dataset, batch_size=cfg.data.batch_size, shuffle=False, pin_memory=device_type == "cuda", num_workers=4
+        val_dataset,
+        batch_size=cfg.data.batch_size,
+        shuffle=False,
+        pin_memory=device_type == "cuda",
+        num_workers=4,
+        device=device,
     )
 
     def get_batch(split):
@@ -260,14 +270,6 @@ def main(cfg: DictConfig):
             return train_loader.get_batch()
         else:
             return val_loader.get_batch()
-
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=cfg.data.batch_size,
-        shuffle=False,
-        pin_memory=True if device_type == "cuda" else False,
-        num_workers=4,  # Adjust based on your system
-    )
 
     # init these up here, can override if init_from='resume' (i.e. from a checkpoint)
     iter_num = 0
