@@ -49,16 +49,15 @@ def generate_bass(
     model: GPT,
     tokenizer: ExponentialTokenizer | AwesomeTokenizer,
     prompt_notes: pd.DataFrame,
-    target_notes: pd.DataFrame,
+    prompt_bass: pd.DataFrame,
     prompt_context_duration: float,
     target_context_duration: float,
-    time_step: float,
     device: torch.device,
     temperature: float = 1.0,
     max_new_tokens: int = 512,
 ) -> pd.DataFrame:
     """
-    Generate bass notes iteratively using the given model and tokenizer.
+    Generate bass notes using the given model and tokenizer.
 
     Args:
         model: The GPT model for generation
@@ -75,81 +74,49 @@ def generate_bass(
         DataFrame containing generated bass notes
     """
     # Initialize the first step with notes within the prompt and target context durations
-    step_prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration]
-    step_bass_notes = target_notes[target_notes.end < target_context_duration]
-    # Initialize the list of all bass notes with the initial target notes
-    all_bass_notes = [step_bass_notes]
-    time = 0
-    end = prompt_notes.end.max()
+    prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration]
+    prompt_bass = prompt_bass[prompt_bass.end < target_context_duration]
 
     # Handle the case where there's no target context
     if target_context_duration == 0:
-        step_bass_notes = pd.DataFrame(columns=prompt_notes.columns)
-    it = 0
-    # Iterate through the piece, generating bass notes in steps
-    while time + time_step < end:
-        # Calculate the start offset for the bass notes in this step
-        start_offset = it * time_step
-        it += 1
-        step_prompt_notes.start -= start_offset
-        step_prompt_notes.end -= start_offset
+        prompt_bass = pd.DataFrame(columns=prompt_notes.columns)
 
-        step_bass_notes = step_bass_notes[(step_bass_notes.start > 0) & (step_bass_notes.end > 0)]
-        # Tokenize the current step's prompt and target notes
-        step_sequence = tokenizer.tokenize(step_prompt_notes)
-        step_bass = tokenizer.tokenize(step_bass_notes)
+    # Tokenize prompt and target notes
+    step_sequence = tokenizer.tokenize(prompt_notes)
+    step_bass = tokenizer.tokenize(prompt_bass)
+    # Combine prompt, bass marker, and target into input sequence
+    input_sequence = ["<NO_BASS>"] + step_sequence + ["<BASS>"] + step_bass
+    # Convert tokens to ids and prepare input tensor
+    input_token_ids = torch.tensor(
+        [[tokenizer.token_to_id[token] for token in input_sequence]],
+        device=device,
+    )
 
-        # Combine prompt, bass marker, and target into input sequence
-        input_sequence = step_sequence + ["<BASS>"] + step_bass
-        # Convert tokens to ids and prepare input tensor
-        input_token_ids = torch.tensor(
-            [[tokenizer.token_to_id[token] for token in input_sequence]],
-            device=device,
-        )
-        print(f"generating {time} - {time + prompt_context_duration} with {target_context_duration} target context")
-        # Generate new tokens using the model
-        output = model.generate(
-            idx=input_token_ids,
-            temperature=temperature,
-            max_new_tokens=max_new_tokens,
-        )
-        print("generation successful")
-        # Convert output to numpy array and decode tokens
-        output = output[0].cpu().numpy()
-        out_tokens = [tokenizer.vocab[token_id] for token_id in output]
+    # Generate new tokens using the model
+    output = model.generate(
+        idx=input_token_ids,
+        temperature=temperature,
+        max_new_tokens=max_new_tokens,
+    )
 
-        # Extract bass tokens (everything after the <BASS> marker)
-        bass_command_position = out_tokens.index("<BASS>")
-        bass_tokens = out_tokens[bass_command_position:].copy()
+    # Convert output to numpy array and decode tokens
+    output = output[0].cpu().numpy()
+    out_tokens = [tokenizer.vocab[token_id] for token_id in output]
 
-        # Convert bass tokens back to notes
-        output_bass_notes = tokenizer.untokenize(bass_tokens)
+    # Extract bass tokens (everything after the <BASS> marker)
+    bass_command_position = out_tokens.index("<BASS>")
+    bass_tokens = out_tokens[bass_command_position:].copy()
 
-        # Select only the newly generated notes within the current time step
-        notes_after_context = output_bass_notes.start > target_context_duration
-        notes_within_step = output_bass_notes.end < target_context_duration + time_step
-        valid_new_notes = notes_after_context & notes_within_step
-        bass_notes = output_bass_notes[valid_new_notes].copy()
-        step_bass_notes = bass_notes.copy()
+    # Convert bass tokens back to notes
+    output_bass_notes = tokenizer.untokenize(bass_tokens)
 
-        # Adjust the start and end times of the bass notes
-        bass_notes.start += start_offset
-        bass_notes.end += start_offset
-        bass_notes["duration"] = bass_notes.end - bass_notes.start
+    # Select only the newly generated notes within the prompt duration
+    notes_after_context = output_bass_notes.start > target_context_duration
+    notes_within_step = output_bass_notes.end < prompt_context_duration
+    valid_new_notes = notes_after_context & notes_within_step
+    bass_notes = output_bass_notes[valid_new_notes].copy()
 
-        # Add the generated bass notes to the collection
-        all_bass_notes.append(bass_notes)
-        # Prepare for the next iteration:
-        # Select the prompt notes for the next time step
-        time = time + time_step
-        prompt_selector = (prompt_notes.start > time) & (prompt_notes.end < time + prompt_context_duration)
-        step_prompt_notes = prompt_notes[prompt_selector].copy()
-        step_bass_notes = step_bass_notes[step_bass_notes.start > target_context_duration + time_step]
-        step_bass_notes.start -= target_context_duration + time_step
-        step_bass_notes.end -= target_context_duration + time_step
-
-    # Combine all generated bass notes and return
-    return pd.concat(all_bass_notes)
+    return bass_notes
 
 
 def prepare_prompts(
@@ -165,29 +132,33 @@ def prepare_prompts(
     notes = pd.DataFrame(record["notes"])
     source = json.loads(record["source"])
     prompts = []
-
     while time + prompt_context_duration < notes.end.max():
         start = time
         end = time + prompt_context_duration
 
-        notes = notes[(notes.start > start) & (notes.end < end)]
-        notes.end -= notes.start.min()
-        notes.start -= notes.start.min()
-        extracted_ids = (notes.pitch >= low) & (notes.pitch < high)
-        source_notes = notes[~extracted_ids]
-        target_notes = notes[extracted_ids]
+        fragment = notes[(notes.start > start) & (notes.end < end)]
+        fragment_start = fragment.start.min()
+        fragment_end = fragment.start.max()
+
+        fragment.end -= fragment_start
+        fragment.start -= fragment_start
+
+        extracted_ids = (fragment.pitch >= low) & (fragment.pitch < high)
+        source_notes = fragment[~extracted_ids]
+        target_notes = fragment[extracted_ids]
         target_prompt = target_notes[target_notes.end < target_context_duration]
+        if len(fragment) == 0:
+            continue
         prompt = {
             "source_notes": source_notes,
             "target_prompt": target_prompt,
             "prompt_notes": pd.concat([source_notes, target_prompt]),
-            "start_time": notes.start.min(),
-            "end_time": notes.start.max(),
+            "start_time": fragment_start,
+            "end_time": fragment_end,
             "midi_filename": source["midi_filename"],
         }
         prompts.append(prompt)
         time += time_step
-
     return prompts
 
 
@@ -213,18 +184,18 @@ def main():
         run_name = os.path.basename(checkpoint_path)
 
         # Hard-coded for the specific naming style
-        milion_parameters = run_name.split("-")[3][-1]
+        milion_parameters = run_name.split("-")[2][:-1]
 
         model_descriptor = {
             "name": os.path.basename(checkpoint_path),
             "milion_parameters": milion_parameters,
-            "best_val_loss": checkpoint["best_val_loss"],
+            "best_val_loss": checkpoint["best_val_loss"].item(),
         }
 
         st.success(f"Model loaded! Best validation loss: {checkpoint['best_val_loss']:.4f}")
         if "wandb" in dict(checkpoint).keys():
             st.link_button(label="View Training Run", url=checkpoint["wandb"])
-            model_descriptor |= {"wandb": checkpoint["wandb"]}
+            model_descriptor |= {"wandb_link": checkpoint["wandb"]}
 
     cfg, _, tokenizer = dashboard_utils.load_tokenizer(checkpoint)
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
@@ -309,7 +280,7 @@ def main():
                     help="Time step for generation in seconds",
                 )
             generation_parameters = {
-                "tempperature": temperature,
+                "temperature": temperature,
                 "max_new_tokens": max_new_tokens,
                 "prompt_context_duration": prompt_context_duration,
                 "target_context_duration": target_context_duration,
@@ -321,7 +292,10 @@ def main():
     if run:
         with tab3:
             st.header("Generation state")
+            pad_token_id = tokenizer.token_to_id["<PAD>"]
+
             prompts: list[dict] = []
+            st.spinner("Slicing the records into prompts")
             for record in dataset:
                 prompts += prepare_prompts(
                     record=record,
@@ -330,6 +304,13 @@ def main():
                     time_step=time_step,
                     target_context_duration=target_context_duration,
                 )
+
+            model = dashboard_utils.initialize_model(
+                cfg,
+                checkpoint=checkpoint,
+                device=device,
+                pad_token_id=pad_token_id,
+            )
             num_prompts = len(prompts)
 
             for idx, prompt in enumerate(prompts):
@@ -337,14 +318,6 @@ def main():
                 bass_prompt = prompt.pop("target_prompt")
 
                 with st.spinner(f"Generating bass line... {idx} / {num_prompts}"):
-                    pad_token_id = tokenizer.token_to_id["<PAD>"]
-                    model = dashboard_utils.initialize_model(
-                        cfg,
-                        checkpoint=checkpoint,
-                        device=device,
-                        pad_token_id=pad_token_id,
-                    )
-
                     prefix_token = get_source_extraction_token(extraction_type=extraction_type)
                     note_token_ids = tokenizer.encode(source_notes, prefix_tokens=[prefix_token])
                     note_token_ids.append(tokenizer.token_to_id["<BASS>"])
@@ -355,20 +328,21 @@ def main():
                             tokenizer=tokenizer,
                             prompt_notes=source_notes,
                             prompt_bass=bass_prompt,
+                            prompt_context_duration=prompt_context_duration,
+                            target_context_duration=target_context_duration,
                             device=device,
                             max_new_tokens=max_new_tokens,
                             temperature=temperature,
                         )
 
-                st.success("Bass line generated successfully!")
-
-            generated_notes = bass_notes.iloc[len(bass_prompt) :]
-            database_manager.insert_generated_notes(
-                model=model_descriptor,
-                prompt=prompt,
-                parameters=generation_parameters,
-                generated_notes=generated_notes,
-            )
+                generated_notes = bass_notes.iloc[len(bass_prompt) :]
+                database_manager.insert_generated_notes(
+                    model=model_descriptor,
+                    prompt=prompt,
+                    parameters=generation_parameters,
+                    generated_notes=generated_notes,
+                )
+            st.success(f"Prepared {num_prompts} generations")
 
 
 if __name__ == "__main__":

@@ -2,13 +2,17 @@ import json
 
 import pandas as pd
 import sqlalchemy as sa
-from runtime import database_cnx  # Adjust the import based on your project structure
+
+from dashboards.common.runtime import database_cnx  # Adjust the import based on your project structure
 
 
 def get_or_create_id(table: str, filters: dict, dtype: dict) -> int:
     # Build the SELECT query to check if the record exists
     query = f"SELECT id FROM {table} WHERE 1=1"
+
     for key, value in filters.items():
+        if "notes" in key:
+            continue
         if isinstance(value, str):
             query += f" AND {key} = '{value}'"
         else:
@@ -24,14 +28,13 @@ def get_or_create_id(table: str, filters: dict, dtype: dict) -> int:
     database_cnx.to_sql(
         df=df,
         table=table,
-        schema="midi_transformer",
         dtype=dtype,
         index=False,
         if_exists="append",
     )
 
     df = database_cnx.read_sql(sql=query)
-    return df.iloc[0][f"{table[:-1]}_id"]
+    return df.iloc[0]["id"]
 
 
 def insert_generated_notes(
@@ -41,6 +44,8 @@ def insert_generated_notes(
     generated_notes: pd.DataFrame,
 ):
     generated_notes = generated_notes.to_json()
+    prompt["prompt_notes"] = prompt["prompt_notes"].to_json()
+
     # Define dtypes
     parameter_dtype = {
         "id": sa.Integer,
@@ -85,7 +90,6 @@ def insert_generated_notes(
     database_cnx.to_sql(
         df=df,
         table="generated_notes",
-        schema="midi_transformer",
         dtype={
             "id": sa.Integer,
             "parameters_id": sa.Integer,
@@ -105,7 +109,6 @@ def register_model(model_registration: dict):
     database_cnx.to_sql(
         df=df,
         table=table,
-        schema="midi_transformer",
         dtype={
             "model_id": sa.Integer,
             "name": sa.String(255),
@@ -123,7 +126,6 @@ def insert_data(df: pd.DataFrame, table: str):
     database_cnx.to_sql(
         df=df,
         table=table,
-        schema="midi_transformer",
         index=False,
         if_exists="append",
     )
@@ -162,7 +164,9 @@ def purge_model(model_name: str):
 
 
 def get_model_predictions(
-    model_filters: dict = None, prompt_filters: dict = None, parameter_filters: dict = None
+    model_filters: dict = None,
+    prompt_filters: dict = None,
+    parameter_filters: dict = None,
 ) -> pd.DataFrame:
     base_query = """
     SELECT
@@ -170,11 +174,11 @@ def get_model_predictions(
     FROM
         generated_notes gn
     JOIN
-        models m ON gn.model_id = m.model_id
+        models m ON gn.model_id = m.id
     JOIN
-        prompt_notes pn ON gn.prompt_id = pn.prompt_id
+        prompt_notes pn ON gn.prompt_id = pn.id
     JOIN
-        generation_parameters gp ON gn.parameters_id = gp.parameters_id
+        generation_parameters gp ON gn.parameters_id = gp.id
     WHERE
         1=1
     """
@@ -259,7 +263,6 @@ def register_generation_parameters(generation_parameters: dict):
     database_cnx.to_sql(
         df=df,
         table=table,
-        schema="midi_transformer",
         dtype={
             "id": sa.Integer,
             "temperature": sa.Float,
@@ -300,7 +303,6 @@ def register_prompt_notes(prompt_notes: dict):
     database_cnx.to_sql(
         df=df,
         table=table,
-        schema="midi_transformer",
         dtype={
             "id": sa.Integer,
             "start_time": sa.Float,

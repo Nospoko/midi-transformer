@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 
 from dashboards.gpt_review import main as gpt_review
 from dashboards.browse_generated import main as browse_generated
+from dashboards.generate_records import main as generate_records
 from dashboards.augmentation_review import main as augmentation_review
 from dashboards.midi_dataset_review import main as midi_dataset_review
 from dashboards.hf_midi_dataset_review import main as hf_datasets_review
@@ -15,8 +16,9 @@ load_dotenv()
 
 def main():
     options = [
-        "gpt_review",
         "extracted_voice_gpt_review",
+        "generate_records",
+        "gpt_review",
         "browse generated",
         "hf_midi_datasets_review",
         "hf_subsequence_datasets_review",
@@ -44,6 +46,8 @@ def main():
             browse_generated()
         case "subsequence_dataset_review":
             subsequense_dataset_review()
+        case "generate_records":
+            generate_records()
 
 
 if __name__ == "__main__":
