@@ -295,15 +295,15 @@ def main():
             pad_token_id = tokenizer.token_to_id["<PAD>"]
 
             prompts: list[dict] = []
-            st.spinner("Slicing the records into prompts")
-            for record in dataset:
-                prompts += prepare_prompts(
-                    record=record,
-                    extraction_type=extraction_type,
-                    prompt_context_duration=prompt_context_duration,
-                    time_step=time_step,
-                    target_context_duration=target_context_duration,
-                )
+            with st.spinner("Slicing the records into prompts"):
+                for record in dataset:
+                    prompts += prepare_prompts(
+                        record=record,
+                        extraction_type=extraction_type,
+                        prompt_context_duration=prompt_context_duration,
+                        time_step=time_step,
+                        target_context_duration=target_context_duration,
+                    )
 
             model = dashboard_utils.initialize_model(
                 cfg,
