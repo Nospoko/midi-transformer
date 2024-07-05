@@ -413,17 +413,6 @@ def main(cfg: DictConfig):
         if iter_num % cfg.eval_interval == 0 and master_process:
             losses = estimate_loss()
             print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-            if cfg.logging.wandb_log:
-                wandb.log(
-                    {
-                        "iter": iter_num,
-                        "train/loss_batch": losses["train"],
-                        "val/loss_batch": losses["val"],
-                        "total_tokens": total_tokens,
-                        "best_val_loss": best_val_loss,
-                    },
-                    step=iter_num,
-                )
             if losses["val"] < best_val_loss or cfg.always_save_checkpoint:
                 best_val_loss = losses["val"]
                 checkpoint = {
@@ -438,6 +427,17 @@ def main(cfg: DictConfig):
                 }
                 print(f"saving checkpoint to {out_dir}")
                 torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
+            if cfg.logging.wandb_log:
+                wandb.log(
+                    {
+                        "iter": iter_num,
+                        "train/loss_batch": losses["train"],
+                        "val/loss_batch": losses["val"],
+                        "total_tokens": total_tokens,
+                        "best_val_loss": best_val_loss,
+                    },
+                    step=iter_num,
+                )
 
         if iter_num % cfg.logging.log_interval == 1 and master_process:
             # get loss as float. note: this is a CPU-GPU sync point
