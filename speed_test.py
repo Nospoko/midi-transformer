@@ -3,12 +3,13 @@ import time
 import pandas as pd
 from datasets import load_dataset
 
+from artifacts import special_tokens
 from data.tokenizer import ExponentialTokenizer
 
 
 def main():
     """Test the speed of encoding step in tokenizer"""
-    tokenizer = ExponentialTokenizer()
+    tokenizer = ExponentialTokenizer(special_tokens=special_tokens)
     dataset = load_dataset("roszcz/maestro-sustain-v2", split="test+train+validation")
     tokens_total = 0
     print("starting")

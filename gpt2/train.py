@@ -19,13 +19,14 @@ $ torchrun --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr=123.456.123
 import os
 import math
 import time
+import itertools
 from contextlib import nullcontext
 
 import hydra
 import torch
-import numpy as np
 from dotenv import load_dotenv
 from datasets import load_dataset
+from torch.utils.data import DataLoader
 from hydra.utils import to_absolute_path
 from omegaconf import OmegaConf, DictConfig
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -39,6 +40,29 @@ from data.subsequence_dataset import SubSequenceMidiDataset
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 
 load_dotenv()
+
+
+class CyclicalDataLoader:
+    def __init__(
+        self,
+        dataset,
+        batch_size,
+        shuffle=False,
+        pin_memory=False,
+        num_workers=0,
+        device: torch.device = "cpu",
+    ):
+        self.dataloader = DataLoader(
+            dataset, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory, num_workers=num_workers
+        )
+        self.device = device
+        self.iterator = iter(itertools.cycle(self.dataloader))
+
+    def get_batch(self):
+        batch = next(self.iterator)
+        x = batch["source_token_ids"].to(self.device, non_blocking=True)
+        y = batch["target_token_ids"].to(self.device, non_blocking=True)
+        return x, y
 
 
 def load_tokenizer(cfg: DictConfig):
@@ -222,21 +246,28 @@ def main(cfg: DictConfig):
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
     ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
 
+    # Create the loaders
+    train_loader = CyclicalDataLoader(
+        train_dataset, batch_size=cfg.data.batch_size, shuffle=True, pin_memory=device_type == "cuda", num_workers=4
+    )
+
+    val_loader = CyclicalDataLoader(
+        val_dataset, batch_size=cfg.data.batch_size, shuffle=False, pin_memory=device_type == "cuda", num_workers=4
+    )
+
     def get_batch(split):
         if split == "train":
-            data = train_dataset
+            return train_loader.get_batch()
         else:
-            data = val_dataset
-        ix = np.random.randint(0, len(data), size=(cfg.data.batch_size,))
-        # numpy to int :(
-        x = torch.stack([data[int(i)]["source_token_ids"] for i in ix])
-        y = torch.stack([data[int(i)]["target_token_ids"] for i in ix])
-        if device_type == "cuda":
-            # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
-            x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)
-        else:
-            x, y = x.to(device), y.to(device)
-        return x, y
+            return val_loader.get_batch()
+
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=cfg.data.batch_size,
+        shuffle=False,
+        pin_memory=True if device_type == "cuda" else False,
+        num_workers=4,  # Adjust based on your system
+    )
 
     # init these up here, can override if init_from='resume' (i.e. from a checkpoint)
     iter_num = 0
