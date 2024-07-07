@@ -53,7 +53,11 @@ class CyclicalDataLoader:
         device: torch.device = "cpu",
     ):
         self.dataloader = DataLoader(
-            dataset, batch_size=batch_size, shuffle=shuffle, pin_memory=pin_memory, num_workers=num_workers
+            dataset,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            pin_memory=pin_memory,
+            num_workers=num_workers,
         )
         self.device = device
         self.iterator = iter(itertools.cycle(self.dataloader))
@@ -252,7 +256,7 @@ def main(cfg: DictConfig):
         batch_size=cfg.data.batch_size,
         shuffle=True,
         pin_memory=device_type == "cuda",
-        num_workers=4,
+        num_workers=cfg.system.dataloader_workers,
         device=device,
     )
 
@@ -261,7 +265,7 @@ def main(cfg: DictConfig):
         batch_size=cfg.data.batch_size,
         shuffle=False,
         pin_memory=device_type == "cuda",
-        num_workers=4,
+        num_workers=cfg.system.dataloader_workers,
         device=device,
     )
 
