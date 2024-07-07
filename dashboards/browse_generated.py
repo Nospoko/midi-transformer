@@ -1,4 +1,3 @@
-import os
 import json
 
 import pandas as pd
@@ -6,74 +5,128 @@ import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
 
-from dashboards.common.components import download_button
+import dashboards.common.database_manager as dm
 
 
 def main():
-    models = ["midi-gpt2-302M-pretraining-2024-04-30-05-26", "midi-gpt2-333M-pretraining-2024-04-30-14-59"]
-    model = st.selectbox(options=models, label="model")
-    directory = f"tmp/{model}"
-    with open(f"{directory}/file_descriptors.json", "r+") as file:
-        file_descriptors = json.load(file)
+    # Streamlit App Title
+    st.title("MIDI Transformers Database Browser")
 
-    file_descriptors = pd.DataFrame.from_dict(file_descriptors, orient="index")
-    composers = file_descriptors.composer.unique()
-
-    selected_composer = st.selectbox(
-        label="Select composer",
-        options=composers,
-        index=0,
+    # Sidebar for navigation
+    st.sidebar.title("Navigation")
+    page = st.sidebar.selectbox(
+        "Choose a page",
+        ["Models", "Generation Parameters", "Prompt Notes", "Model Predictions"],
     )
 
-    ids = file_descriptors.composer == selected_composer
-    piece_titles = file_descriptors[ids].title.unique()
+    if page == "Models":
+        st.header("Models")
+        models_df = dm.get_all_models()
+        st.write(models_df)
 
-    selected_title = st.selectbox(
-        label="Select title",
-        options=piece_titles,
-    )
+    if page == "Generation Parameters":
+        st.header("Generation Parameters")
+        parameters_df = dm.get_all_generation_parameters()
+        st.write(parameters_df)
 
-    ids = (file_descriptors.composer == selected_composer) & (file_descriptors.title == selected_title)
-    selected_files = file_descriptors[ids]
-    idx = st.number_input(label="idx", value=0, max_value=len(selected_files))
-    path = f"{directory}/{selected_files.index[idx]}"
+    if page == "Prompt Notes":
+        st.header("Prompt Notes")
+        prompts_df = dm.get_all_prompt_notes()
+        st.write(prompts_df)
 
-    piece = ff.MidiPiece.from_file(path)
-    piece.source = selected_files.iloc[idx].to_dict()
+    if page == "Model Predictions":
+        st.header("Model Predictions")
 
-    st.json(piece.source)
-    st.write("whole model output")
-    generated_notes_with_offset = piece.df[piece.df.start > piece.source["original end"]].copy()
-    second_part = ff.MidiPiece(generated_notes_with_offset)
+        models_df = dm.get_all_models()
+        model_names = models_df["name"].tolist()
 
-    # Model could have also add "NOTE_OFF" events to original sequence
-    expanded_input_notes = piece.df[: -second_part.size].copy()
-    expanded_piece = ff.MidiPiece(expanded_input_notes)
-    streamlit_pianoroll.from_fortepyan(piece=expanded_piece, secondary_piece=second_part)
+        col1, col2 = st.columns(2)
 
-    try:
-        with open(path, "rb") as file:
-            download_button_str = download_button(
-                object_to_download=file.read(),
-                download_filename=path.split("/")[-1],
-                button_text="Download midi with context",
+        with col1:
+            selected_model_name_1 = st.selectbox(
+                "Select Model 1",
+                model_names,
+                key="model_1",
             )
-            st.markdown(download_button_str, unsafe_allow_html=True)
-    except ValueError:
-        print("Error with reading the file...")
 
-    midi_path = f"tmp/{model}_{selected_files.index[idx]}.mid"
-    generated_file = second_part.to_midi()
-
-    try:
-        generated_file.write(midi_path)
-        with open(midi_path, "rb") as file:
-            download_button_str = download_button(
-                object_to_download=file.read(),
-                download_filename=midi_path.split("/")[-1],
-                button_text="Download generated midi",
+        with col2:
+            selected_model_name_2 = st.selectbox(
+                "Select Model 2",
+                model_names,
+                key="model_2",
             )
-            st.markdown(download_button_str, unsafe_allow_html=True)
-    finally:
-        # make sure to always clean up
-        os.unlink(midi_path)
+
+        if selected_model_name_1 and selected_model_name_2:
+            # Get the selected model_ids
+            selected_model_id_1 = models_df[models_df["name"] == selected_model_name_1].iloc[0]["id"]
+            selected_model_id_2 = models_df[models_df["name"] == selected_model_name_2].iloc[0]["id"]
+
+            # Fetch common prompt_ids and parameters_ids for the selected models
+            prompt_ids, parameters_ids = dm.get_common_prompts_and_parameters_for_models(
+                model_id_1=selected_model_id_1,
+                model_id_2=selected_model_id_2,
+            )
+
+            selected_prompt_id = st.selectbox("Select Prompt ID", prompt_ids)
+            full_prompt = dm.get_prompt(prompt_id=selected_prompt_id)
+            st.write(full_prompt)
+            selected_parameters_id = st.selectbox("Select Parameters ID", parameters_ids)
+            full_parameters = dm.get_parameters(parameters_id=selected_parameters_id)
+            st.write(full_parameters)
+
+            filters_1 = {}
+            filters_2 = {}
+
+            if selected_model_name_1:
+                filters_1["model_filters"] = {"name": selected_model_name_1}
+            if selected_prompt_id:
+                filters_1["prompt_filters"] = {"id": selected_prompt_id}
+            if selected_parameters_id:
+                filters_1["parameter_filters"] = {"id": selected_parameters_id}
+
+            if selected_model_name_2:
+                filters_2["model_filters"] = {"name": selected_model_name_2}
+            if selected_prompt_id:
+                filters_2["prompt_filters"] = {"id": selected_prompt_id}
+            if selected_parameters_id:
+                filters_2["parameter_filters"] = {"id": selected_parameters_id}
+
+            if st.button("Get Predictions"):
+                predictions_df_1 = dm.get_model_predictions(
+                    model_filters=filters_1.get("model_filters"),
+                    prompt_filters=filters_1.get("prompt_filters"),
+                    parameter_filters=filters_1.get("parameter_filters"),
+                )
+
+                predictions_df_2 = dm.get_model_predictions(
+                    model_filters=filters_2.get("model_filters"),
+                    prompt_filters=filters_2.get("prompt_filters"),
+                    parameter_filters=filters_2.get("parameter_filters"),
+                )
+
+                notes_1 = json.loads(predictions_df_1["generated_notes"][0])
+                notes_2 = json.loads(predictions_df_2["generated_notes"][0])
+
+                notes_1 = pd.DataFrame(notes_1)
+                notes_2 = pd.DataFrame(notes_2)
+
+                piece_1 = ff.MidiPiece(df=notes_1)
+                piece_2 = ff.MidiPiece(df=notes_2)
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.subheader(f"Predictions for {selected_model_name_1}")
+                    streamlit_pianoroll.from_fortepyan(piece=piece_1)
+
+                with col2:
+                    st.subheader(f"Predictions for {selected_model_name_2}")
+                    streamlit_pianoroll.from_fortepyan(piece=piece_2)
+
+            # Display the selected values
+            st.write(f"Selected Model 1: {selected_model_name_1}")
+            st.write(f"Selected Model 2: {selected_model_name_2}")
+            st.write(f"Selected Prompt ID: {selected_prompt_id}")
+            st.write(f"Selected Parameters ID: {selected_parameters_id}")
+        else:
+            st.write("Please select both models to see common prompts and parameters.")
