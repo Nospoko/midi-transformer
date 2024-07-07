@@ -123,7 +123,7 @@ def prepare_subsequence_datasets(cfg: DictConfig):
     dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
     dataset = load_dataset(
         dataset_path,
-        num_proc=8,
+        num_proc=cfg.device.dataloader_workers,
         trust_remote_code=True,
         **dataset_config,
     )
