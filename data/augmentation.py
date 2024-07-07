@@ -137,16 +137,17 @@ def augment_dataset(dataset: Dataset, speed_change_factors: list[float] = None, 
     change_speed_args = {
         "speed_change_factors": speed_change_factors,
     }
+
     dataset = dataset.map(
-        apply_pitch_shift,
-        fn_kwargs=pitch_shift_args,
+        apply_speed_change,
+        fn_kwargs=change_speed_args,
         batched=True,
         batch_size=1,
         num_proc=num_cpus,
     )
     dataset = dataset.map(
-        apply_speed_change,
-        fn_kwargs=change_speed_args,
+        apply_pitch_shift,
+        fn_kwargs=pitch_shift_args,
         batched=True,
         batch_size=1,
         num_proc=num_cpus,
