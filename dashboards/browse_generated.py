@@ -12,29 +12,10 @@ def main():
     # Streamlit App Title
     st.title("MIDI Transformers Database Browser")
 
-    # Sidebar for navigation
-    st.sidebar.title("Navigation")
-    page = st.sidebar.selectbox(
-        "Choose a page",
-        ["Models", "Generation Parameters", "Prompt Notes", "Model Predictions"],
-    )
+    # Create tabs for navigation
+    tab1, tab2, tab3, tab4 = st.tabs(["Model Predictions", "Models", "Generation Parameters", "Prompt Notes"])
 
-    if page == "Models":
-        st.header("Models")
-        models_df = dm.get_all_models()
-        st.write(models_df)
-
-    if page == "Generation Parameters":
-        st.header("Generation Parameters")
-        parameters_df = dm.get_all_generation_parameters()
-        st.write(parameters_df)
-
-    if page == "Prompt Notes":
-        st.header("Prompt Notes")
-        prompts_df = dm.get_all_prompt_notes()
-        st.write(prompts_df)
-
-    if page == "Model Predictions":
+    with tab1:
         st.header("Model Predictions")
 
         models_df = dm.get_all_models()
@@ -142,3 +123,38 @@ def main():
             st.write(f"Selected Parameters ID: {selected_parameters_id}")
         else:
             st.write("Please select both models to see common prompts and parameters.")
+
+    with tab2:
+        st.header("Models")
+        models_df = dm.get_all_models()
+        st.write(models_df)
+
+        # Add a section for purging a model
+        st.subheader("Purge Model")
+        model_to_purge = st.selectbox("Select a model to purge", models_df["name"].tolist())
+        if st.button("Purge Selected Model"):
+            if st.checkbox("Are you sure? This action cannot be undone."):
+                try:
+                    dm.purge_model(model_to_purge)
+                    st.success(f"Model '{model_to_purge}' has been purged successfully.")
+                    # Refresh the models dataframe
+                    models_df = dm.get_all_models()
+                    st.write(models_df)
+                except Exception as e:
+                    st.error(f"An error occurred while purging the model: {str(e)}")
+            else:
+                st.warning("Please confirm the action by checking the box.")
+
+    with tab3:
+        st.header("Generation Parameters")
+        parameters_df = dm.get_all_generation_parameters()
+        st.write(parameters_df)
+
+    with tab4:
+        st.header("Prompt Notes")
+        prompts_df = dm.get_all_prompt_notes()
+        st.write(prompts_df)
+
+
+if __name__ == "__main__":
+    main()
