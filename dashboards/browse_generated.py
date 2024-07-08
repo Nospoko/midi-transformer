@@ -48,6 +48,12 @@ def main():
                 model_names,
                 key="model_1",
             )
+            if selected_model_name_1:
+                selected_model_1 = models_df[models_df["name"] == selected_model_name_1].iloc[0]
+                if pd.notna(selected_model_1["wandb_link"]):
+                    st.link_button("View Model 1 on W&B", url=selected_model_1["wandb_link"])
+                else:
+                    st.write("No W&B link available for Model 1")
 
         with col2:
             selected_model_name_2 = st.selectbox(
@@ -55,6 +61,12 @@ def main():
                 model_names,
                 key="model_2",
             )
+            if selected_model_name_2:
+                selected_model_2 = models_df[models_df["name"] == selected_model_name_2].iloc[0]
+                if pd.notna(selected_model_2["wandb_link"]):
+                    st.link_button("View Model 2 on W&B", url=selected_model_2["wandb_link"])
+                else:
+                    st.write("No W&B link available for Model 2")
 
         if selected_model_name_1 and selected_model_name_2:
             # Get the selected model_ids
