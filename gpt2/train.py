@@ -393,7 +393,7 @@ def main(cfg: DictConfig):
             # backward pass, with gradient scaling if training in fp16
             scaler.scale(loss).backward()
 
-        total_tokens += n_iter_tokens
+        total_tokens += n_iter_tokens * ddp_world_size
 
         # clip the gradient
         if cfg.optimizer.grad_clip != 0.0:
@@ -450,7 +450,7 @@ def main(cfg: DictConfig):
             mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
             running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
 
-            tps = n_iter_tokens / t_forward_backward
+            tps = n_iter_tokens / t_forward_backward * ddp_world_size
             wandb.log(
                 {
                     "iter": iter_num,
