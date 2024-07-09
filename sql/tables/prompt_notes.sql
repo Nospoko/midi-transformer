@@ -1,10 +1,10 @@
 CREATE TABLE prompt_notes (
     id SERIAL PRIMARY KEY,
+    midi_name VARCHAR(255),  -- youtube_id or midi_filename
     start_time FLOAT,
     end_time FLOAT,
-    composer VARCHAR(255) NULL,
-    title VARCHAR(255) NULL,
-    midi_filename VARCHAR(255) NULL,
+    dataset VARCHAR(255) NULL,
+    source JSON,
     prompt_notes JSON,
-    UNIQUE (start_time, end_time, midi_filename)
+    UNIQUE (start_time, end_time, midi_name)
 );

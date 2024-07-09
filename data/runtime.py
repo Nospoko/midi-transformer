@@ -5,8 +5,8 @@ import sqlalchemy as sa
 from dotenv import load_dotenv
 
 load_dotenv()
-POSTGRES_PASSWORD = os.environ["POSTGRES_PASSWORD"]
-DB_DSN = f"postgresql://localhost/midi_transformers?user=root&password={POSTGRES_PASSWORD}"
+# POSTGRES_PASSWORD = os.environ["POSTGRES_PASSWORD"]
+DB_DSN = f"postgresql://localhost/midi_transformers?user=root&password=my_password"
 
 
 class DatabaseConnection:

@@ -424,7 +424,7 @@ def main(cfg: DictConfig):
                     "optimizer": optimizer.state_dict(),
                     "model_args": model_args,
                     "iter_num": iter_num,
-                    "best_val_loss": best_val_loss,
+                    "best_val_loss": best_val_loss.item(),
                     "config": config,
                     "wandb": wandb_link,
                     "total_tokens": total_tokens,
