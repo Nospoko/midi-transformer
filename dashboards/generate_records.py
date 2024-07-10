@@ -400,8 +400,6 @@ def main():
                 )
                 prompt_creation_time_step = st.number_input(
                     "Prompt Creation Time Step",
-                    min_value=1.0,
-                    max_value=30.0,
                     value=10.0,
                     help="Time step for creating prompts",
                 )
@@ -410,6 +408,7 @@ def main():
                 "max_new_tokens": max_new_tokens,
                 "prompt_context_duration": prompt_context_duration,
                 "target_context_duration": target_context_duration,
+                "time_step": time_step,
                 "task": "bass_prediction",
             }
             run = st.form_submit_button("Generate Bass Line")

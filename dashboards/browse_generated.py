@@ -43,16 +43,24 @@ def main():
                     predictions_df = dm.get_model_predictions(
                         model_filters={"id": selected_model_id}, prompt_filters={"id": selected_prompt_id}
                     )
+                    print(predictions_df)
 
                     if not predictions_df.empty:
                         for _, row in predictions_df.iterrows():
-                            parameters = dm.get_parameters(row["parameters_id"]).to_dict(orient="records")
-                            st.json(parameters, expanded=False)
-                            notes = json.loads(row["generated_notes"])
-                            notes_df = pd.DataFrame(notes)
-                            piece = ff.MidiPiece(df=notes_df)
+                            parameters = dm.get_parameters(row["parameters_id"]).iloc[0].to_dict()
+                            prompt = dm.get_prompt(row["prompt_id"]).iloc[0]
 
-                            streamlit_pianoroll.from_fortepyan(piece=piece)
+                            st.json(parameters, expanded=False)
+                            prompt_notes = json.loads(prompt["prompt_notes"])
+                            prompt_notes_df = pd.DataFrame(prompt_notes)
+
+                            bass_notes = json.loads(row["generated_notes"])
+                            bass_notes_df = pd.DataFrame(bass_notes)
+
+                            bass_piece = ff.MidiPiece(df=bass_notes_df)
+                            prompt_piece = ff.MidiPiece(df=prompt_notes_df)
+
+                            streamlit_pianoroll.from_fortepyan(piece=prompt_piece, secondary_piece=bass_piece)
                             st.divider()  # Add a divider between predictions
                     else:
                         st.write("No predictions found for this prompt and model combination.")

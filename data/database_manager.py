@@ -49,7 +49,7 @@ def get_or_create_id(table: str, filters: dict, dtype: dict) -> int:
     query = f"SELECT id FROM {table} WHERE 1=1"
 
     for key, value in filters.items():
-        if "notes" in key or "source" in key or "configs" in key:  # ignore the large fields
+        if "notes" in key or "source" in key:  # ignore the large fields
             continue
         if isinstance(value, str):
             query += f" AND {key} = '{value}'"
@@ -141,7 +141,7 @@ def insert_generated_notes(
     # Get or create IDs
     parameters_id = get_or_create_id("generation_parameters", parameters, parameter_dtype)
     prompt_id = get_or_create_id("prompt_notes", prompt, prompt_dtype)
-    model_id = get_or_create_id("models", model, model_dtype)
+    model_id = register_model(model_registration=model)
 
     # Check if the record already exists
     query = f"""
@@ -151,6 +151,7 @@ def insert_generated_notes(
       AND prompt_id = {prompt_id}
       AND model_id = {model_id}
     """
+
     existing_record = database_cnx.read_df(query)
 
     if existing_record.empty:
@@ -208,18 +209,18 @@ def get_prompt(prompt_id: int) -> pd.DataFrame:
 
 def get_prompts_for_model(model_id: int) -> pd.DataFrame:
     query = f"""
-    SELECT DISTINCT 
-        pn.id, 
-        pn.midi_name, 
-        pn.start_time, 
-        pn.end_time, 
+    SELECT DISTINCT
+        pn.id,
+        pn.midi_name,
+        pn.start_time,
+        pn.end_time,
         pn.dataset
     FROM prompt_notes pn
     JOIN generated_notes gn ON pn.id = gn.prompt_id
     WHERE gn.model_id = {model_id}
     """
     df = database_cnx.read_sql(sql=query)
-    
+
     # Fetch JSON fields separately
     if not df.empty:
         json_query = f"""
@@ -228,10 +229,10 @@ def get_prompts_for_model(model_id: int) -> pd.DataFrame:
         WHERE id IN ({','.join(map(str, df['id']))})
         """
         json_df = database_cnx.read_sql(sql=json_query)
-        
+
         # Merge the results
-        df = df.merge(json_df, on='id', how='left')
-    
+        df = df.merge(json_df, on="id", how="left")
+
     return df
 
 
@@ -265,7 +266,7 @@ def get_model_id(model_name: str) -> int:
     query = f"""
     SELECT
         id
-    FROM 
+    FROM
         models
     WHERE
         name = '{model_name}'
@@ -275,8 +276,8 @@ def get_model_id(model_name: str) -> int:
         return None
     else:
         return df.iloc[-1]["id"]
-    
-    
+
+
 def purge_model(model_name: str):
     query_table = f"""
     DELETE FROM generated_notes
@@ -357,18 +358,21 @@ def get_all_prompt_notes() -> pd.DataFrame:
     return df
 
 
-def register_model(model_registration: dict):
+def register_model(model_registration: dict) -> int:
     # Check if the record already exists
     query = f"""
-        SELECT 
+        SELECT
             id
-        FROM 
+        FROM
             models
-        WHERE  
+        WHERE
             name = '{model_registration['name']}'
-        AND 
+        AND
             iter_num = {model_registration['iter_num']}
+        AND
+            training_task = '{model_registration['training_task']}'
     """
+
     existing_records = database_cnx.read_df(query)
 
     if not existing_records.empty:
@@ -385,16 +389,21 @@ def register_model(model_registration: dict):
         if_exists="append",
     )
 
-    return None
+    df = database_cnx.read_sql(sql=query)
+    return df.iloc[0]["id"]
 
 
-def register_model_from_checkpoint(checkpoint: dict, run_name: str,):
+def register_model_from_checkpoint(
+    checkpoint: dict,
+    run_name: str,
+):
     # Hard-coded for the specific naming style
     milion_parameters = run_name.split("-")[2][:-1]
     init_from = checkpoint["config"]["init_from"]
+    base_model_id = None
     if init_from != "scratch":
         base_model_id = get_model_id(model_name=init_from)
-    
+
     model_registration = {
         "name": run_name,
         "milion_parameters": milion_parameters,
@@ -411,7 +420,7 @@ def register_model_from_checkpoint(checkpoint: dict, run_name: str,):
         model_registration |= {"base_model_id": base_model_id}
 
     register_model(model_registration=model_registration)
-    
+
     return model_registration
 
 
@@ -430,7 +439,7 @@ def register_generation_parameters(generation_parameters: dict):
 
     if not existing_records.empty:
         return existing_records.iloc[0]["id"]
-    
+
     # Create DataFrame from parameters
     df = pd.DataFrame([generation_parameters])
     # Insert new record
@@ -442,13 +451,12 @@ def register_generation_parameters(generation_parameters: dict):
         index=False,
         if_exists="append",
     )
-    return None
+    df = database_cnx.read_sql(sql=query)
+    return df.iloc[0]["id"]
 
 
 def register_prompt_notes(prompt_notes: dict):
     prompt_notes["prompt_notes"] = json.dumps(prompt_notes["prompt_notes"])
-
-    
 
     # Check if the record already exists
     query = f"""
@@ -462,7 +470,7 @@ def register_prompt_notes(prompt_notes: dict):
 
     if not existing_records.empty:
         return existing_records.iloc[0]["id"]
-    
+
     # Create DataFrame from prompt_note
     df = pd.DataFrame([prompt_notes])
     # Insert new record
