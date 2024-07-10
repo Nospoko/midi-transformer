@@ -17,6 +17,7 @@ $ torchrun --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr=123.456.123
 """
 
 import os
+import json
 import math
 import time
 import itertools
@@ -24,6 +25,7 @@ from contextlib import nullcontext
 
 import hydra
 import torch
+import pandas as pd
 from dotenv import load_dotenv
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -35,6 +37,8 @@ from torch.distributed import init_process_group, destroy_process_group
 import wandb
 from artifacts import special_tokens
 from gpt2.model import GPT, GPTConfig
+import data.database_manager as database_manager
+from gpt2.generation import generate_from_prompt
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
@@ -149,6 +153,30 @@ def setup_device(cfg: DictConfig):
         torch.cuda.set_device(local_rank)
         return f"cuda:{local_rank}", True
     return cfg.system.device, False
+
+
+def run_generation_commands(model: GPT, checkpoint: dict, run_name: str):
+    model_description, model_id = database_manager.register_model_from_checkpoint(
+        checkpoint=checkpoint,
+        run_name=run_name,
+    )
+    commands = database_manager.get_commands(model=model_description)
+    for command in commands:
+        generated_notes = generate_from_prompt(
+            model=model,
+            prompt=command["prompt"],
+            parameters=command["generation_parameters"],
+        )
+
+        generated_info = {
+            "parameters_id": command["parameters"]["id"],
+            "prompt_id": command["prompt"]["id"],
+            "model_id": model_id,
+            "generated_notes": json.dumps(generated_notes),
+        }
+        database_manager.insert_data(pd.DataFrame(generated_info))
+    print(f"Populated dataset with {len(commands)} generations!")
+    # TODO: purged compeleted commands
 
 
 @hydra.main(config_path="configs", config_name="gpt2_pretraining", version_base=None)
@@ -431,6 +459,11 @@ def main(cfg: DictConfig):
                 }
                 print(f"saving checkpoint to {out_dir}")
                 torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
+                if cfg.logging.use_database:
+                    run_generation_commands(
+                        checkpoint=checkpoint,
+                        run_name=run_name,
+                    )
             if cfg.logging.wandb_log:
                 wandb.log(
                     {

@@ -2,7 +2,7 @@
 
 db_name="midi_transformers"
 sql_files_path="/sql_tables"
-sql_table_names=("generation_parameters" "models" "prompt_notes" "generated_notes")
+sql_table_names=("generation_parameters" "models" "prompt_notes" "generated_notes", "generation_commands")
 
 echo "Checking if database $db_name exists"
 if psql -U "$POSTGRES_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$db_name';" | grep -q 1; then

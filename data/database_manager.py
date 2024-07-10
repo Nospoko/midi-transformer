@@ -44,6 +44,13 @@ generated_notes_dtype = {
 }
 
 
+models_table = "models"
+parameters_table = "generation_parameters"
+generations_table = "generated_notes"
+prompt_table = "prompt_notes"
+command_table = "generation_command"
+
+
 def get_or_create_id(table: str, filters: dict, dtype: dict) -> int:
     # Build the SELECT query to check if the record exists
     query = f"SELECT id FROM {table} WHERE 1=1"
@@ -88,9 +95,9 @@ def insert_generated_notes_batch(
         prompt["prompt_notes"] = prompt["prompt_notes"].to_json()
 
     # Get or create IDs for all entries
-    parameters_ids = [get_or_create_id("generation_parameters", param, parameter_dtype) for param in parameters]
-    prompt_ids = [get_or_create_id("prompt_notes", prompt, prompt_dtype) for prompt in prompts]
-    model_ids = [get_or_create_id("models", model, model_dtype) for model in models]
+    parameters_ids = [get_or_create_id(parameters_table, param, parameter_dtype) for param in parameters]
+    prompt_ids = [get_or_create_id(prompt_table, prompt, prompt_dtype) for prompt in prompts]
+    model_ids = [get_or_create_id(models_table, model, model_dtype) for model in models]
 
     generation_data = []
 
@@ -122,7 +129,45 @@ def insert_generated_notes_batch(
         # Insert the generated notes
         database_cnx.to_sql(
             df=df,
-            table="generated_notes",
+            table=generations_table,
+            dtype=generated_notes_dtype,
+            index=False,
+            if_exists="append",
+        )
+
+
+def insert_generation_command(
+    model: dict,
+    prompt: dict,
+    parameters: dict,
+):
+    # Get or create IDs
+    parameters_id = get_or_create_id(parameters_table, parameters, parameter_dtype)
+    prompt_id = get_or_create_id(prompt_table, prompt, prompt_dtype)
+    model_id = register_model(model_registration=model)
+
+    # Check if the record already exists
+    query = f"""
+    SELECT id
+    FROM {command_table}
+    WHERE parameters_id = {parameters_id}
+      AND prompt_id = {prompt_id}
+      AND model_id = {model_id}
+    """
+
+    existing_record = database_cnx.read_df(query)
+
+    if existing_record.empty:
+        generation_data = {
+            "parameters_id": parameters_id,
+            "prompt_id": prompt_id,
+            "model_id": model_id,
+        }
+        # Insert the generation data
+        df = pd.DataFrame([generation_data])
+        database_cnx.to_sql(
+            df=df,
+            table=generations_table,
             dtype=generated_notes_dtype,
             index=False,
             if_exists="append",
@@ -139,8 +184,8 @@ def insert_generated_notes(
     prompt["prompt_notes"] = prompt["prompt_notes"].to_json()
 
     # Get or create IDs
-    parameters_id = get_or_create_id("generation_parameters", parameters, parameter_dtype)
-    prompt_id = get_or_create_id("prompt_notes", prompt, prompt_dtype)
+    parameters_id = get_or_create_id(parameters_table, parameters, parameter_dtype)
+    prompt_id = get_or_create_id(prompt_table, prompt, prompt_dtype)
     model_id = register_model(model_registration=model)
 
     # Check if the record already exists
@@ -165,7 +210,7 @@ def insert_generated_notes(
         df = pd.DataFrame([generation_data])
         database_cnx.to_sql(
             df=df,
-            table="generated_notes",
+            table=generations_table,
             dtype=generated_notes_dtype,
             index=False,
             if_exists="append",
@@ -186,7 +231,7 @@ def get_parameters(parameters_id: int) -> pd.DataFrame:
     SELECT
         *
     FROM
-        generation_parameters
+        {parameters_table}
     WHERE
         id = {parameters_id}
     """
@@ -199,12 +244,32 @@ def get_prompt(prompt_id: int) -> pd.DataFrame:
     SELECT
         *
     FROM
-        prompt_notes
+        {prompt_table}
     WHERE
         id = {prompt_id}
     """
     df = database_cnx.read_sql(sql=query)
     return df
+
+
+def get_commands(model: dict) -> list:
+    query = f"""
+        SELECT
+            *
+        FROM
+            {command_table}
+        WHERE
+            model_name = {model["name"]}
+    """
+
+    commands = []
+    commands_df = database_cnx.read_sql(sql=query)
+    for _, row in commands_df.iterrows():
+        parameters = get_parameters(parameters_id=row["parameters_id"]).iloc[0].to_dict()
+        prompt = get_prompt(prompt_id=row["prompt_id"]).iloc[0].to_dict()
+        command = {"generation_parameters": parameters, "prompt": prompt}
+        commands.append(command)
+    return commands
 
 
 def get_prompts_for_model(model_id: int) -> pd.DataFrame:
@@ -215,7 +280,7 @@ def get_prompts_for_model(model_id: int) -> pd.DataFrame:
         pn.start_time,
         pn.end_time,
         pn.dataset
-    FROM prompt_notes pn
+    FROM {prompt_table} pn
     JOIN generated_notes gn ON pn.id = gn.prompt_id
     WHERE gn.model_id = {model_id}
     """
@@ -224,8 +289,8 @@ def get_prompts_for_model(model_id: int) -> pd.DataFrame:
     # Fetch JSON fields separately
     if not df.empty:
         json_query = f"""
-        SELECT id, source, prompt_notes
-        FROM prompt_notes
+        SELECT id, source, {prompt_table}
+        FROM {prompt_table}
         WHERE id IN ({','.join(map(str, df['id']))})
         """
         json_df = database_cnx.read_sql(sql=json_query)
@@ -239,7 +304,7 @@ def get_prompts_for_model(model_id: int) -> pd.DataFrame:
 def get_parameters_for_model_and_prompt(model_id: int, prompt_id: int) -> pd.DataFrame:
     query = f"""
     SELECT DISTINCT gp.*
-    FROM generation_parameters gp
+    FROM {parameters_table} gp
     JOIN generated_notes gn ON gp.id = gn.parameters_id
     WHERE gn.model_id = {model_id} AND gn.prompt_id = {prompt_id}
     """
@@ -252,7 +317,7 @@ def get_models(model_name: str) -> pd.DataFrame:
         SELECT
             *
         FROM
-            models
+            {models_table}
         WHERE
             name = '{model_name}'
     """
@@ -267,7 +332,7 @@ def get_model_id(model_name: str) -> int:
     SELECT
         id
     FROM
-        models
+        {models_table}
     WHERE
         name = '{model_name}'
     """
@@ -275,6 +340,7 @@ def get_model_id(model_name: str) -> int:
     if len(df) == 0:
         return None
     else:
+        # Here, we are interested in the last recorded checkpoint
         return df.iloc[-1]["id"]
 
 
@@ -282,13 +348,13 @@ def purge_model(model_name: str):
     query_table = f"""
     DELETE FROM generated_notes
     WHERE model_id IN (
-        SELECT model_id FROM models WHERE name = '{model_name}'
+        SELECT model_id FROM {models_table} WHERE name = '{model_name}'
     )
     """
     database_cnx.execute(query_table)
 
     model_query = f"""
-    DELETE FROM models
+    DELETE FROM {models_table}
     WHERE name = '{model_name}'
     """
     database_cnx.execute(model_query)
@@ -299,17 +365,17 @@ def get_model_predictions(
     prompt_filters: dict = None,
     parameter_filters: dict = None,
 ) -> pd.DataFrame:
-    base_query = """
+    base_query = f"""
     SELECT
         gn.*
     FROM
         generated_notes gn
     JOIN
-        models m ON gn.model_id = m.id
+        {models_table} m ON gn.model_id = m.id
     JOIN
-        prompt_notes pn ON gn.prompt_id = pn.id
+        {prompt_table} pn ON gn.prompt_id = pn.id
     JOIN
-        generation_parameters gp ON gn.parameters_id = gp.id
+        {parameters_table} gp ON gn.parameters_id = gp.id
     WHERE
         1=1
     """
@@ -341,19 +407,19 @@ def get_unique_values(column, table):
 
 
 def get_all_models() -> pd.DataFrame:
-    query = "SELECT * FROM models"
+    query = f"SELECT * FROM {models_table}"
     df = database_cnx.read_df(query)
     return df
 
 
 def get_all_generation_parameters() -> pd.DataFrame:
-    query = "SELECT * FROM generation_parameters"
+    query = f"SELECT * FROM {parameters_table}"
     df = database_cnx.read_df(query)
     return df
 
 
 def get_all_prompt_notes() -> pd.DataFrame:
-    query = "SELECT * FROM prompt_notes"
+    query = f"SELECT * FROM {prompt_table}"
     df = database_cnx.read_df(query)
     return df
 
@@ -364,7 +430,7 @@ def register_model(model_registration: dict) -> int:
         SELECT
             id
         FROM
-            models
+            {models_table}
         WHERE
             name = '{model_registration['name']}'
         AND
@@ -380,7 +446,7 @@ def register_model(model_registration: dict) -> int:
 
     # If the record doesn't exist, insert it
     df = pd.DataFrame([model_registration])
-    table = "models"
+    table = models_table
     database_cnx.to_sql(
         df=df,
         table=table,
@@ -419,16 +485,16 @@ def register_model_from_checkpoint(
     if base_model_id is not None:
         model_registration |= {"base_model_id": base_model_id}
 
-    register_model(model_registration=model_registration)
+    model_id = register_model(model_registration=model_registration)
 
-    return model_registration
+    return model_registration, model_id
 
 
 def register_generation_parameters(generation_parameters: dict):
     # Check if the record already exists
     query = f"""
         SELECT id
-        FROM generation_parameters
+        FROM {parameters_table}
         WHERE temperature = {generation_parameters['temperature']}
           AND max_new_tokens = {generation_parameters['max_new_tokens']}
           AND prompt_context_duration = {generation_parameters['prompt_context_duration']}
@@ -443,7 +509,7 @@ def register_generation_parameters(generation_parameters: dict):
     # Create DataFrame from parameters
     df = pd.DataFrame([generation_parameters])
     # Insert new record
-    table = "generation_parameters"
+    table = parameters_table
     database_cnx.to_sql(
         df=df,
         table=table,
@@ -461,7 +527,7 @@ def register_prompt_notes(prompt_notes: dict):
     # Check if the record already exists
     query = f"""
         SELECT id
-        FROM prompt_notes
+        FROM {prompt_table}
         WHERE start_time = {prompt_notes['start_time']}
           AND end_time = {prompt_notes['end_time']}
           AND midi_name = '{prompt_notes['midi_name']}'
@@ -474,7 +540,7 @@ def register_prompt_notes(prompt_notes: dict):
     # Create DataFrame from prompt_note
     df = pd.DataFrame([prompt_notes])
     # Insert new record
-    table = "prompt_notes"
+    table = prompt_table
     database_cnx.to_sql(
         df=df,
         table=table,

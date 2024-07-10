@@ -5,7 +5,7 @@ import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
 
-import data.database_manager as dm
+import data.database_manager as database_manager
 
 
 def main():
@@ -16,7 +16,7 @@ def main():
     with tab1:
         st.header("Model Predictions")
 
-        models_df = dm.get_all_models()
+        models_df = database_manager.get_all_models()
         model_names = models_df["name"].tolist()
 
         selected_model_name = st.selectbox("Select Model", model_names, key="model")
@@ -31,24 +31,24 @@ def main():
             selected_model_id = selected_model["id"]
 
             # Fetch prompts for the selected model
-            prompts = dm.get_prompts_for_model(model_id=selected_model_id)
+            prompts = database_manager.get_prompts_for_model(model_id=selected_model_id)
             selected_prompt_id = st.selectbox("Select Prompt", prompts["id"].tolist())
 
             if selected_prompt_id:
-                full_prompt = dm.get_prompt(prompt_id=selected_prompt_id)
+                full_prompt = database_manager.get_prompt(prompt_id=selected_prompt_id)
                 st.write(full_prompt)
 
                 if st.button("Get Predictions"):
                     # Fetch all predictions for the selected model and prompt
-                    predictions_df = dm.get_model_predictions(
+                    predictions_df = database_manager.get_model_predictions(
                         model_filters={"id": selected_model_id}, prompt_filters={"id": selected_prompt_id}
                     )
                     print(predictions_df)
 
                     if not predictions_df.empty:
                         for _, row in predictions_df.iterrows():
-                            parameters = dm.get_parameters(row["parameters_id"]).iloc[0].to_dict()
-                            prompt = dm.get_prompt(row["prompt_id"]).iloc[0]
+                            parameters = database_manager.get_parameters(row["parameters_id"]).iloc[0].to_dict()
+                            prompt = database_manager.get_prompt(row["prompt_id"]).iloc[0]
 
                             st.json(parameters, expanded=False)
                             prompt_notes = json.loads(prompt["prompt_notes"])
@@ -68,7 +68,7 @@ def main():
     # The rest of the tabs remain unchanged
     with tab2:
         st.header("Models")
-        models_df = dm.get_all_models()
+        models_df = database_manager.get_all_models()
         st.write(models_df)
 
         st.subheader("Purge Model")
@@ -76,9 +76,9 @@ def main():
         if st.button("Purge Selected Model"):
             if st.checkbox("Are you sure? This action cannot be undone."):
                 try:
-                    dm.purge_model(model_to_purge)
+                    database_manager.purge_model(model_to_purge)
                     st.success(f"Model '{model_to_purge}' has been purged successfully.")
-                    models_df = dm.get_all_models()
+                    models_df = database_manager.get_all_models()
                     st.write(models_df)
                 except Exception as e:
                     st.error(f"An error occurred while purging the model: {str(e)}")
@@ -87,12 +87,12 @@ def main():
 
     with tab3:
         st.header("Generation Parameters")
-        parameters_df = dm.get_all_generation_parameters()
+        parameters_df = database_manager.get_all_generation_parameters()
         st.write(parameters_df)
 
     with tab4:
         st.header("Prompt Notes")
-        prompts_df = dm.get_all_prompt_notes()
+        prompts_df = database_manager.get_all_prompt_notes()
         st.write(prompts_df)
 
 

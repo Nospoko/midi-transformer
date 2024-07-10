@@ -6,7 +6,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 POSTGRES_PASSWORD = os.environ["POSTGRES_PASSWORD"]
-DB_DSN = "postgresql://localhost/midi_transformers?user=root&password=my_password"
+POSTGRES_USER = os.environ["POSTGRES_USER"]
+POSTGRES_HOST = os.environ["POSTGRES_HOST"]
+POSTGRES_PORT = os.environ["POSTGRES_PORT"]
+DB_DSN = f"""
+    postgresql://{POSTGRES_HOST}/midi_transformers:{POSTGRES_PORT}?user={POSTGRES_USER}&password={POSTGRES_PASSWORD}
+"""
 
 
 class DatabaseConnection:
