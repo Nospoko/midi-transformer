@@ -3,7 +3,9 @@ import json
 import pandas as pd
 import sqlalchemy as sa
 
-from data.runtime import database_cnx  # Adjust the import based on your project structure
+from data.database_connection import DatabaseConnection  # Adjust the import based on your project structure
+
+database_cnx = DatabaseConnection()
 
 prompt_dtype = {
     "id": sa.Integer,
@@ -48,7 +50,7 @@ models_table = "models"
 parameters_table = "generation_parameters"
 generations_table = "generated_notes"
 prompt_table = "prompt_notes"
-command_table = "generation_command"
+validation_table = "validation_prompts"
 
 
 def get_or_create_id(table: str, filters: dict, dtype: dict) -> int:
@@ -110,7 +112,7 @@ def insert_generated_notes_batch(
           AND prompt_id = {prompt_id}
           AND model_id = {model_id}
         """
-        existing_record = database_cnx.read_df(query)
+        existing_record = database_cnx.read_sql(sql=query)
 
         if existing_record.empty:
             generation_data.append(
@@ -136,32 +138,28 @@ def insert_generated_notes_batch(
         )
 
 
-def insert_generation_command(
-    model: dict,
+def insert_validation_prompt(
     prompt: dict,
     parameters: dict,
 ):
     # Get or create IDs
     parameters_id = get_or_create_id(parameters_table, parameters, parameter_dtype)
     prompt_id = get_or_create_id(prompt_table, prompt, prompt_dtype)
-    model_id = register_model(model_registration=model)
 
     # Check if the record already exists
     query = f"""
     SELECT id
-    FROM {command_table}
+    FROM {validation_table}
     WHERE parameters_id = {parameters_id}
       AND prompt_id = {prompt_id}
-      AND model_id = {model_id}
     """
 
-    existing_record = database_cnx.read_df(query)
+    existing_record = database_cnx.read_sql(sql=query)
 
     if existing_record.empty:
         generation_data = {
             "parameters_id": parameters_id,
             "prompt_id": prompt_id,
-            "model_id": model_id,
         }
         # Insert the generation data
         df = pd.DataFrame([generation_data])
@@ -197,7 +195,7 @@ def insert_generated_notes(
       AND model_id = {model_id}
     """
 
-    existing_record = database_cnx.read_df(query)
+    existing_record = database_cnx.read_sql(sql=query)
 
     if existing_record.empty:
         generation_data = {
@@ -252,24 +250,20 @@ def get_prompt(prompt_id: int) -> pd.DataFrame:
     return df
 
 
-def get_commands(model: dict) -> list:
+def get_validation_prompts(model: dict) -> list[dict]:
     query = f"""
-        SELECT
-            *
-        FROM
-            {command_table}
-        WHERE
-            model_name = {model["name"]}
+    SELECT
+        *
+    FROM
+        {validation_table}
+    JOIN
+        {prompt_table} pn ON gn.prompt_id = pn.id
+    JOIN
+        {parameters_table} gp ON gn.parameters_id = gp.id
     """
 
-    commands = []
-    commands_df = database_cnx.read_sql(sql=query)
-    for _, row in commands_df.iterrows():
-        parameters = get_parameters(parameters_id=row["parameters_id"]).iloc[0].to_dict()
-        prompt = get_prompt(prompt_id=row["prompt_id"]).iloc[0].to_dict()
-        command = {"generation_parameters": parameters, "prompt": prompt}
-        commands.append(command)
-    return commands
+    validation_prompts = database_cnx.read_sql(sql=query)
+    return validation_prompts
 
 
 def get_prompts_for_model(model_id: int) -> pd.DataFrame:
@@ -314,14 +308,14 @@ def get_parameters_for_model_and_prompt(model_id: int, prompt_id: int) -> pd.Dat
 
 def get_models(model_name: str) -> pd.DataFrame:
     query = f"""
-        SELECT
-            *
-        FROM
-            {models_table}
-        WHERE
-            name = '{model_name}'
+    SELECT
+        *
+    FROM
+        {models_table}
+    WHERE
+        name = '{model_name}'
     """
-    df = database_cnx.read_df(query)
+    df = database_cnx.read_sql(sql=query)
     if len(df) == 0:
         return {}
     return df
@@ -336,7 +330,7 @@ def get_model_id(model_name: str) -> int:
     WHERE
         name = '{model_name}'
     """
-    df = database_cnx.read_df(query=query)
+    df = database_cnx.read_sql(sql=query)
     if len(df) == 0:
         return None
     else:
@@ -345,19 +339,29 @@ def get_model_id(model_name: str) -> int:
 
 
 def purge_model(model_name: str):
-    query_table = f"""
-    DELETE FROM generated_notes
+    notes_query = f"""
+    DELETE FROM {generations_table}
     WHERE model_id IN (
         SELECT model_id FROM {models_table} WHERE name = '{model_name}'
     )
     """
-    database_cnx.execute(query_table)
+    database_cnx.execute(notes_query)
 
     model_query = f"""
     DELETE FROM {models_table}
     WHERE name = '{model_name}'
     """
     database_cnx.execute(model_query)
+
+
+def remove_validation_prompt(validation_prompt_id: int):
+    query = f"""
+    DELETE FROM
+        {validation_table}
+    WHERE
+        id = {validation_prompt_id}
+    """
+    database_cnx.execute(query=query)
 
 
 def get_model_predictions(
@@ -402,44 +406,59 @@ def get_model_predictions(
 
 def get_unique_values(column, table):
     query = f"SELECT DISTINCT {column} FROM {table} ORDER BY {column}"
-    df = database_cnx.read_df(query)
+    df = database_cnx.read_sql(sql=query)
     return df[column].dropna().tolist()
 
 
 def get_all_models() -> pd.DataFrame:
     query = f"SELECT * FROM {models_table}"
-    df = database_cnx.read_df(query)
+    df = database_cnx.read_sql(sql=query)
     return df
 
 
 def get_all_generation_parameters() -> pd.DataFrame:
     query = f"SELECT * FROM {parameters_table}"
-    df = database_cnx.read_df(query)
+    df = database_cnx.read_sql(sql=query)
     return df
 
 
 def get_all_prompt_notes() -> pd.DataFrame:
     query = f"SELECT * FROM {prompt_table}"
-    df = database_cnx.read_df(query)
+    df = database_cnx.read_sql(sql=query)
+    return df
+
+
+def get_all_validation_prompts() -> pd.DataFrame:
+    query = f"""
+    SELECT
+        *
+    FROM
+        {validation_table} vp
+    JOIN
+        {prompt_table} pn ON vp.prompt_id = pn.id
+    JOIN
+        {parameters_table} gp ON vp.parameters_id = gp.id
+    """
+    df = database_cnx.read_sql(sql=query)
     return df
 
 
 def register_model(model_registration: dict) -> int:
     # Check if the record already exists
     query = f"""
-        SELECT
-            id
-        FROM
-            {models_table}
-        WHERE
-            name = '{model_registration['name']}'
-        AND
-            iter_num = {model_registration['iter_num']}
-        AND
-            training_task = '{model_registration['training_task']}'
+    SELECT
+        id
+    FROM
+        {models_table}
+    WHERE
+        name = '{model_registration['name']}'
+    AND
+        iter_num = {model_registration['iter_num']}
+    AND
+        training_task = '{model_registration['training_task']}'
     """
 
-    existing_records = database_cnx.read_df(query)
+    existing_records = database_cnx.read_sql(sql=query)
 
     if not existing_records.empty:
         return existing_records.iloc[0]["id"]
@@ -493,15 +512,15 @@ def register_model_from_checkpoint(
 def register_generation_parameters(generation_parameters: dict):
     # Check if the record already exists
     query = f"""
-        SELECT id
-        FROM {parameters_table}
-        WHERE temperature = {generation_parameters['temperature']}
-          AND max_new_tokens = {generation_parameters['max_new_tokens']}
-          AND prompt_context_duration = {generation_parameters['prompt_context_duration']}
-          AND target_context_duration = {generation_parameters['target_context_duration']}
-          AND task = '{generation_parameters['task']}'
+    SELECT id
+    FROM {parameters_table}
+    WHERE temperature = {generation_parameters['temperature']}
+      AND max_new_tokens = {generation_parameters['max_new_tokens']}
+      AND prompt_context_duration = {generation_parameters['prompt_context_duration']}
+      AND target_context_duration = {generation_parameters['target_context_duration']}
+      AND task = '{generation_parameters['task']}'
     """
-    existing_records = database_cnx.read_df(query)
+    existing_records = database_cnx.read_sql(sql=query)
 
     if not existing_records.empty:
         return existing_records.iloc[0]["id"]
@@ -526,13 +545,13 @@ def register_prompt_notes(prompt_notes: dict):
 
     # Check if the record already exists
     query = f"""
-        SELECT id
-        FROM {prompt_table}
-        WHERE start_time = {prompt_notes['start_time']}
-          AND end_time = {prompt_notes['end_time']}
-          AND midi_name = '{prompt_notes['midi_name']}'
+    SELECT id
+    FROM {prompt_table}
+    WHERE start_time = {prompt_notes['start_time']}
+      AND end_time = {prompt_notes['end_time']}
+      AND midi_name = '{prompt_notes['midi_name']}'
     """
-    existing_records = database_cnx.read_df(query)
+    existing_records = database_cnx.read_sql(sql=query)
 
     if not existing_records.empty:
         return existing_records.iloc[0]["id"]

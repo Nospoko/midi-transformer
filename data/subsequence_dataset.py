@@ -25,15 +25,15 @@ class SubSequenceMidiDataset(MidiDataset):
         extraction_type = record["extraction_type"]
         source_prefix = get_source_extraction_token(extraction_type)
         target_prefix = get_target_extraction_token(extraction_type)
-        no_bass_tokens = self.tokenizer.encode(
+        prompt_tokens = self.tokenizer.encode(
             notes=pd.DataFrame(record["source_notes"]),
             prefix_tokens=[source_prefix],
         )
-        bass_tokens = self.tokenizer.encode(
+        target_tokens = self.tokenizer.encode(
             notes=pd.DataFrame(record["target_notes"]),
             prefix_tokens=[target_prefix],
         )
-        encoding = no_bass_tokens + bass_tokens
+        encoding = prompt_tokens + target_tokens
         # Concatenating tokens so had to move padding here again
         # I think this is good place for paddig btw, because we do not need it during inference anyway
         # and this class is for loading data for training - which is the only scenario where we need padding
