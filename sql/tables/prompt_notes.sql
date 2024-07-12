@@ -1,5 +1,5 @@
 CREATE TABLE prompt_notes (
-    id SERIAL PRIMARY KEY,
+    prompt_id SERIAL PRIMARY KEY,
     midi_name VARCHAR(255),  -- youtube_id or midi_filename
     start_time FLOAT,
     end_time FLOAT,

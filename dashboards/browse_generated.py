@@ -28,11 +28,11 @@ def main():
             else:
                 st.write("No W&B link available for this model")
 
-            selected_model_id = selected_model["id"]
+            selected_model_id = selected_model["model_id"]
 
             # Fetch prompts for the selected model
             prompts = database_manager.get_prompts_for_model(model_id=selected_model_id)
-            selected_prompt_id = st.selectbox("Select Prompt", prompts["id"].tolist())
+            selected_prompt_id = st.selectbox("Select Prompt", prompts["prompt_id"].tolist())
 
             if selected_prompt_id:
                 full_prompt = database_manager.get_prompt(prompt_id=selected_prompt_id)
@@ -41,7 +41,7 @@ def main():
                 if st.button("Get Predictions"):
                     # Fetch all predictions for the selected model and prompt
                     predictions_df = database_manager.get_model_predictions(
-                        model_filters={"id": selected_model_id}, prompt_filters={"id": selected_prompt_id}
+                        model_filters={"model_id": selected_model_id}, prompt_filters={"prompt_id": selected_prompt_id}
                     )
                     print(predictions_df)
 

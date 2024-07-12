@@ -1,6 +1,6 @@
 CREATE TABLE models (
-    id SERIAL PRIMARY KEY,
-    base_model_id INT REFERENCES models(id) NULL,
+    model_id SERIAL PRIMARY KEY,
+    base_model_id INT REFERENCES models(model_id) NULL,
     name VARCHAR(255),
     milion_parameters INT,
     best_val_loss FLOAT,

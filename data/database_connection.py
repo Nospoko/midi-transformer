@@ -26,7 +26,6 @@ class DatabaseConnection:
     def execute(self, query: str):
         with self.__engine.connect() as connection:
             result = connection.execute(sa.text(query))
-            connection.commit()
 
         return result
 

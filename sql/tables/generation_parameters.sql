@@ -1,5 +1,5 @@
 CREATE TABLE generation_parameters (
-    id SERIAL PRIMARY KEY,
+    parameters_id SERIAL PRIMARY KEY,
     temperature FLOAT,
     max_new_tokens INT,
     prompt_context_duration FLOAT,  -- setpoint value

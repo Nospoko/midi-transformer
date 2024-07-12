@@ -155,7 +155,7 @@ def setup_device(cfg: DictConfig):
     return cfg.system.device, False
 
 
-def run_generation_commands(model: GPT, checkpoint: dict, run_name: str):
+def run_generation_step(model: GPT, checkpoint: dict, run_name: str):
     model_description, model_id = database_manager.register_model_from_checkpoint(
         checkpoint=checkpoint,
         run_name=run_name,
@@ -169,8 +169,8 @@ def run_generation_commands(model: GPT, checkpoint: dict, run_name: str):
         )
 
         generated_info = {
-            "parameters_id": command["parameters"]["id"],
-            "prompt_id": command["prompt"]["id"],
+            "parameters_id": command["parameters"]["parameters_id"],
+            "prompt_id": command["prompt"]["prompt_id"],
             "model_id": model_id,
             "generated_notes": json.dumps(generated_notes),
         }
@@ -459,11 +459,12 @@ def main(cfg: DictConfig):
                 }
                 print(f"saving checkpoint to {out_dir}")
                 torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
-                if cfg.logging.use_database:
-                    run_generation_commands(
+                if os.path.exists(".generate"):
+                    run_generation_step(
                         checkpoint=checkpoint,
                         run_name=run_name,
                     )
+                    os.unlink(".generate")
             if cfg.logging.wandb_log:
                 wandb.log(
                     {
