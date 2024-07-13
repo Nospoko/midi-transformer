@@ -49,12 +49,17 @@ class NextTokenDataset(MidiDataset):
         encoding = self.tokenizer.encode(notes=notes, pad_to_size=self.sequence_length + 1)
 
         # The inputs to the transformer will be the offset sequence
-        source_token_ids = encoding[:-1]
-        target_token_ids = encoding[1:]
+        source_encoding = encoding[:-1]
+        target_encoding = encoding[1:]
+
+        source_token_ids = torch.tensor(source_encoding[: self.sequence_length], dtype=torch.int64)
+        target_token_ids = torch.tensor(target_encoding[: self.sequence_length], dtype=torch.int64)
+        target_mask = target_token_ids != self.tokenizer.pad_token_id
 
         out = {
-            "source_token_ids": torch.tensor(source_token_ids[: self.sequence_length], dtype=torch.int64),
-            "target_token_ids": torch.tensor(target_token_ids[: self.sequence_length], dtype=torch.int64),
+            "source_token_ids": source_token_ids,
+            "target_token_ids": target_token_ids,
+            "target_mask": target_mask,
             "source": record["source"],
         }
         return out

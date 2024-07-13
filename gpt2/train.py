@@ -41,13 +41,12 @@ from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 
+load_dotenv()
+
 
 def log_open_files():
     process = psutil.Process()
     print(f"Open file descriptors: {process.num_fds()}")
-
-
-load_dotenv()
 
 
 class CyclicalDataLoader:
@@ -80,7 +79,8 @@ class CyclicalDataLoader:
 
         x = batch["source_token_ids"].to(self.device, non_blocking=True)
         y = batch["target_token_ids"].to(self.device, non_blocking=True)
-        return x, y
+        mask = batch["target_mask"].to(self.device, non_blocking=True)
+        return x, y, mask
 
 
 def load_tokenizer(cfg: DictConfig):
@@ -146,11 +146,13 @@ def prepare_subsequence_datasets(cfg: DictConfig):
         dataset=dataset["train"],
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
+        loss_calculation_style=cfg.loss_calculation_style,
     )
     val_dataset = SubSequenceMidiDataset(
         dataset=dataset["validation"],
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
+        loss_calculation_style=cfg.loss_calculation_style,
     )
 
     return train_dataset, val_dataset, to_absolute_path(cfg.out_dir)
@@ -210,7 +212,6 @@ def run_generation_step(
             "generated_notes": generated_notes.to_json(),
         }
 
-        print(generated_info)
         generations.append(generated_info)
 
     database_manager.insert_validation_generations_batch(generations=generations)
@@ -390,9 +391,9 @@ def main(cfg: DictConfig):
         for split in ["train", "val"]:
             losses = torch.zeros(cfg.eval_iters)
             for k in range(cfg.eval_iters):
-                X, Y = get_batch(split)
+                X, Y, mask = get_batch(split)
                 with ctx:
-                    logits, loss = model(X, Y)
+                    logits, loss = model(X, Y, mask)
                 losses[k] = loss.item()
             out[split] = losses.mean()
         model.train()
@@ -428,7 +429,7 @@ def main(cfg: DictConfig):
 
     total_tokens = 0
     # training loop
-    X, Y = get_batch("train")  # fetch the very first batch
+    X, Y, mask = get_batch("train")  # fetch the very first batch
     t0 = time.time()
     local_iter_num = 0  # number of iterations in the lifetime of this process
     raw_model = model.module if ddp else model  # unwrap DDP container if needed
@@ -453,12 +454,12 @@ def main(cfg: DictConfig):
                 model.require_backward_grad_sync = micro_step == cfg.data.gradient_accumulation_steps - 1
             with ctx:
                 n_iter_tokens += X.numel()
-                logits, loss = model(X, Y)
+                logits, loss = model(X, Y, mask)
                 # scale the loss to account for gradient accumulation
                 loss = loss / cfg.data.gradient_accumulation_steps
 
             # immediately async prefetch next batch while model is doing the forward pass on the GPU
-            X, Y = get_batch("train")
+            X, Y, mask = get_batch("train")
             # backward pass, with gradient scaling if training in fp16
             scaler.scale(loss).backward()
 
