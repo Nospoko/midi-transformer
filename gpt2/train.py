@@ -19,7 +19,6 @@ $ torchrun --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr=123.456.123
 import os
 import math
 import time
-import multiprocessing
 from contextlib import nullcontext
 
 import hydra
@@ -41,8 +40,6 @@ from gpt2.generation import generate_from_prompt
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
-
-multiprocessing.set_start_method("spawn", force=True)
 
 
 def log_open_files():
@@ -252,9 +249,7 @@ def main(cfg: DictConfig):
         ddp_world_size = 1
 
     if master_process:
-        database_manager.database_cnx.open()
         validation_examples = prepare_validation_examples()
-        database_manager.database_cnx.close()
 
     # First load checkpoint if init_from midi_gpt2*
     if cfg.init_from.startswith("midi-gpt2"):
