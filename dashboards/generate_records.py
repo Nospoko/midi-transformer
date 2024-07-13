@@ -7,10 +7,10 @@ import torch
 import streamlit as st
 from datasets import Dataset
 
+from artifacts import get_source_task_token
 import data.database_manager as database_manager
 import dashboards.common.utils as dashboard_utils
-from artifacts import get_source_extraction_token
-from gpt2.generation import prepare_prompts, generate_bass_iteratively
+from gpt2.generation import prepare_prompts, generate_subsequence_iteratively
 
 
 def multiselect_part_dataset(midi_dataset: Dataset) -> Dataset:
@@ -161,13 +161,15 @@ def main():
                     value=10.0,
                     help="Time step for creating prompts",
                 )
+                task_options = ["bass_prediction", "reverse_bass_prediction"]
+                task = st.selectbox(label="task", options=task_options)
             generation_parameters = {
                 "temperature": temperature,
                 "max_new_tokens": max_new_tokens,
                 "prompt_context_duration": prompt_context_duration,
                 "target_context_duration": target_context_duration,
                 "time_step": time_step,
-                "task": "bass_prediction",
+                "task": task,
             }
             run = st.form_submit_button("Generate Bass Line")
         st.image("dashboards/img/iterative_generation.png")
@@ -201,12 +203,12 @@ def main():
                 bass_prompt = prompt.pop("target_prompt")
 
                 with st.spinner(f"Generating bass line... {idx} / {num_prompts}"):
-                    prefix_token = get_source_extraction_token(extraction_type=extraction_type)
+                    prefix_token = get_source_task_token(extraction_type=extraction_type)
                     note_token_ids = tokenizer.encode(source_notes, prefix_tokens=[prefix_token])
                     note_token_ids.append(tokenizer.token_to_id["<BASS>"])
 
                     with ctx:
-                        bass_notes = generate_bass_iteratively(
+                        bass_notes = generate_subsequence_iteratively(
                             model=model,
                             tokenizer=tokenizer,
                             prompt_notes=source_notes,

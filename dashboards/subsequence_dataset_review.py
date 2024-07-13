@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 from datasets import load_dataset
 
 from data.tokenizer import ExponentialTokenizer
+from artifacts import special_tokens, get_target_task_token
 from data.subsequence_dataset import SubSequenceMidiDataset
-from artifacts import special_tokens, get_target_extraction_token
 
 
 def plot_target_mask(target_mask):
@@ -24,6 +24,7 @@ def main():
 
     dataset_names = [
         "BassPredictionDataset",
+        "ReverseBassPredictionDataset",
         # Add more dataset names here
     ]
     dataset_name = st.selectbox(label="Dataset", options=dataset_names)
@@ -131,7 +132,7 @@ def main():
 
     src_tokens = [midi_dataset.tokenizer.vocab[token_id] for token_id in src_token_ids]
 
-    extraction_token = get_target_extraction_token(extracted)
+    extraction_token = get_target_task_token(extracted)
     extraction_position = src_tokens.index(extraction_token)
     prompt_tokens = src_tokens[:extraction_position]
     extracted_tokens = src_tokens[extraction_position:]

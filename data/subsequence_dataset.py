@@ -6,7 +6,7 @@ from datasets import Dataset as HuggingFaceDataset
 
 from data.dataset import MidiDataset
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
-from artifacts import get_source_extraction_token, get_target_extraction_token
+from artifacts import get_source_task_token, get_target_task_token
 
 
 class SubSequenceMidiDataset(MidiDataset):
@@ -27,8 +27,8 @@ class SubSequenceMidiDataset(MidiDataset):
     def __getitem__(self, idx: int) -> dict:
         record = self.dataset[idx]
         extraction_type = record["extraction_type"]
-        source_prefix = get_source_extraction_token(extraction_type)
-        target_prefix = get_target_extraction_token(extraction_type)
+        source_prefix = get_source_task_token(extraction_type)
+        target_prefix = get_target_task_token(extraction_type)
         prompt_token_ids = self.tokenizer.encode(
             notes=pd.DataFrame(record["source_notes"]),
             prefix_tokens=[source_prefix],

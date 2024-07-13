@@ -36,9 +36,9 @@ import wandb
 from artifacts import special_tokens
 from gpt2.model import GPT, GPTConfig
 import data.database_manager as database_manager
-from gpt2.generation import generate_from_prompt
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
+from gpt2.generation import generate_from_validation_example
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 
 load_dotenv()
@@ -197,7 +197,7 @@ def run_generation_step(
     )
     generations = []
     for example in validation_examples:
-        generated_notes = generate_from_prompt(
+        generated_notes = generate_from_validation_example(
             model=model,
             tokenizer=tokenizer,
             prompt=example["prompt"],

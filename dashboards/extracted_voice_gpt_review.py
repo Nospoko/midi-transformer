@@ -13,8 +13,8 @@ from streamlit.errors import DuplicateWidgetID
 from gpt2.model import GPT
 import dashboards.common.utils as dashboard_utils
 from dashboards.common.components import download_button
+from artifacts import get_voice_range, get_source_task_token
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
-from artifacts import get_voice_range, get_source_extraction_token
 
 
 def generate_bass_iteratively(
@@ -308,7 +308,7 @@ def main():
                     pad_token_id=pad_token_id,
                 )
 
-                prefix_token = get_source_extraction_token(extraction_type=extraction_type)
+                prefix_token = get_source_task_token(extraction_type=extraction_type)
                 note_token_ids = tokenizer.encode(source_notes, prefix_tokens=[prefix_token])
                 note_token_ids.append(tokenizer.token_to_id["<BASS>"])
 

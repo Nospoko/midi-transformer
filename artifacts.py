@@ -32,6 +32,7 @@ special_tokens = [
 
 extraction_type_to_token_pair = {
     "bass": ("<BASS>", "<NO_BASS>"),
+    "no_bass": ("<NO_BASS>", "<BASS>"),
     "tenor": ("<TENOR>", "<NO_TENOR>"),
     "alto": ("<ALTO>", "<NO_ALTO>"),
     "soprano": ("<SOPRANO>", "<NO_SOPRANO>"),
@@ -46,6 +47,7 @@ extraction_type_to_token_pair = {
 
 voice_to_range = {
     "bass": (21, 48),
+    "no_bass": (49, 108),
     "tenor": (43, 81),
     "alto": (53, 84),
     "soprano": (60, 96),
@@ -62,11 +64,11 @@ dynamic_to_range = {
 }
 
 
-def get_source_extraction_token(extraction_type: str):
+def get_source_task_token(extraction_type: str):
     return extraction_type_to_token_pair[extraction_type][1]
 
 
-def get_target_extraction_token(extraction_type: str):
+def get_target_task_token(extraction_type: str):
     return extraction_type_to_token_pair[extraction_type][0]
 
 
