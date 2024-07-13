@@ -133,7 +133,7 @@ def prepare_next_token_datasets(cfg: DictConfig):
 def prepare_subsequence_datasets(cfg: DictConfig):
     dataset_config = OmegaConf.to_container(cfg.dataset)
     tokenizer = load_tokenizer(cfg)
-    dataset_name = "BassExtractedDataset"
+    dataset_name = "BassPredictionDataset"
     dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
     dataset = load_dataset(
         dataset_path,

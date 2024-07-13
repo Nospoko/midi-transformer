@@ -23,7 +23,7 @@ def main():
     st.title("MIDI Dataset Review Dashboard")
 
     dataset_names = [
-        "BassExtractedDataset",
+        "BassPredictionDataset",
         # Add more dataset names here
     ]
     dataset_name = st.selectbox(label="Dataset", options=dataset_names)
@@ -34,11 +34,11 @@ def main():
         with col1:
             base_dataset_name = st.text_input(label="Base Dataset Name", value="roszcz/maestro-sustain-v2")
             extra_datasets = st.text_input(label="Extra Datasets (comma separated)", value="")
-            notes_per_record = st.number_input(label="Notes per Record", min_value=1, value=512)
+            notes_per_record = st.number_input(label="Notes per Record", min_value=1, value=128)
             step = st.number_input(label="Step", min_value=1, value=512)
         with col2:
             pause_detection_threshold = st.number_input(label="Pause Detection Threshold", value=4.0)
-            sequence_length = st.number_input(label="Sequence Length", min_value=1, value=5000, step=500)
+            sequence_length = st.number_input(label="Sequence Length", min_value=1, value=1024, step=1024)
             loss_calculation_style = st.selectbox(label="Loss Calculation Style", options=["pretraining", "finetuning"])
 
         st.form_submit_button(label="Update Config")

@@ -12,7 +12,7 @@ Each record has the same sum of notes.
 """
 
 
-class BassExtractedDataset(MidiSequenceDataset):
+class BassPredictionDataset(MidiSequenceDataset):
     def _info(self) -> DatasetInfo:
         return DatasetInfo(description=_DESC)
 
