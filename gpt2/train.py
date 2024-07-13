@@ -19,7 +19,6 @@ $ torchrun --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr=123.456.123
 import os
 import math
 import time
-import itertools
 import multiprocessing
 from contextlib import nullcontext
 
@@ -72,10 +71,16 @@ class CyclicalDataLoader:
             num_workers=num_workers,
         )
         self.device = device
-        self.iterator = iter(itertools.cycle(self.dataloader))
+        self.iterator = iter(self.dataloader)
 
     def get_batch(self):
-        batch = next(self.iterator)
+        try:
+            batch = next(self.iterator)
+        except StopIteration:
+            # Reset the iterator when it's exhausted
+            self.iterator = iter(self.dataloader)
+            batch = next(self.iterator)
+
         x = batch["source_token_ids"].to(self.device, non_blocking=True)
         y = batch["target_token_ids"].to(self.device, non_blocking=True)
         return x, y
