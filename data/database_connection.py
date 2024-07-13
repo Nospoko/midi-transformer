@@ -19,8 +19,20 @@ class DatabaseConnection:
         # https://docs.sqlalchemy.org/en/20/core/pooling.html#sqlalchemy.pool.Pool.params.pre_ping
         self.__engine = sa.create_engine(db_url, pool_pre_ping=True)
 
+    def open(self):
+        db_url = sa.engine.make_url(DB_DSN)
+        if self.__engine is None:
+            self.__engine = sa.create_engine(db_url, pool_pre_ping=True)
+
+    def close(self):
+        if self.__engine is not None:
+            self.__engine.dispose()
+            self.__engine = None
+
     @property
     def engine(self) -> sa.engine.Engine:
+        if self.__engine is None:
+            raise RuntimeError("Database connection is not open. Call 'open()' first.")
         return self.__engine
 
     def execute(self, query: str):

@@ -3,22 +3,20 @@ import json
 import pandas as pd
 import sqlalchemy as sa
 
-from data.database_connection import DatabaseConnection  # Adjust the import based on your project structure
-
-database_cnx = DatabaseConnection()
+from data.database_connection import database_cnx
 
 prompt_dtype = {
     "prompt_id": sa.Integer,
     "midi_name": sa.String(255),
     "start_time": sa.Float,
     "end_time": sa.Float,
-    "dataset": sa.String(255),
     "source": sa.JSON,
     "prompt_notes": sa.JSON,
 }
 
 model_dtype = {
     "model_id": sa.Integer,
+    "base_model_id": sa.Integer,
     "name": sa.String(255),
     "milion_parameters": sa.Integer,
     "best_val_loss": sa.Float,
@@ -34,6 +32,7 @@ parameter_dtype = {
     "max_new_tokens": sa.Integer,
     "prompt_context_duration": sa.Float,
     "target_context_duration": sa.Float,
+    "time_step": sa.Float,
     "task": sa.String(255),
 }
 
@@ -45,7 +44,11 @@ generated_notes_dtype = {
     "generated_notes": sa.JSON,
 }
 
-validation_examples_dtype = {"example_id": sa.Integer, "parameters_id": sa.Integer, "prompt_id": sa.Integer}
+validation_examples_dtype = {
+    "example_id": sa.Integer,
+    "parameters_id": sa.Integer,
+    "prompt_id": sa.Integer,
+}
 
 
 models_table = "models"
@@ -53,6 +56,49 @@ parameters_table = "generation_parameters"
 generations_table = "generated_notes"
 prompt_table = "prompt_notes"
 validation_table = "validation_examples"
+
+
+def insert_validation_generations_batch(generations: list[dict]):
+    generation_data = []
+    for generation_info in generations:
+        param_id = generation_info["parameters_id"]
+        prompt_id = generation_info["prompt_id"]
+        model_id = generation_info["model_id"]
+        query = f"""
+        SELECT
+            generation_id
+        FROM
+            {generations_table}
+        WHERE
+            parameters_id = {param_id}
+        AND
+            prompt_id = {prompt_id}
+        AND
+            model_id = {model_id}
+        """
+        existing_record = database_cnx.read_sql(sql=query)
+
+        if existing_record.empty:
+            generation_data.append(
+                {
+                    "parameters_id": param_id,
+                    "prompt_id": prompt_id,
+                    "model_id": model_id,
+                    "generated_notes": generation_info["generated_notes"],
+                }
+            )
+
+    if generation_data:
+        df = pd.DataFrame(generation_data)
+
+        # Insert the generated notes
+        database_cnx.to_sql(
+            df=df,
+            table=generations_table,
+            dtype=generated_notes_dtype,
+            index=False,
+            if_exists="append",
+        )
 
 
 def insert_generated_notes_batch(
@@ -221,22 +267,6 @@ def get_prompt(prompt_id: int) -> pd.DataFrame:
     return df
 
 
-def get_validation_prompts(model: dict) -> list[dict]:
-    query = f"""
-    SELECT
-        *
-    FROM
-        {validation_table}
-    JOIN
-        {prompt_table} pn ON gn.prompt_id = pn.prompt_id
-    JOIN
-        {parameters_table} gp ON gn.parameters_id = gp.generation_id
-    """
-
-    validation_prompts = database_cnx.read_sql(sql=query)
-    return validation_prompts
-
-
 def get_prompts_for_model(model_id: int) -> pd.DataFrame:
     query = f"""
     SELECT DISTINCT
@@ -270,7 +300,7 @@ def get_parameters_for_model_and_prompt(model_id: int, prompt_id: int) -> pd.Dat
     query = f"""
     SELECT DISTINCT gp.*
     FROM {parameters_table} gp
-    JOIN generated_notes gn ON gp.generation_id = gn.parameters_id
+    JOIN generated_notes gn ON gp.parameters_id = gn.parameters_id
     WHERE gn.model_id = {model_id} AND gn.prompt_id = {prompt_id}
     """
     df = database_cnx.read_sql(sql=query)
@@ -350,7 +380,7 @@ def get_model_predictions(
     JOIN
         {prompt_table} pn ON gn.prompt_id = pn.prompt_id
     JOIN
-        {parameters_table} gp ON gn.parameters_id = gp.generation_id
+        {parameters_table} gp ON gn.parameters_id = gp.parameters_id
     WHERE
         1=1
     """

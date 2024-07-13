@@ -17,15 +17,15 @@ $ torchrun --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr=123.456.123
 """
 
 import os
-import json
 import math
 import time
 import itertools
+import multiprocessing
 from contextlib import nullcontext
 
 import hydra
 import torch
-import pandas as pd
+import psutil
 from dotenv import load_dotenv
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -42,6 +42,14 @@ from gpt2.generation import generate_from_prompt
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
+
+multiprocessing.set_start_method("spawn", force=True)
+
+
+def log_open_files():
+    process = psutil.Process()
+    print(f"Open file descriptors: {process.num_fds()}")
+
 
 load_dotenv()
 
@@ -155,28 +163,56 @@ def setup_device(cfg: DictConfig):
     return cfg.system.device, False
 
 
-def run_generation_step(model: GPT, checkpoint: dict, run_name: str):
-    model_description, model_id = database_manager.register_model_from_checkpoint(
+def prepare_validation_examples() -> list[dict]:
+    validation_examples = database_manager.get_all_validation_prompts()
+    prepared_examles = []
+
+    def process_row(row):
+        example = {
+            "generation_parameters": row[database_manager.parameter_dtype.keys()].to_dict(),
+            "prompt": row[database_manager.prompt_dtype.keys()].to_dict(),
+        }
+        prepared_examles.append(example)
+
+    validation_examples.apply(process_row, axis=1)
+
+    return prepared_examles
+
+
+def run_generation_step(
+    model: GPT,
+    checkpoint: dict,
+    run_name: str,
+    validation_examples: list[dict],
+    tokenizer: AwesomeTokenizer | ExponentialTokenizer,
+    device: torch.device,
+):
+    _, model_id = database_manager.register_model_from_checkpoint(
         checkpoint=checkpoint,
         run_name=run_name,
     )
-    commands = database_manager.get_commands(model=model_description)
-    for command in commands:
+    generations = []
+    for example in validation_examples:
         generated_notes = generate_from_prompt(
             model=model,
-            prompt=command["prompt"],
-            parameters=command["generation_parameters"],
+            tokenizer=tokenizer,
+            prompt=example["prompt"],
+            parameters=example["generation_parameters"],
+            device=device,
         )
 
         generated_info = {
-            "parameters_id": command["parameters"]["parameters_id"],
-            "prompt_id": command["prompt"]["prompt_id"],
+            "parameters_id": example["generation_parameters"]["parameters_id"],
+            "prompt_id": example["prompt"]["prompt_id"],
             "model_id": model_id,
-            "generated_notes": json.dumps(generated_notes),
+            "generated_notes": generated_notes.to_json(),
         }
-        database_manager.insert_data(pd.DataFrame(generated_info))
-    print(f"Populated dataset with {len(commands)} generations!")
-    # TODO: purged compeleted commands
+
+        print(generated_info)
+        generations.append(generated_info)
+
+    database_manager.insert_validation_generations_batch(generations=generations)
+    print(f"Populated dataset with {len(validation_examples)} generations!")
 
 
 @hydra.main(config_path="configs", config_name="gpt2_pretraining", version_base=None)
@@ -209,6 +245,11 @@ def main(cfg: DictConfig):
         master_process = True
         seed_offset = 0
         ddp_world_size = 1
+
+    if master_process:
+        database_manager.database_cnx.open()
+        validation_examples = prepare_validation_examples()
+        database_manager.database_cnx.close()
 
     # First load checkpoint if init_from midi_gpt2*
     if cfg.init_from.startswith("midi-gpt2"):
@@ -443,6 +484,7 @@ def main(cfg: DictConfig):
 
         # evaluate the loss on train/val sets and write checkpoints
         if iter_num % cfg.eval_interval == 0 and master_process:
+            log_open_files()
             losses = estimate_loss()
             print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
             if losses["val"] < best_val_loss or cfg.always_save_checkpoint:
@@ -461,8 +503,12 @@ def main(cfg: DictConfig):
                 torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
                 if os.path.exists(".generate"):
                     run_generation_step(
+                        model=model,
+                        tokenizer=tokenizer,
                         checkpoint=checkpoint,
                         run_name=run_name,
+                        validation_examples=validation_examples,
+                        device=device,
                     )
                     os.unlink(".generate")
             if cfg.logging.wandb_log:

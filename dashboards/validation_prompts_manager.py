@@ -37,7 +37,6 @@ def main():
 def show_validation_prompts():
     st.header("Validation Prompts in dataset")
     validation_prompts = database_manager.get_all_validation_prompts()
-    print(validation_prompts)
     for idx, row in validation_prompts.iterrows():
 
         def remove_from_validation():
@@ -46,9 +45,14 @@ def show_validation_prompts():
         prompt_notes = json.loads(row["prompt_notes"])
         prompt_notes_df = pd.DataFrame(prompt_notes)
         prompt_piece = ff.MidiPiece(prompt_notes_df)
+
         parameters = row[database_manager.parameter_dtype.keys()].to_dict()
-        print(parameters)
-        st.json(parameters)
+        source = json.loads(row["source"])
+
+        json_columns = st.columns(2)
+        json_columns[0].json(parameters)
+        json_columns[1].json(source)
+
         streamlit_pianoroll.from_fortepyan(prompt_piece)
         st.button("Remove from validation", on_click=remove_from_validation, key=f"remove_{idx}")
 

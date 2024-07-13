@@ -38,32 +38,29 @@ def main():
                 full_prompt = database_manager.get_prompt(prompt_id=selected_prompt_id)
                 st.write(full_prompt)
 
-                if st.button("Get Predictions"):
-                    # Fetch all predictions for the selected model and prompt
-                    predictions_df = database_manager.get_model_predictions(
-                        model_filters={"model_id": selected_model_id}, prompt_filters={"prompt_id": selected_prompt_id}
-                    )
-                    print(predictions_df)
+                # Fetch all predictions for the selected model and prompt
+                predictions_df = database_manager.get_model_predictions(
+                    model_filters={"model_id": selected_model_id}, prompt_filters={"prompt_id": selected_prompt_id}
+                )
 
-                    if not predictions_df.empty:
-                        for _, row in predictions_df.iterrows():
-                            parameters = database_manager.get_parameters(row["parameters_id"]).iloc[0].to_dict()
-                            prompt = database_manager.get_prompt(row["prompt_id"]).iloc[0]
+                if not predictions_df.empty:
+                    for _, row in predictions_df.iterrows():
+                        parameters = database_manager.get_parameters(row["parameters_id"]).iloc[0].to_dict()
+                        prompt = database_manager.get_prompt(row["prompt_id"]).iloc[0]
 
-                            st.json(parameters, expanded=False)
-                            prompt_notes = json.loads(prompt["prompt_notes"])
-                            prompt_notes_df = pd.DataFrame(prompt_notes)
+                        st.json(parameters, expanded=False)
+                        prompt_notes = json.loads(prompt["prompt_notes"])
+                        prompt_notes_df = pd.DataFrame(prompt_notes)
 
-                            bass_notes = json.loads(row["generated_notes"])
-                            bass_notes_df = pd.DataFrame(bass_notes)
+                        bass_notes = json.loads(row["generated_notes"])
+                        bass_notes_df = pd.DataFrame(bass_notes)
+                        bass_piece = ff.MidiPiece(df=bass_notes_df)
 
-                            bass_piece = ff.MidiPiece(df=bass_notes_df)
-                            prompt_piece = ff.MidiPiece(df=prompt_notes_df)
-
-                            streamlit_pianoroll.from_fortepyan(piece=prompt_piece, secondary_piece=bass_piece)
-                            st.divider()  # Add a divider between predictions
-                    else:
-                        st.write("No predictions found for this prompt and model combination.")
+                        prompt_piece = ff.MidiPiece(df=prompt_notes_df)
+                        streamlit_pianoroll.from_fortepyan(piece=prompt_piece, secondary_piece=bass_piece)
+                        st.divider()  # Add a divider between predictions
+                else:
+                    st.write("No predictions found for this prompt and model combination.")
 
     # The rest of the tabs remain unchanged
     with tab2:

@@ -172,8 +172,8 @@ def generate_bass_iteratively(
     the end of the prompt notes is reached.
     """
     # Initialize the first step with notes within the prompt and target context durations
-    step_prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration]
-    step_bass_notes = target_notes[target_notes.end < target_context_duration]
+    step_prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration].copy()
+    step_bass_notes = target_notes[target_notes.end < target_context_duration].copy()
     # Initialize the list of all bass notes with the initial target notes
     all_bass_notes = [step_bass_notes]
     time = 0
@@ -184,7 +184,7 @@ def generate_bass_iteratively(
         step_bass_notes = pd.DataFrame(columns=prompt_notes.columns)
     it = 0
     # Iterate through the piece, generating bass notes in steps
-    while time + time_step < end:
+    while time + time_step <= end:
         # Calculate the start offset for the bass notes in this step
         start_offset = it * time_step
         it += 1
@@ -239,7 +239,7 @@ def generate_bass_iteratively(
         time = time + time_step
         prompt_selector = (prompt_notes.start > time) & (prompt_notes.end < time + prompt_context_duration)
         step_prompt_notes = prompt_notes[prompt_selector].copy()
-        step_bass_notes = step_bass_notes[step_bass_notes.start > target_context_duration + time_step]
+        step_bass_notes = step_bass_notes[step_bass_notes.start > target_context_duration + time_step].copy()
         step_bass_notes.start -= target_context_duration + time_step
         step_bass_notes.end -= target_context_duration + time_step
 
@@ -249,9 +249,27 @@ def generate_bass_iteratively(
 
 def generate_from_prompt(
     model: GPT,
+    tokenizer: AwesomeTokenizer | ExponentialTokenizer,
     prompt: dict,
     parameters: dict,
+    device: torch.device,
 ):
-    # TODO
-    prompt_notes = json.loads(prompt["prompt_notes"])
-    return prompt_notes
+    prompt_notes = pd.DataFrame(json.loads(prompt["prompt_notes"]))
+    if parameters["task"] == "bass_prediction":
+        low, high = get_voice_range("bass")
+
+        no_bass_notes = prompt_notes[prompt_notes.pitch > high]
+        target_notes = prompt_notes[prompt_notes.pitch < high]
+        generated_notes = generate_bass_iteratively(
+            model=model,
+            tokenizer=tokenizer,
+            prompt_notes=no_bass_notes,
+            target_notes=target_notes,
+            prompt_context_duration=parameters["prompt_context_duration"],
+            target_context_duration=parameters["target_context_duration"],
+            time_step=parameters["time_step"],
+            device=device,
+            temperature=parameters["temperature"],
+            max_new_tokens=parameters["max_new_tokens"],
+        )
+    return generated_notes
