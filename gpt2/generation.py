@@ -270,7 +270,7 @@ def generate_subsequence_iteratively(
 
         # Select only the newly generated notes within the current time step
         notes_after_context = output_bass_notes.start > target_context_duration
-        notes_within_step = output_bass_notes.end < time_step
+        notes_within_step = output_bass_notes.end < target_context_duration + time_step
         valid_new_notes = notes_after_context & notes_within_step
         target_notes = output_bass_notes[valid_new_notes].copy()
         step_target_notes = target_notes.copy()
@@ -287,7 +287,7 @@ def generate_subsequence_iteratively(
         time = time + time_step
         prompt_selector = (prompt_notes.start > time) & (prompt_notes.end < time + prompt_context_duration)
         step_prompt_notes = prompt_notes[prompt_selector].copy()
-        step_target_notes = step_target_notes[step_target_notes.start > time_step].copy()
+        step_target_notes = step_target_notes[step_target_notes.start > time_step]
         step_target_notes.start -= time_step
         step_target_notes.end -= time_step
 
@@ -353,10 +353,12 @@ def generate_from_validation_example(
         )
 
     if parameters["task"] == "bass_prediction":
-        low, high = get_voice_range("bass")
+        prediction_type = "bass"
 
     elif parameters["task"] == "reverse_bass_prediction":
-        low, high = get_voice_range("no_bass")
+        prediction_type = "no_bass"
+    
+    low, high = get_voice_range(prediction_type)
 
     target_note_ids = (prompt_notes.pitch < high) & (prompt_notes.pitch > low)
     source_notes = prompt_notes[~target_note_ids]
@@ -371,6 +373,7 @@ def generate_from_validation_example(
         target_context_duration=parameters["target_context_duration"],
         time_step=parameters["time_step"],
         device=device,
+        prediction_type=prediction_type,
         temperature=parameters["temperature"],
         max_new_tokens=parameters["max_new_tokens"],
         ctx=ctx,

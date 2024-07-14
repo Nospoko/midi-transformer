@@ -177,7 +177,7 @@ def main():
                 source_notes, target_notes = prepare_record(record=record, extraction_type=extraction_type)
                 notes = pd.concat([source_notes, target_notes], ignore_index=True)
                 notes = notes.sort_values(by="start").reset_index(drop=True)
-                bass_prompt = target_notes[target_notes.end < target_context_duration]
+                bass_prompt = target_notes[target_notes.end < target_context_duration].copy()
 
                 source_piece = ff.MidiPiece(source_notes)
                 bass_prompt_piece = ff.MidiPiece(bass_prompt)
