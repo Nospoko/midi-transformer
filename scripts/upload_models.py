@@ -7,7 +7,7 @@ load_dotenv()
 HF_WRITE_TOKEN = os.environ.get("HF_WRITE_TOKEN")  # Make sure to keep this secret!
 
 # Set the local directory containing your checkpoints
-CHECKPOINTS_DIR = "checkpoints/subsequence"
+CHECKPOINTS_DIR = "checkpoints"
 
 # Initialize Hugging Face API
 api = HfApi()
@@ -15,7 +15,7 @@ api = HfApi()
 # Main script
 if __name__ == "__main__":
     # Create a repository name based on the subdirectory name
-    repo_name = "wmatejuk/subsequence_models"
+    repo_name = "wmatejuk/midi-transformers"
 
     try:
         api.upload_folder(folder_path=CHECKPOINTS_DIR, repo_id=repo_name, repo_type="model", token=HF_WRITE_TOKEN)

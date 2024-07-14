@@ -1,5 +1,6 @@
 import json
 import hashlib
+from contextlib import AbstractContextManager
 
 import torch
 import pandas as pd
@@ -9,7 +10,49 @@ from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 from artifacts import get_voice_range, get_source_task_token, get_target_task_token
 
 
-def prepare_prompts(
+def prepare_next_token_prediction_prompts(
+    record: dict,
+    time_step: float,
+    prompt_duration: float,
+) -> list[dict]:
+    notes = pd.DataFrame(record["notes"])
+    source = json.loads(record["source"])
+    if "midi_filename" in source.keys():
+        midi_name = source["midi_filename"]
+    elif "youtube_id" in source.keys():
+        midi_name = source["youtube_id"]
+    else:
+        midi_name = hashlib.sha256(record["source"])
+
+    prompts = []
+    time = 0
+    while time + prompt_duration < notes.end.max():
+        start = time
+        end = time + prompt_duration
+
+        fragment = notes[(notes.start > start) & (notes.end < end)]
+        fragment_start = fragment.start.min()
+        fragment_end = fragment.start.max()
+
+        fragment.end -= fragment_start
+        fragment.start -= fragment_start
+
+        source_notes = fragment
+        if len(fragment) == 0:
+            continue
+        prompt = {
+            "prompt_notes": source_notes,
+            "start_time": fragment_start,
+            "end_time": fragment_end,
+            "midi_name": midi_name,
+            "source": record["source"],
+        }
+        prompts.append(prompt)
+        time += time_step
+    return prompts
+
+
+def prepare_subsequence_prediction_prompts(
     record: dict,
     extraction_type: str,
     time_step: float,
@@ -142,6 +185,7 @@ def generate_subsequence_iteratively(
     target_context_duration: float,
     time_step: float,
     device: torch.device,
+    ctx: AbstractContextManager,
     temperature: float = 1.0,
     max_new_tokens: int = 512,
     prediction_type: str = "bass",
@@ -207,20 +251,21 @@ def generate_subsequence_iteratively(
             device=device,
         )
         # Generate new tokens using the model
-        output = model.generate(
-            idx=input_token_ids,
-            temperature=temperature,
-            max_new_tokens=max_new_tokens,
-        )
+        with ctx:
+            output = model.generate(
+                idx=input_token_ids,
+                temperature=temperature,
+                max_new_tokens=max_new_tokens,
+            )
         # Convert output to numpy array and decode tokens
         output = output[0].cpu().numpy()
         out_tokens = [tokenizer.vocab[token_id] for token_id in output]
 
-        # Extract bass tokens (everything after the <BASS> marker)
-        predict_command_position = out_tokens.index("<BASS>")
+        # Extract target tokens (everything after the target notes marker)
+        predict_command_position = out_tokens.index(target_task_token)
         target_tokens = out_tokens[predict_command_position:].copy()
 
-        # Convert bass tokens back to notes
+        # Convert target tokens back to notes
         output_bass_notes = tokenizer.untokenize(target_tokens)
 
         # Select only the newly generated notes within the current time step
@@ -256,6 +301,7 @@ def generate_continuation(
     prompt_notes: pd.DataFrame,
     prompt_context_duration: float,
     device: torch.device,
+    ctx: AbstractContextManager,
     temperature: float = 1.0,
     max_new_tokens: int = 512,
 ):
@@ -270,11 +316,12 @@ def generate_continuation(
     )
 
     # Generate new tokens using the model
-    output = model.generate(
-        idx=input_token_ids,
-        temperature=temperature,
-        max_new_tokens=max_new_tokens,
-    )
+    with ctx:
+        output = model.generate(
+            idx=input_token_ids,
+            temperature=temperature,
+            max_new_tokens=max_new_tokens,
+        )
 
     # Convert output to numpy array and decode tokens
     output = output[0].cpu().numpy()
@@ -290,6 +337,7 @@ def generate_from_validation_example(
     prompt: dict,
     parameters: dict,
     device: torch.device,
+    ctx: AbstractContextManager,
 ):
     prompt_notes = pd.DataFrame(json.loads(prompt["prompt_notes"]))
     if parameters["task"] == "next_token_prediction":
@@ -301,6 +349,7 @@ def generate_from_validation_example(
             device=device,
             temperature=parameters["temperature"],
             max_new_tokens=parameters["max_new_tokens"],
+            ctx=ctx,
         )
 
     if parameters["task"] == "bass_prediction":
@@ -324,5 +373,6 @@ def generate_from_validation_example(
         device=device,
         temperature=parameters["temperature"],
         max_new_tokens=parameters["max_new_tokens"],
+        ctx=ctx,
     )
     return generated_notes

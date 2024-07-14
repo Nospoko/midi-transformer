@@ -19,7 +19,7 @@ $ torchrun --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr=123.456.123
 import os
 import math
 import time
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
 
 import hydra
 import torch
@@ -221,6 +221,7 @@ def run_generation_step(
     validation_examples: list[dict],
     tokenizer: AwesomeTokenizer | ExponentialTokenizer,
     device: torch.device,
+    ctx: AbstractContextManager,
 ):
     _, model_id = database_manager.register_model_from_checkpoint(
         checkpoint=checkpoint,
@@ -234,6 +235,7 @@ def run_generation_step(
             prompt=example["prompt"],
             parameters=example["generation_parameters"],
             device=device,
+            ctx=ctx,
         )
 
         generated_info = {
@@ -541,6 +543,7 @@ def main(cfg: DictConfig):
                         run_name=run_name,
                         validation_examples=validation_examples,
                         device=device,
+                        ctx=ctx,
                     )
                     os.unlink(".generate")
             if cfg.logging.wandb_log:
