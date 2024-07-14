@@ -311,7 +311,7 @@ def generate_continuation(
     input_sequence = tokenizer.encode(prompt_notes)
     # Convert tokens to ids and prepare input tensor
     input_token_ids = torch.tensor(
-        [[input_sequence]],
+        [input_sequence],
         device=device,
     )
 

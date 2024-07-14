@@ -52,12 +52,12 @@ def main():
                         prompt_notes = json.loads(prompt["prompt_notes"])
                         prompt_notes_df = pd.DataFrame(prompt_notes)
 
-                        bass_notes = json.loads(row["generated_notes"])
-                        bass_notes_df = pd.DataFrame(bass_notes)
-                        bass_piece = ff.MidiPiece(df=bass_notes_df)
+                        generated_notes = json.loads(row["generated_notes"])
+                        generated_notes_df = pd.DataFrame(generated_notes)
+                        generated_piece = ff.MidiPiece(df=generated_notes_df)
 
                         prompt_piece = ff.MidiPiece(df=prompt_notes_df)
-                        streamlit_pianoroll.from_fortepyan(piece=prompt_piece, secondary_piece=bass_piece)
+                        streamlit_pianoroll.from_fortepyan(piece=prompt_piece, secondary_piece=generated_piece)
                         st.divider()  # Add a divider between predictions
                 else:
                     st.write("No predictions found for this prompt and model combination.")

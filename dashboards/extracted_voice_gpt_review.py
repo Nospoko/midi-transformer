@@ -59,7 +59,7 @@ def main():
         device = st.selectbox("Select Device", options=devices, help="Choose the device to run the model on")
         checkpoint_path = st.selectbox(
             "Select Checkpoint",
-            options=glob("checkpoints/*/*.pt"),
+            options=glob("checkpoints/*.pt"),
             help="Choose the model checkpoint to use",
         )
 
