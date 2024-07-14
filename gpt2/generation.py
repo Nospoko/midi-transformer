@@ -4,7 +4,7 @@ from contextlib import AbstractContextManager
 
 import torch
 import pandas as pd
-import torch.functional as F
+from torch.nn import functional as F
 
 from gpt2.model import GPT
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
@@ -406,12 +406,12 @@ def generate(
     the sequence max_new_tokens times, feeding the predictions back into the model each time.
     Most likely you'll want to make sure to be in model.eval() mode of operation for this.
     """
-    if config is None:
+    if model_config is None:
         # Model config has to be passed if using DDP
-        config = model.config
+        model_config = model.config
     for _ in range(max_new_tokens):
         # if the sequence context is growing too long we must crop it at block_size
-        idx_cond = idx if idx.size(1) <= config.block_size else idx[:, config.block_size :]
+        idx_cond = idx if idx.size(1) <= model_config.block_size else idx[:, model_config.block_size :]
         # forward the model to get the logits for the index in the sequence
         logits, _ = model(idx_cond)
         # pluck the logits at the final step and scale by desired temperature
