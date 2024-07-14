@@ -4,6 +4,7 @@ import pandas as pd
 import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
+from streamlit.errors import DuplicateWidgetID
 
 import gpt2.generation as generation
 import data.database_manager as database_manager
@@ -54,7 +55,10 @@ def show_validation_prompts():
         json_columns[0].json(parameters)
         json_columns[1].json(prompt)
 
-        streamlit_pianoroll.from_fortepyan(prompt_piece)
+        try:
+            streamlit_pianoroll.from_fortepyan(piece=prompt_piece)
+        except DuplicateWidgetID:
+            st.write("Duplicate widget")
         st.button(
             "Remove from validation",
             on_click=remove_from_validation,
@@ -135,14 +139,21 @@ def show_prompt_generator():
             source_notes = prompt["prompt_notes"]
 
             source_piece = ff.MidiPiece(source_notes)
-            streamlit_pianoroll.from_fortepyan(piece=source_piece)
+            try:
+                streamlit_pianoroll.from_fortepyan(piece=source_piece)
+            except DuplicateWidgetID:
+                st.write("Duplicate widget")
         else:
             source_notes = prompt.pop("source_notes")
             target_notes = prompt.pop("target_prompt")
 
             source_piece = ff.MidiPiece(source_notes)
             target_piece = ff.MidiPiece(target_notes)
-            streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=target_piece)
+            try:
+                streamlit_pianoroll.from_fortepyan(piece=source_piece, secondary_piece=target_piece)
+            except DuplicateWidgetID:
+                st.write("Duplicate widget")
+
         prompt["prompt_notes"] = prompt["prompt_notes"].to_dict()
 
         def add_to_database(prompt):

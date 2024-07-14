@@ -26,7 +26,7 @@ def main(model_path: str):
 
     validation_examples = gpt2_utils.prepare_validation_examples_for_task(cfg)
 
-    run_name = os.path.basename(model_path)
+    run_name = os.path.splitext(os.path.basename(model_path))[0]
     gpt2_utils.run_generation_step(
         model=model,
         checkpoint=checkpoint,

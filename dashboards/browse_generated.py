@@ -4,6 +4,7 @@ import pandas as pd
 import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
+from streamlit.errors import DuplicateWidgetID
 
 import data.database_manager as database_manager
 
@@ -57,7 +58,10 @@ def main():
                         generated_piece = ff.MidiPiece(df=generated_notes_df)
 
                         prompt_piece = ff.MidiPiece(df=prompt_notes_df)
-                        streamlit_pianoroll.from_fortepyan(piece=prompt_piece, secondary_piece=generated_piece)
+                        try:
+                            streamlit_pianoroll.from_fortepyan(piece=prompt_piece, secondary_piece=generated_piece)
+                        except DuplicateWidgetID:
+                            st.write("Duplicate widget")
                         st.divider()  # Add a divider between predictions
                 else:
                     st.write("No predictions found for this prompt and model combination.")
@@ -71,16 +75,11 @@ def main():
         st.subheader("Purge Model")
         model_to_purge = st.selectbox("Select a model to purge", models_df["name"].tolist())
         if st.button("Purge Selected Model"):
-            if st.checkbox("Are you sure? This action cannot be undone."):
-                try:
-                    database_manager.purge_model(model_to_purge)
-                    st.success(f"Model '{model_to_purge}' has been purged successfully.")
-                    models_df = database_manager.get_all_models()
-                    st.write(models_df)
-                except Exception as e:
-                    st.error(f"An error occurred while purging the model: {str(e)}")
-            else:
-                st.warning("Please confirm the action by checking the box.")
+            try:
+                database_manager.purge_model(model_to_purge)
+                st.success(f"Model '{model_to_purge}' has been purged successfully.")
+            except Exception as e:
+                st.error(f"An error occurred while purging the model: {str(e)}")
 
     with tab3:
         st.header("Generation Parameters")

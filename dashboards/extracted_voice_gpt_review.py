@@ -197,7 +197,7 @@ def main():
                     pad_token_id=pad_token_id,
                 )
 
-                bass_notes, prompt_pieces = generate_subsequence_iteratively(
+                bass_notes = generate_subsequence_iteratively(
                     model=model,
                     tokenizer=tokenizer,
                     prompt_notes=source_notes,
@@ -246,19 +246,6 @@ def main():
                     f"combined_{source['title']}.mid",
                     "Download Combined MIDI",
                 )
-
-            with st.expander("View Generation Details"):
-                st.write("Bass Notes:", bass_notes)
-                st.write("Prompt Pieces:")
-                for i, (prompt_piece, bass_prompt_piece) in enumerate(prompt_pieces):
-                    st.write(f"Step {i+1}")
-                    try:
-                        streamlit_pianoroll.from_fortepyan(
-                            piece=prompt_piece,
-                            secondary_piece=bass_prompt_piece,
-                        )
-                    except DuplicateWidgetID:
-                        st.write("Duplicate pianoroll")
 
 
 def download_midi(piece, filename, button_text):

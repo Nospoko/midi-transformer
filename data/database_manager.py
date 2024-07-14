@@ -274,8 +274,7 @@ def get_prompts_for_model(model_id: int) -> pd.DataFrame:
         pn.prompt_id,
         pn.midi_name,
         pn.start_time,
-        pn.end_time,
-        pn.dataset
+        pn.end_time
     FROM {prompt_table} pn
     JOIN generated_notes gn ON pn.prompt_id = gn.prompt_id
     WHERE gn.model_id = {model_id}

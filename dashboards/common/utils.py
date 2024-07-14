@@ -81,7 +81,7 @@ def select_generation_parameters() -> (
             )
             prompt_creation_time_step = st.number_input(
                 "Prompt Creation Time Step",
-                value=10.0,
+                value=120.0,
                 help="Time step for creating prompts",
             )
             task_options = ["bass_prediction", "reverse_bass_prediction", "next_token_prediction"]

@@ -30,7 +30,7 @@ def prepare_next_token_prediction_prompts(
         start = time
         end = time + prompt_duration
 
-        fragment = notes[(notes.start > start) & (notes.end < end)]
+        fragment = notes[(notes.start > start) & (notes.end < end)].copy()
         fragment_start = fragment.start.min()
         fragment_end = fragment.start.max()
 
@@ -76,7 +76,7 @@ def prepare_subsequence_prediction_prompts(
         start = time
         end = time + prompt_duration
 
-        fragment = notes[(notes.start > start) & (notes.end < end)]
+        fragment = notes[(notes.start > start) & (notes.end < end)].copy()
         fragment_start = fragment.start.min()
         fragment_end = fragment.start.max()
 
@@ -359,7 +359,7 @@ def generate_from_validation_example(
         low, high = get_voice_range("no_bass")
 
     target_note_ids = (prompt_notes.pitch < high) & (prompt_notes.pitch > low)
-    source_notes = prompt_notes[target_note_ids]
+    source_notes = prompt_notes[~target_note_ids]
     target_notes = prompt_notes[target_note_ids]
 
     generated_notes = generate_subsequence_iteratively(
