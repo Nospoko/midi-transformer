@@ -1,4 +1,5 @@
 import json
+from typing import Literal
 
 import pandas as pd
 import sqlalchemy as sa
@@ -425,6 +426,25 @@ def get_all_generation_parameters() -> pd.DataFrame:
 
 def get_all_prompt_notes() -> pd.DataFrame:
     query = f"SELECT * FROM {prompt_table}"
+    df = database_cnx.read_sql(sql=query)
+    return df
+
+
+def get_validation_prompt_for_task(
+    task: Literal["bass_prediction", "next_token_prediction", "from_bass_prediction"],
+) -> pd.DataFrame:
+    query = f"""
+    SELECT
+        *
+    FROM
+        {validation_table} vp
+    JOIN
+        {prompt_table} pn ON vp.prompt_id = pn.prompt_id
+    JOIN
+        {parameters_table} gp ON vp.parameters_id = gp.parameters_id
+    WHERE
+        task = '{task}'
+    """
     df = database_cnx.read_sql(sql=query)
     return df
 

@@ -140,13 +140,15 @@ def show_prompt_generator():
                 value=120.0,
                 help="Time step for creating prompts",
             )
+            task_options = ["bass_prediction", "next_token_prediction"]
+            task = st.selectbox("Prediction task", options=task_options)
         generation_parameters = {
             "temperature": temperature,
             "max_new_tokens": max_new_tokens,
             "prompt_context_duration": prompt_context_duration,
             "target_context_duration": target_context_duration,
             "time_step": time_step,
-            "task": "bass_prediction",
+            "task": task,
         }
         st.form_submit_button("Generate Prompts")
     st.image("dashboards/img/iterative_generation.png")

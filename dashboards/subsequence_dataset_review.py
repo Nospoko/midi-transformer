@@ -33,10 +33,24 @@ def main():
     with st.form(key="config_form"):
         col1, col2 = st.columns(2)
         with col1:
-            base_dataset_name = st.text_input(label="Base Dataset Name", value="roszcz/maestro-sustain-v2")
-            extra_datasets = st.text_input(label="Extra Datasets (comma separated)", value="")
-            notes_per_record = st.number_input(label="Notes per Record", min_value=1, value=128)
-            step = st.number_input(label="Step", min_value=1, value=512)
+            base_dataset_name = st.text_input(
+                label="Base Dataset Name",
+                value="roszcz/maestro-sustain-v2",
+            )
+            extra_datasets = st.text_input(
+                label="Extra Datasets (comma separated)",
+                value="",
+            )
+            notes_per_record = st.number_input(
+                label="Notes per Record",
+                min_value=1,
+                value=128,
+            )
+            step = st.number_input(
+                label="Step",
+                min_value=1,
+                value=128,
+            )
         with col2:
             pause_detection_threshold = st.number_input(label="Pause Detection Threshold", value=4.0)
             sequence_length = st.number_input(label="Sequence Length", min_value=1, value=1024, step=1024)
@@ -47,9 +61,20 @@ def main():
     with st.form(key="tokenizer_form"):
         col1, col2 = st.columns(2)
         with col1:
-            min_time_unit = st.number_input(label="Min Time Unit", min_value=0.01, value=0.01, step=0.01, format="%.2f")
+            min_time_unit = st.number_input(
+                label="Min Time Unit",
+                min_value=0.01,
+                value=0.01,
+                step=0.01,
+                format="%.2f",
+            )
         with col2:
-            n_velocity_bins = st.number_input(label="Velocity Bins", min_value=1, value=32, step=1)
+            n_velocity_bins = st.number_input(
+                label="Velocity Bins",
+                min_value=1,
+                value=32,
+                step=1,
+            )
 
         st.form_submit_button(label="Update Tokenizer")
 
@@ -95,7 +120,12 @@ def main():
     with st.expander("Tokenizer Parameters"):
         st.json(tokenizer_parameters)
 
-    idx = st.number_input(label="Record ID", value=0, min_value=0, max_value=len(dataset) - 1)
+    idx = st.number_input(
+        label="Record ID",
+        value=0,
+        min_value=0,
+        max_value=len(dataset) - 1,
+    )
     record = midi_dataset[idx]
 
     with st.expander(label="Source Data"):

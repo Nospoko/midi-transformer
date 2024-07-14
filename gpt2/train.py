@@ -99,10 +99,41 @@ def load_tokenizer(cfg: DictConfig):
 
 
 def get_dataset_for_task(cfg: DictConfig):
-    if cfg.task == "pretraining":
+    if cfg.task == "next_token_prediction":
         return prepare_next_token_datasets(cfg)
-    if cfg.task == "subsequence":
+    if cfg.task == "bass_prediction":
         return prepare_subsequence_datasets(cfg)
+    if cfg.task == "from_bass_prediction":
+        return prepare_reverse_bass_datasets(cfg)
+
+
+def get_validation_examples_for_task(cfg: DictConfig):
+    return database_manager.get_validation_prompt_for_task(task=cfg.task)
+
+
+def prepare_reverse_bass_datasets(cfg: DictConfig):
+    dataset_config = OmegaConf.to_container(cfg.dataset)
+    tokenizer = load_tokenizer(cfg)
+    dataset_name = "ReverseBassPredictionDataset"
+    dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
+    dataset = load_dataset(
+        dataset_path,
+        num_proc=cfg.system.dataloader_workers,
+        trust_remote_code=True,
+        **dataset_config,
+    )
+    train_dataset = NextTokenDataset(
+        dataset=dataset["train"],
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+    )
+    val_dataset = NextTokenDataset(
+        dataset=dataset["validation"],
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+    )
+
+    return train_dataset, val_dataset, to_absolute_path(cfg.out_dir)
 
 
 def prepare_next_token_datasets(cfg: DictConfig):
@@ -167,8 +198,8 @@ def setup_device(cfg: DictConfig):
     return cfg.system.device, False
 
 
-def prepare_validation_examples() -> list[dict]:
-    validation_examples = database_manager.get_all_validation_prompts()
+def prepare_validation_examples_for_task(cfg: DictConfig) -> list[dict]:
+    validation_examples = get_validation_examples_for_task(cfg=cfg)
     prepared_examles = []
 
     def process_row(row):
@@ -250,7 +281,7 @@ def main(cfg: DictConfig):
         ddp_world_size = 1
 
     if master_process:
-        validation_examples = prepare_validation_examples()
+        validation_examples = prepare_validation_examples_for_task(cfg=cfg)
 
     # First load checkpoint if init_from midi_gpt2*
     if cfg.init_from.startswith("midi-gpt2"):
