@@ -33,8 +33,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
 import wandb
-from artifacts import special_tokens
 from gpt2.model import GPT, GPTConfig
+from gpt2.utils import load_tokenizer
 import data.database_manager as database_manager
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
@@ -83,21 +83,6 @@ class CyclicalDataLoader:
         return x, y, mask
 
 
-def load_tokenizer(cfg: DictConfig):
-    tokenizer_parameters = OmegaConf.to_container(cfg.data.tokenizer_parameters)
-    tokenizer_parameters |= {"special_tokens": special_tokens}
-
-    if cfg.data.tokenizer == "AwesomeMidiTokenizer":
-        min_time_unit = tokenizer_parameters["min_time_unit"]
-        n_velocity_bins = tokenizer_parameters["min_velocity_bins"]
-        tokenizer_path = to_absolute_path(
-            f"pretrained/awesome_tokenizers/awesome-tokenizer-{min_time_unit}-{n_velocity_bins}.json"
-        )
-        return AwesomeTokenizer.from_file(tokenizer_path)
-    else:
-        return ExponentialTokenizer(**tokenizer_parameters)
-
-
 def get_dataset_for_task(cfg: DictConfig):
     if cfg.task == "next_token_prediction":
         return prepare_next_token_datasets(cfg)
@@ -105,10 +90,6 @@ def get_dataset_for_task(cfg: DictConfig):
         return prepare_subsequence_datasets(cfg)
     if cfg.task == "from_bass_prediction":
         return prepare_reverse_bass_datasets(cfg)
-
-
-def get_validation_examples_for_task(cfg: DictConfig):
-    return database_manager.get_validation_prompt_for_task(task=cfg.task)
 
 
 def prepare_reverse_bass_datasets(cfg: DictConfig):
@@ -199,7 +180,7 @@ def setup_device(cfg: DictConfig):
 
 
 def prepare_validation_examples_for_task(cfg: DictConfig) -> list[dict]:
-    validation_examples = get_validation_examples_for_task(cfg=cfg)
+    validation_examples = database_manager.get_validation_examples_for_task(task=cfg["task"])
     prepared_examles = []
 
     def process_row(row):

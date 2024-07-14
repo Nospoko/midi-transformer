@@ -13,6 +13,7 @@ import data.database_manager as database_manager
 import dashboards.common.utils as dashboard_utils
 from dashboards.common.utils import select_generation_parameters
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
+from gpt2.utils import load_cfg, load_tokenizer, initialize_model
 
 
 def multiselect_part_dataset(midi_dataset: Dataset) -> Dataset:
@@ -52,9 +53,9 @@ def load_model_and_tokenizer():
         )
 
         with st.spinner("Loading checkpoint..."):
-            checkpoint = dashboard_utils.load_checkpoint(
-                checkpoint_path=checkpoint_path,
-                device=device,
+            checkpoint = torch.load(
+                f=checkpoint_path,
+                map_location=device,
             )
 
         run_name = os.path.basename(checkpoint_path)
@@ -67,7 +68,8 @@ def load_model_and_tokenizer():
         if "wandb" in checkpoint:
             st.link_button(label="View Training Run", url=checkpoint["wandb"])
 
-    cfg, _, tokenizer = dashboard_utils.load_tokenizer(checkpoint)
+    cfg = load_cfg(checkpoint=checkpoint)
+    tokenizer = load_tokenizer(cfg=cfg)
     st.write("Training config")
     st.json(checkpoint["config"], expanded=False)
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
@@ -200,7 +202,7 @@ def main():
     if run:
         with tab3:
             st.header("Generation state")
-            model = dashboard_utils.initialize_model(
+            model = initialize_model(
                 cfg,
                 checkpoint=checkpoint,
                 device=device,

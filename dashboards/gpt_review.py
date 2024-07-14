@@ -11,6 +11,7 @@ import streamlit_pianoroll
 
 import dashboards.common.utils as dashboard_utils
 from dashboards.common.components import download_button
+from gpt2.utils import load_cfg, load_tokenizer, initialize_model
 
 
 def prepare_record(record: dict, start: float, end: float):
@@ -34,16 +35,17 @@ def main():
         )
 
         with st.spinner("Loading checkpoint..."):
-            checkpoint = dashboard_utils.load_checkpoint(
-                checkpoint_path=checkpoint_path,
-                device=device,
+            checkpoint = torch.load(
+                f=checkpoint_path,
+                map_location=device,
             )
         best_val_loss = checkpoint["best_val_loss"]
         st.write(f"Model best val loss: {best_val_loss:.4f}")
         if "wandb" in dict(checkpoint).keys():
             st.link_button(label="wandb run", url=checkpoint["wandb"])
 
-    cfg, _, tokenizer = dashboard_utils.load_tokenizer(checkpoint)
+    cfg = load_cfg(checkpoint=checkpoint)
+    tokenizer = load_tokenizer(cfg=cfg)
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
     device_type = "cuda" if "cuda" in device else "cpu"
     ctx = (
@@ -119,7 +121,7 @@ def main():
             return
 
         pad_token_id = tokenizer.token_to_id["<PAD>"]
-        model = dashboard_utils.initialize_model(cfg, checkpoint=checkpoint, device=device, pad_token_id=pad_token_id)
+        model = initialize_model(cfg, checkpoint=checkpoint, device=device, pad_token_id=pad_token_id)
         # Generate new tokens and create the generated piece - generation does not require padding
         note_token_ids = tokenizer.encode(
             notes=notes,

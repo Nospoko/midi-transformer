@@ -430,7 +430,7 @@ def get_all_prompt_notes() -> pd.DataFrame:
     return df
 
 
-def get_validation_prompt_for_task(
+def get_validation_examples_for_task(
     task: Literal["bass_prediction", "next_token_prediction", "from_bass_prediction"],
 ) -> pd.DataFrame:
     query = f"""
