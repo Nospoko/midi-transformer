@@ -399,7 +399,7 @@ def generate(
     max_new_tokens,
     temperature=1.0,
     top_k=None,
-    config=None,
+    model_config=None,
 ):
     """
     Take a conditioning sequence of indices idx (LongTensor of shape (b,t)) and complete
