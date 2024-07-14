@@ -4,6 +4,7 @@ from contextlib import AbstractContextManager
 
 import torch
 import pandas as pd
+import torch.functional as F
 
 from gpt2.model import GPT
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
@@ -150,7 +151,8 @@ def generate_bass(
     )
 
     # Generate new tokens using the model
-    output = model.generate(
+    output = generate(
+        model=model,
         idx=input_token_ids,
         temperature=temperature,
         max_new_tokens=max_new_tokens,
@@ -189,6 +191,7 @@ def generate_subsequence_iteratively(
     temperature: float = 1.0,
     max_new_tokens: int = 512,
     prediction_type: str = "bass",
+    model_config=None,
 ) -> pd.DataFrame:
     """
     Generate subsequence of notes iteratively using the given model and tokenizer.
@@ -252,7 +255,9 @@ def generate_subsequence_iteratively(
         )
         # Generate new tokens using the model
         with ctx:
-            output = model.generate(
+            output = generate(
+                model=model,
+                model_config=model_config,
                 idx=input_token_ids,
                 temperature=temperature,
                 max_new_tokens=max_new_tokens,
@@ -304,6 +309,7 @@ def generate_continuation(
     ctx: AbstractContextManager,
     temperature: float = 1.0,
     max_new_tokens: int = 512,
+    model_config=None,
 ):
     prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration]
 
@@ -317,7 +323,9 @@ def generate_continuation(
 
     # Generate new tokens using the model
     with ctx:
-        output = model.generate(
+        output = generate(
+            model=model,
+            model_config=model_config,
             idx=input_token_ids,
             temperature=temperature,
             max_new_tokens=max_new_tokens,
@@ -338,6 +346,7 @@ def generate_from_validation_example(
     parameters: dict,
     device: torch.device,
     ctx: AbstractContextManager,
+    model_config=None,
 ):
     prompt_notes = pd.DataFrame(json.loads(prompt["prompt_notes"]))
     if parameters["task"] == "next_token_prediction":
@@ -350,6 +359,7 @@ def generate_from_validation_example(
             temperature=parameters["temperature"],
             max_new_tokens=parameters["max_new_tokens"],
             ctx=ctx,
+            model_config=model_config,
         )
 
     if parameters["task"] == "bass_prediction":
@@ -357,7 +367,7 @@ def generate_from_validation_example(
 
     elif parameters["task"] == "reverse_bass_prediction":
         prediction_type = "no_bass"
-    
+
     low, high = get_voice_range(prediction_type)
 
     target_note_ids = (prompt_notes.pitch < high) & (prompt_notes.pitch > low)
@@ -377,5 +387,43 @@ def generate_from_validation_example(
         temperature=parameters["temperature"],
         max_new_tokens=parameters["max_new_tokens"],
         ctx=ctx,
+        model_config=model_config,
     )
     return generated_notes
+
+
+@torch.no_grad()
+def generate(
+    model,
+    idx,
+    max_new_tokens,
+    temperature=1.0,
+    top_k=None,
+    config=None,
+):
+    """
+    Take a conditioning sequence of indices idx (LongTensor of shape (b,t)) and complete
+    the sequence max_new_tokens times, feeding the predictions back into the model each time.
+    Most likely you'll want to make sure to be in model.eval() mode of operation for this.
+    """
+    if config is None:
+        # Model config has to be passed if using DDP
+        config = model.config
+    for _ in range(max_new_tokens):
+        # if the sequence context is growing too long we must crop it at block_size
+        idx_cond = idx if idx.size(1) <= config.block_size else idx[:, config.block_size :]
+        # forward the model to get the logits for the index in the sequence
+        logits, _ = model(idx_cond)
+        # pluck the logits at the final step and scale by desired temperature
+        logits = logits[:, -1, :] / temperature
+        # optionally crop the logits to only the top k options
+        if top_k is not None:
+            v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+            logits[logits < v[:, [-1]]] = -float("Inf")
+        # apply softmax to convert logits to (normalized) probabilities
+        probs = F.softmax(logits, dim=-1)
+        # sample from the distribution
+        idx_next = torch.multinomial(probs, num_samples=1)
+        # append sampled index to the running sequence and continue
+        idx = torch.cat((idx, idx_next), dim=1)
+    return idx

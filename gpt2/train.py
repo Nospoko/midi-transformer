@@ -469,6 +469,7 @@ def main(cfg: DictConfig):
                         validation_examples=validation_examples,
                         device=device,
                         ctx=ctx,
+                        model_config=gptconf,
                     )
                     os.unlink(".generate")
             if cfg.logging.wandb_log:

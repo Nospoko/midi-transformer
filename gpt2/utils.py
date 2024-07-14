@@ -35,6 +35,7 @@ def run_generation_step(
     tokenizer: AwesomeTokenizer | ExponentialTokenizer,
     device: torch.device,
     ctx: AbstractContextManager,
+    model_config=None,
 ):
     _, model_id = database_manager.register_model_from_checkpoint(
         checkpoint=checkpoint,
@@ -49,6 +50,7 @@ def run_generation_step(
             parameters=example["generation_parameters"],
             device=device,
             ctx=ctx,
+            model_config=model_config,
         )
 
         generated_info = {
