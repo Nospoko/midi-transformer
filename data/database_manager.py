@@ -430,8 +430,13 @@ def get_all_prompt_notes() -> pd.DataFrame:
 
 
 def get_validation_examples_for_task(
-    task: Literal["bass_prediction", "next_token_prediction", "from_bass_prediction"],
+    task: Literal["bass_prediction", "next_token_prediction", "from_bass_prediction", "subsequence", "pretraining"],
 ) -> pd.DataFrame:
+    # Backward compatibility
+    if task == "subsequence":
+        task = "bass_prediction"
+    if task == "pretraining":
+        task = "next_token_prediction"
     query = f"""
     SELECT
         *
