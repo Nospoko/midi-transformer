@@ -15,20 +15,20 @@ class SubSequenceMidiDataset(MidiDataset):
         dataset: HuggingFaceDataset,
         tokenizer: AwesomeTokenizer | ExponentialTokenizer,
         sequence_length: int,
-        loss_calculation_style: Literal["finetuning", "pretraining"] = "pretraining",
+        loss_masking: Literal["finetuning", "pretraining"] = "pretraining",
     ):
         super().__init__(
             dataset=dataset,
             tokenizer=tokenizer,
         )
         self.sequence_length = sequence_length
-        self.loss_calculation_style = loss_calculation_style
+        self.loss_masking = loss_masking
 
     def __getitem__(self, idx: int) -> dict:
         record = self.dataset[idx]
-        extraction_type = record["extraction_type"]
-        source_prefix = get_source_task_token(extraction_type)
-        target_prefix = get_target_task_token(extraction_type)
+        prediction_task = record["prediction_task"]
+        source_prefix = get_source_task_token(prediction_task)
+        target_prefix = get_target_task_token(prediction_task)
         prompt_token_ids = self.tokenizer.encode(
             notes=pd.DataFrame(record["source_notes"]),
             prefix_tokens=[source_prefix],
@@ -52,13 +52,13 @@ class SubSequenceMidiDataset(MidiDataset):
         source_token_ids = torch.tensor(source_encoding[: self.sequence_length], dtype=torch.int64)
         target_token_ids = torch.tensor(target_encoding[: self.sequence_length], dtype=torch.int64)
         target_mask = target_token_ids != self.tokenizer.pad_token_id
-        if self.loss_calculation_style == "finetuning":
+        if self.loss_masking == "finetuning":
             target_mask[: len(prompt_token_ids)] = False
         out = {
             "source_token_ids": source_token_ids,
             "target_token_ids": target_token_ids,
             "target_mask": target_mask,
-            "extraction_type": extraction_type,
+            "prediction_task": prediction_task,
             "source": record["source"],
         }
         return out

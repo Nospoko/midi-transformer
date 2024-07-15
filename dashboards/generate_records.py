@@ -95,9 +95,9 @@ def dataset_configuration():
             help="Choose the dataset split to use",
         )
     with col3:
-        extraction_type = st.selectbox(
+        prediction_task = st.selectbox(
             "Extraction Type",
-            options=["bass", "no_bass", "-"],
+            options=["bass_prediction", "reverse_bass_prediction", "-"],
             help="Select the type of notes to extract",
         )
 
@@ -106,7 +106,7 @@ def dataset_configuration():
         dataset = multiselect_part_dataset(midi_dataset=dataset)
 
     st.success(f"Dataset loaded! Total records: {len(dataset)}")
-    return dataset, extraction_type
+    return dataset, prediction_task
 
 
 def generate_music(
@@ -119,7 +119,7 @@ def generate_music(
     model_registration: dict,
     prompt_duration: float,
     prompt_creation_time_step: float,
-    extraction_type: str = None,
+    prediction_task: str = None,
 ):
     task = generation_parameters["task"]
     prompts = []
@@ -135,7 +135,7 @@ def generate_music(
             else:
                 prompts += generation.prepare_subsequence_prediction_prompts(
                     record=record,
-                    extraction_type=extraction_type,
+                    prediction_task=prediction_task,
                     prompt_duration=prompt_duration,
                     time_step=prompt_creation_time_step,
                     target_context_duration=generation_parameters["target_context_duration"],
@@ -194,7 +194,7 @@ def main():
     tab1, tab2, tab3 = st.tabs(["Dataset Selection", "Generation Parameters", "Results"])
 
     with tab1:
-        dataset, extraction_type = dataset_configuration()
+        dataset, prediction_task = dataset_configuration()
 
     with tab2:
         run, generation_parameters, prompt_duration, prompt_creation_time_step = select_generation_parameters()
@@ -218,7 +218,7 @@ def main():
                 model_registration=model_registration,
                 prompt_duration=prompt_duration,
                 prompt_creation_time_step=prompt_creation_time_step,
-                extraction_type=extraction_type,
+                prediction_task=prediction_task,
             )
 
 

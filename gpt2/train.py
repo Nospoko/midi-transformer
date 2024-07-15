@@ -19,6 +19,7 @@ $ torchrun --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr=123.456.123
 import os
 import math
 import time
+import datetime
 from contextlib import nullcontext
 
 import hydra
@@ -155,13 +156,13 @@ def prepare_subsequence_datasets(cfg: DictConfig):
         dataset=dataset["train"],
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
-        loss_calculation_style=cfg.loss_calculation_style,
+        loss_masking=cfg.loss_masking,
     )
     val_dataset = SubSequenceMidiDataset(
         dataset=dataset["validation"],
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
-        loss_calculation_style=cfg.loss_calculation_style,
+        loss_masking=cfg.loss_masking,
     )
 
     return train_dataset, val_dataset, to_absolute_path(cfg.out_dir)
@@ -169,7 +170,7 @@ def prepare_subsequence_datasets(cfg: DictConfig):
 
 def setup_device(cfg: DictConfig):
     if int(os.environ.get("RANK", -1)) != -1:
-        init_process_group(backend=cfg.ddp.backend)
+        init_process_group(backend=cfg.ddp.backend, timeout=datetime.timedelta(seconds=1800))
         local_rank = int(os.environ["LOCAL_RANK"])
         torch.cuda.set_device(local_rank)
         return f"cuda:{local_rank}", True

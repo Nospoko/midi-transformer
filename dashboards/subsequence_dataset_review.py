@@ -54,7 +54,7 @@ def main():
         with col2:
             pause_detection_threshold = st.number_input(label="Pause Detection Threshold", value=4.0)
             sequence_length = st.number_input(label="Sequence Length", min_value=1, value=1024, step=1024)
-            loss_calculation_style = st.selectbox(label="Loss Calculation Style", options=["pretraining", "finetuning"])
+            loss_masking = st.selectbox(label="Loss Calculation Style", options=["pretraining", "finetuning"])
 
         st.form_submit_button(label="Update Config")
 
@@ -107,7 +107,7 @@ def main():
         dataset=dataset,
         tokenizer=tokenizer,
         sequence_length=sequence_length,
-        loss_calculation_style=loss_calculation_style,
+        loss_masking=loss_masking,
     )
 
     total_tokens = config["notes_per_record"] * dataset.num_rows
@@ -131,7 +131,7 @@ def main():
     with st.expander(label="Source Data"):
         st.json(record["source"])
 
-    extracted = record["extraction_type"]
+    extracted = record["prediction_task"]
     st.write(f"Extraction Type: {extracted}")
 
     src_token_ids = record["source_token_ids"]

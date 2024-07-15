@@ -8,7 +8,7 @@ from torch.nn import functional as F
 
 from gpt2.model import GPT
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
-from artifacts import get_voice_range, get_source_task_token, get_target_task_token
+from artifacts import get_voice_task_range, get_source_task_token, get_target_task_token
 
 
 def prepare_next_token_prediction_prompts(
@@ -55,12 +55,12 @@ def prepare_next_token_prediction_prompts(
 
 def prepare_subsequence_prediction_prompts(
     record: dict,
-    extraction_type: str,
+    prediction_task: str,
     time_step: float,
     prompt_duration: float,
     target_context_duration: float,
 ) -> list[dict]:
-    low, high = get_voice_range(voice=extraction_type)
+    low, high = get_voice_task_range(task=prediction_task)
     time = 0
 
     notes = pd.DataFrame(record["notes"])
@@ -191,7 +191,7 @@ def generate_subsequence_iteratively(
     ctx: AbstractContextManager,
     temperature: float = 1.0,
     max_new_tokens: int = 512,
-    prediction_type: str = "bass",
+    prediction_task: str = "bass_prediction",
     model_config=None,
 ) -> pd.DataFrame:
     """
@@ -245,8 +245,8 @@ def generate_subsequence_iteratively(
         step_target = tokenizer.tokenize(step_target_notes)
 
         # Combine prompt, bass marker, and target into input sequence
-        source_task_token = get_source_task_token(extraction_type=prediction_type)
-        target_task_token = get_target_task_token(extraction_type=prediction_type)
+        source_task_token = get_source_task_token(prediction_task=prediction_task)
+        target_task_token = get_target_task_token(prediction_task=prediction_task)
 
         input_sequence = [source_task_token] + step_sequence + [target_task_token] + step_target
         # Convert tokens to ids and prepare input tensor
@@ -365,13 +365,7 @@ def generate_from_validation_example(
             model_config=model_config,
         )
 
-    if parameters["task"] == "bass_prediction":
-        prediction_type = "bass"
-
-    elif parameters["task"] == "reverse_bass_prediction":
-        prediction_type = "no_bass"
-
-    low, high = get_voice_range(prediction_type)
+    low, high = get_voice_task_range(parameters["task"])
 
     target_note_ids = (prompt_notes.pitch < high) & (prompt_notes.pitch > low)
     source_notes = prompt_notes[~target_note_ids]
@@ -386,7 +380,7 @@ def generate_from_validation_example(
         target_context_duration=parameters["target_context_duration"],
         time_step=parameters["time_step"],
         device=device,
-        prediction_type=prediction_type,
+        prediction_task=parameters["task"],
         temperature=parameters["temperature"],
         max_new_tokens=parameters["max_new_tokens"],
         ctx=ctx,

@@ -100,9 +100,9 @@ def show_prompt_generator():
             help="Choose the dataset split to use",
         )
     with col3:
-        extraction_type = st.selectbox(
+        prediction_task = st.selectbox(
             "Extraction Type",
-            options=["bass", "no_bass", "-"],
+            options=["bass_prediction", "reverse_bass_prediction", "-"],
             help="Select the type of notes to extract",
         )
 
@@ -130,7 +130,7 @@ def show_prompt_generator():
             else:
                 prompts += generation.prepare_subsequence_prediction_prompts(
                     record=record,
-                    extraction_type=extraction_type,
+                    prediction_task=prediction_task,
                     prompt_duration=prompt_duration,
                     time_step=prompt_creation_time_step,
                     target_context_duration=generation_parameters["target_context_duration"],

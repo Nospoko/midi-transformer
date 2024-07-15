@@ -10,25 +10,25 @@ import streamlit as st
 import streamlit_pianoroll
 from streamlit.errors import DuplicateWidgetID
 
-from artifacts import get_voice_range
+from artifacts import get_voice_task_range
 import dashboards.common.utils as dashboard_utils
 from dashboards.common.components import download_button
 from gpt2.generation import generate_subsequence_iteratively
 from gpt2.utils import load_cfg, load_tokenizer, initialize_model
 
 
-def prepare_record(record: dict, extraction_type: str):
+def prepare_record(record: dict, prediction_task: str):
     """
     Prepare a record for note extraction based on the specified type.
 
     Args:
         record: Dictionary containing note data
-        extraction_type: Type of extraction (e.g., 'bass')
+        prediction_task: Type of extraction (e.g., 'bass')
 
     Returns:
         Tuple of DataFrames (source_notes, target_notes)
     """
-    low, high = get_voice_range(voice=extraction_type)
+    low, high = get_voice_task_range(task=prediction_task)
     start_end_columns = st.columns(2)
     start = start_end_columns[0].number_input(label="start second", value=0.0)
     end = start_end_columns[1].number_input(label="end second", value=60.0)
@@ -104,9 +104,9 @@ def main():
                 help="Choose the dataset split to use",
             )
         with col3:
-            extraction_type = st.selectbox(
+            prediction_task = st.selectbox(
                 "Extraction Type",
-                options=["bass"],
+                options=["bass_prediction"],
                 help="Select the type of notes to extract",
             )
 
@@ -174,7 +174,7 @@ def main():
         with tab3:
             st.header("Generation Results")
             with st.spinner("Preparing data..."):
-                source_notes, target_notes = prepare_record(record=record, extraction_type=extraction_type)
+                source_notes, target_notes = prepare_record(record=record, prediction_task=prediction_task)
                 notes = pd.concat([source_notes, target_notes], ignore_index=True)
                 notes = notes.sort_values(by="start").reset_index(drop=True)
                 bass_prompt = target_notes[target_notes.end < target_context_duration].copy()

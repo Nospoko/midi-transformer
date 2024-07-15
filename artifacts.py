@@ -30,51 +30,51 @@ special_tokens = [
 ] + placeholder_tokens
 
 
-extraction_type_to_token_pair = {
-    "bass": ("<BASS>", "<NO_BASS>"),
-    "no_bass": ("<NO_BASS>", "<BASS>"),
-    "tenor": ("<TENOR>", "<NO_TENOR>"),
-    "alto": ("<ALTO>", "<NO_ALTO>"),
-    "soprano": ("<SOPRANO>", "<NO_SOPRANO>"),
-    "treble": ("<TREBLE>", "<NO_TREBLE>"),
-    "ppp": ("<PPP>", "<NO_PPP>"),
-    "pp": ("<PP>", "<NO_PP>"),
-    "p": ("<P>", "<NO_P>"),
-    "mp": ("<MP>", "<NO_MP>"),
-    "mf": ("<MF>", "<NO_MF>"),
-    "f": ("<F>", "<NO_F>"),
+prediction_task_to_token_pair = {
+    "bass_prediction": ("<BASS>", "<NO_BASS>"),
+    "reverse_bass_prediction": ("<NO_BASS>", "<BASS>"),
+    "tenor_prediction": ("<TENOR>", "<NO_TENOR>"),
+    "alto_prediction": ("<ALTO>", "<NO_ALTO>"),
+    "soprano_prediction": ("<SOPRANO>", "<NO_SOPRANO>"),
+    "treble_prediction": ("<TREBLE>", "<NO_TREBLE>"),
+    "ppp_prediction": ("<PPP>", "<NO_PPP>"),
+    "pp_prediction": ("<PP>", "<NO_PP>"),
+    "p_prediction": ("<P>", "<NO_P>"),
+    "mp_prediction": ("<MP>", "<NO_MP>"),
+    "mf_prediction": ("<MF>", "<NO_MF>"),
+    "f_prediction": ("<F>", "<NO_F>"),
 }
 
-voice_to_range = {
-    "bass": (21, 48),
-    "no_bass": (49, 108),
-    "tenor": (43, 81),
-    "alto": (53, 84),
-    "soprano": (60, 96),
-    "treble": (60, 108),
+voice_task_to_range = {
+    "bass_prediction": (21, 48),
+    "reverse_bass_prediction": (49, 108),
+    "tenor_prediction": (43, 81),
+    "alto_prediction": (53, 84),
+    "soprano_prediction": (60, 96),
+    "treble_prediction": (60, 108),
 }
 
-dynamic_to_range = {
-    "ppp": (0, 30),
-    "pp": (30, 50),
-    "p": (50, 70),
-    "mp": (70, 90),
-    "mf": (90, 110),
-    "f": (110, 127),
+dynamic_task_to_range = {
+    "ppp_prediction": (0, 30),
+    "pp_prediction": (30, 50),
+    "p_prediction": (50, 70),
+    "mp_prediction": (70, 90),
+    "mf_prediction": (90, 110),
+    "f_prediction": (110, 127),
 }
 
 
-def get_source_task_token(extraction_type: str):
-    return extraction_type_to_token_pair[extraction_type][1]
+def get_source_task_token(prediction_task: str):
+    return prediction_task_to_token_pair[prediction_task][1]
 
 
-def get_target_task_token(extraction_type: str):
-    return extraction_type_to_token_pair[extraction_type][0]
+def get_target_task_token(prediction_task: str):
+    return prediction_task_to_token_pair[prediction_task][0]
 
 
-def get_voice_range(voice: str):
-    return voice_to_range[voice]
+def get_voice_task_range(task: str):
+    return voice_task_to_range[task]
 
 
 def get_velocity_range(dynamic_instruction: str):
-    return dynamic_to_range[dynamic_instruction]
+    return dynamic_task_to_range[dynamic_instruction]
