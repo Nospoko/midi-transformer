@@ -594,3 +594,20 @@ def register_prompt_notes(prompt_notes: dict):
     )
     df = database_cnx.read_sql(sql=query)
     return df.iloc[0]["prompt_id"]
+
+
+def remove_models_without_generations():
+    # Query to get all model IDs that have generations produced
+    query = """
+    SELECT DISTINCT model_id
+    FROM generated_notes
+    """
+    models_with_generations = database_cnx.read_sql(sql=query)
+
+    model_ids_with_generations = models_with_generations["model_id"].tolist()
+
+    delete_query = f"""
+    DELETE FROM models
+    WHERE model_id NOT IN ({','.join(map(str, model_ids_with_generations))})
+    """
+    database_cnx.execute(delete_query)
