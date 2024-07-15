@@ -5,7 +5,8 @@ CREATE TABLE models (
     milion_parameters INT,
     best_val_loss FLOAT,
     iter_num INT,
-    total_tokens INT NULL,
+    --TODO: BIGINT!!!!
+    total_tokens BIGINT NULL,
     configs JSON,  -- model, dataset, data, lr, optimizer, system.dtype
     training_task VARCHAR(255), -- next_token_prediction, bass_prediction,
     wandb_link TEXT,

@@ -16,6 +16,9 @@ def prepare_next_token_prediction_prompts(
     time_step: float,
     prompt_duration: float,
 ) -> list[dict]:
+    """
+    Prepare prompts for next_token_prediction, in format acceptable in the database.
+    """
     notes = pd.DataFrame(record["notes"])
     source = json.loads(record["source"])
     if "midi_filename" in source.keys():
@@ -60,6 +63,10 @@ def prepare_subsequence_prediction_prompts(
     prompt_duration: float,
     target_context_duration: float,
 ) -> list[dict]:
+    """
+    Prepare prompts for subsequence prediction tasks,
+    in a format acceptable in the database.
+    """
     low, high = get_voice_task_range(task=prediction_task)
     time = 0
 
@@ -313,6 +320,9 @@ def generate_continuation(
     max_new_tokens: int = 512,
     model_config=None,
 ):
+    """
+    Generates continuation of prompt_notes.
+    """
     prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration]
 
     # Tokenize prompt and target notes
@@ -351,6 +361,9 @@ def generate_from_validation_example(
     ctx: AbstractContextManager,
     model_config=None,
 ):
+    """
+    Generates notes bassed on parameter["task"]
+    """
     prompt_notes = pd.DataFrame(json.loads(prompt["prompt_notes"]))
     if parameters["task"] == "next_token_prediction":
         return generate_continuation(
