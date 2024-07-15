@@ -130,7 +130,11 @@ def main():
         # This should help with model performance and generate better sounding sequences
         if n_notes_pressed > 0:
             note_token_ids = note_token_ids[: -3 * n_notes_pressed]
-        input_sequence = torch.tensor([note_token_ids], device=device)
+        input_sequence = torch.tensor(
+            [note_token_ids],
+            device=device,
+            dtype=torch.int64,
+        )
         with st.spinner("Generating..."):
             with torch.no_grad():
                 with ctx:

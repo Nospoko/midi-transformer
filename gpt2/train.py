@@ -461,6 +461,7 @@ def main(cfg: DictConfig):
                 print(f"saving checkpoint to {out_dir}")
                 torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
                 if os.path.exists(".generate"):
+                    model.eval()
                     run_generation_step(
                         model=model,
                         tokenizer=tokenizer,
@@ -471,6 +472,7 @@ def main(cfg: DictConfig):
                         ctx=ctx,
                         model_config=gptconf,
                     )
+                    model.train()
                     os.unlink(".generate")
             if cfg.logging.wandb_log:
                 wandb.log(

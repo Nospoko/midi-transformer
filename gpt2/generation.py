@@ -148,6 +148,7 @@ def generate_bass(
     input_token_ids = torch.tensor(
         [[tokenizer.token_to_id[token] for token in input_sequence]],
         device=device,
+        dtype=torch.int64,
     )
 
     # Generate new tokens using the model
@@ -252,6 +253,7 @@ def generate_subsequence_iteratively(
         input_token_ids = torch.tensor(
             [[tokenizer.token_to_id[token] for token in input_sequence]],
             device=device,
+            dtype=torch.int64,
         )
         # Generate new tokens using the model
         with ctx:
@@ -319,6 +321,7 @@ def generate_continuation(
     input_token_ids = torch.tensor(
         [input_sequence],
         device=device,
+        dtype=torch.int64,
     )
 
     # Generate new tokens using the model
