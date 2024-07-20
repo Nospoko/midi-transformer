@@ -422,7 +422,8 @@ def main(cfg: DictConfig):
             # backward pass, with gradient scaling if training in fp16
             scaler.scale(loss).backward()
 
-        total_tokens += n_iter_tokens * ddp_world_size
+        tokens_in_step = n_iter_tokens * ddp_world_size
+        total_tokens += tokens_in_step
 
         # clip the gradient
         if cfg.optimizer.grad_clip != 0.0:
@@ -432,11 +433,8 @@ def main(cfg: DictConfig):
         # step the optimizer and scaler if training in fp16
         scaler.step(optimizer)
         scaler.update()
-        # flush the gradients as soon as we can, no need for this memory anymore
-        optimizer.zero_grad(set_to_none=True)
 
         t_forward_backward = time.time() - t00
-
         # timing and logging
         t1 = time.time()
         dt = t1 - t0
@@ -464,7 +462,7 @@ def main(cfg: DictConfig):
                 if os.path.exists(".generate"):
                     model.eval()
                     run_generation_step(
-                        model=model,
+                        model=raw_model,
                         tokenizer=tokenizer,
                         checkpoint=checkpoint,
                         run_name=run_name,
@@ -487,14 +485,17 @@ def main(cfg: DictConfig):
                     step=iter_num,
                 )
 
-        if iter_num % cfg.logging.log_interval == 1 and master_process:
+        # flush the gradients as soon as we can, no need for this memory anymore
+        optimizer.zero_grad(set_to_none=True)
+
+        if local_iter_num % cfg.logging.log_interval == 0 and master_process:
             # get loss as float. note: this is a CPU-GPU sync point
             # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
             lossf = loss.item() * cfg.data.gradient_accumulation_steps
             mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
             running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
+            tps = tokens_in_step / t_forward_backward
 
-            tps = n_iter_tokens / t_forward_backward * ddp_world_size
             wandb.log(
                 {
                     "iter": iter_num,

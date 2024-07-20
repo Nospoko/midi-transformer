@@ -14,6 +14,7 @@ POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
 HF_WRITE_TOKEN=optional_write_token
 ```
+
 #### Run training
 For example:
 ```shell

@@ -3,10 +3,13 @@ In gpt2/generation.py there are methods for generating sequences of notes.
 For different tasks different generation strategies are used.
 
 #### next_token_prediction task
+`gpt2.generation.generate_continuation`
+
 For this task continuation of prompt notes is being generated.
-Model generates max_new_tokens tokens and returns the generated notes.
+Model generates max_new_tokens tokens and the method returns the generated notes.
 
 #### bass_prediction, reverse_bass_prediction and other subsequence tasks
+`gpt2.generation.generate_subsequence_iteratively`
 
 For these tasks other parameters have to be specified:<br>
 `whole_prompt_duration` is the duration of fragment for which we want to generate bass.<br>
