@@ -17,12 +17,8 @@ class SubSequenceMidiDataset(MidiDataset):
         sequence_length: int,
         loss_masking: Literal["finetuning", "pretraining"] = "pretraining",
     ):
-        super().__init__(
-            dataset=dataset,
-            tokenizer=tokenizer,
-        )
+        super().__init__(dataset=dataset, tokenizer=tokenizer, loss_masking=loss_masking)
         self.sequence_length = sequence_length
-        self.loss_masking = loss_masking
 
     def __getitem__(self, idx: int) -> dict:
         record = self.dataset[idx]

@@ -20,15 +20,16 @@ import os
 import math
 import time
 import datetime
+from typing import Any
 from contextlib import nullcontext
 
 import hydra
 import torch
 import psutil
 from dotenv import load_dotenv
-from datasets import load_dataset
 from torch.utils.data import DataLoader
 from hydra.utils import to_absolute_path
+from datasets import Dataset, load_dataset
 from omegaconf import OmegaConf, DictConfig
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
@@ -50,21 +51,26 @@ def log_open_files():
 class CyclicalDataLoader:
     def __init__(
         self,
-        dataset,
-        batch_size,
-        shuffle=False,
-        pin_memory=False,
-        num_workers=0,
-        device: torch.device = "cpu",
+        dataset: NextTokenDataset | SubSequenceMidiDataset,
+        batch_size: int,
+        shuffle: bool = False,
+        pin_memory: bool = False,
+        num_workers: int = 0,
+        device: torch.device = torch.device("cpu"),
     ):
-        self.dataloader = DataLoader(
-            dataset,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            pin_memory=pin_memory,
-            num_workers=num_workers,
-        )
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.pin_memory = pin_memory
+        self.num_workers = num_workers
         self.device = device
+        self.dataloader = DataLoader(
+            self.dataset,
+            batch_size=self.batch_size,
+            pin_memory=self.pin_memory,
+            num_workers=32,
+            shuffle=shuffle,
+        )
         self.iterator = iter(self.dataloader)
 
     def get_batch(self):
@@ -81,91 +87,70 @@ class CyclicalDataLoader:
         return x, y, mask
 
 
-def get_dataset_for_task(cfg: DictConfig):
-    if cfg.task == "next_token_prediction":
-        return prepare_next_token_datasets(cfg)
-    if cfg.task == "bass_prediction":
-        return prepare_subsequence_datasets(cfg)
-    if cfg.task == "from_bass_prediction":
-        return prepare_reverse_bass_datasets(cfg)
+def get_dataset_for_task(cfg: DictConfig) -> tuple[Any, Any, str]:
+    task_to_dataset = {
+        "next_token_prediction": prepare_next_token_datasets,
+        "bass_prediction": prepare_subsequence_datasets,
+        "from_bass_prediction": prepare_reverse_bass_datasets,
+    }
+    prepare_function = task_to_dataset.get(cfg.task)
+    if prepare_function:
+        return prepare_function(cfg)
+    raise ValueError(f"Unknown task: {cfg.task}")
 
 
-def prepare_reverse_bass_datasets(cfg: DictConfig):
+def prepare_dataset_base(cfg: DictConfig, dataset_name: str) -> tuple[Dataset, Dataset]:
     dataset_config = OmegaConf.to_container(cfg.dataset)
-    tokenizer = load_tokenizer(cfg)
-    dataset_name = "ReverseBassPredictionDataset"
     dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
+
     dataset = load_dataset(
         dataset_path,
-        num_proc=cfg.system.dataloader_workers,
         trust_remote_code=True,
+        num_proc=cfg.system.dataloader_workers,
         **dataset_config,
     )
-    train_dataset = NextTokenDataset(
-        dataset=dataset["train"],
-        tokenizer=tokenizer,
-        sequence_length=cfg.data.sequence_length,
-    )
-    val_dataset = NextTokenDataset(
-        dataset=dataset["validation"],
-        tokenizer=tokenizer,
-        sequence_length=cfg.data.sequence_length,
-    )
-
-    return train_dataset, val_dataset, to_absolute_path(cfg.out_dir)
+    train_split: Dataset = dataset["train"]
+    validation_split: Dataset = dataset["validation"]
+    validation_split.shuffle(seed=1337)
+    validation_split = validation_split.select(range(cfg.data.batch_size * cfg.eval_iters))
+    return train_split, validation_split
 
 
-def prepare_next_token_datasets(cfg: DictConfig):
-    dataset_config = OmegaConf.to_container(cfg.dataset)
+def create_datasets(
+    train_split: Dataset,
+    validation_split: Dataset,
+    cfg: DictConfig,
+    dataset_class,
+) -> tuple[Any, Any, str]:
     tokenizer = load_tokenizer(cfg)
-    dataset_name = "MidiSequenceDataset"
-    dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
-    dataset = load_dataset(
-        dataset_path,
-        num_proc=cfg.system.dataloader_workers,
-        trust_remote_code=True,
-        **dataset_config,
-    )
-    train_dataset = NextTokenDataset(
-        dataset=dataset["train"],
-        tokenizer=tokenizer,
-        sequence_length=cfg.data.sequence_length,
-    )
-    val_dataset = NextTokenDataset(
-        dataset=dataset["validation"],
-        tokenizer=tokenizer,
-        sequence_length=cfg.data.sequence_length,
-    )
-
-    return train_dataset, val_dataset, to_absolute_path(cfg.out_dir)
-
-
-def prepare_subsequence_datasets(cfg: DictConfig):
-    dataset_config = OmegaConf.to_container(cfg.dataset)
-    tokenizer = load_tokenizer(cfg)
-    dataset_name = "BassPredictionDataset"
-    dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
-    dataset = load_dataset(
-        dataset_path,
-        num_proc=cfg.system.dataloader_workers,
-        trust_remote_code=True,
-        **dataset_config,
-    )
-
-    train_dataset = SubSequenceMidiDataset(
-        dataset=dataset["train"],
+    train_dataset = dataset_class(
+        dataset=train_split,
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
         loss_masking=cfg.loss_masking,
     )
-    val_dataset = SubSequenceMidiDataset(
-        dataset=dataset["validation"],
+    val_dataset = dataset_class(
+        dataset=validation_split,
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
         loss_masking=cfg.loss_masking,
     )
-
     return train_dataset, val_dataset, to_absolute_path(cfg.out_dir)
+
+
+def prepare_reverse_bass_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
+    train_split, validation_split = prepare_dataset_base(cfg, "ReverseBassPredictionDataset")
+    return create_datasets(train_split, validation_split, cfg, SubSequenceMidiDataset)
+
+
+def prepare_next_token_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
+    train_split, validation_split = prepare_dataset_base(cfg, "MidiSequenceDataset")
+    return create_datasets(train_split, validation_split, cfg, NextTokenDataset)
+
+
+def prepare_subsequence_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
+    train_split, validation_split = prepare_dataset_base(cfg, "BassPredictionDataset")
+    return create_datasets(train_split, validation_split, cfg, SubSequenceMidiDataset)
 
 
 def setup_device(cfg: DictConfig):

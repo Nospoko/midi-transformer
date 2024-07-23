@@ -1,3 +1,5 @@
+from typing import Literal
+
 import torch
 import pandas as pd
 from datasets import Dataset as HuggingFaceDataset
@@ -20,6 +22,7 @@ class NextTokenDataset(MidiDataset):
         dataset: HuggingFaceDataset,
         tokenizer: ExponentialTokenizer | AwesomeTokenizer,
         sequence_length: int,
+        loss_masking: Literal["finetuning", "pretraining"] = "pretraining",
     ):
         """
         Initialize the NextTokenDataset.
@@ -28,10 +31,7 @@ class NextTokenDataset(MidiDataset):
             dataset (HuggingFaceDataset): The HuggingFace dataset containing tokenized MIDI data.
             tokenizer (MidiTokenizer): The MidiTokenizer used for tokenizing the MIDI data.
         """
-        super().__init__(
-            dataset=dataset,
-            tokenizer=tokenizer,
-        )
+        super().__init__(dataset=dataset, tokenizer=tokenizer, loss_masking=loss_masking)
         self.sequence_length = sequence_length
 
     def __getitem__(self, idx: int) -> dict:
