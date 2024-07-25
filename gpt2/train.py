@@ -109,7 +109,7 @@ def prepare_dataset_base(cfg: DictConfig, dataset_name: str) -> tuple[Dataset, D
     dataset = load_dataset(
         dataset_path,
         trust_remote_code=True,
-        num_proc=cfg.system.dataloader_workers,
+        num_proc=cfg.system.data_workers,
         **dataset_config,
     )
     train_split: Dataset = dataset["train"]
@@ -147,7 +147,7 @@ def prepare_reverse_bass_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
 
 
 def prepare_next_token_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
-    train_split, validation_split = prepare_dataset_base(cfg, "MidiSequenceDataset")
+    train_split, validation_split = prepare_dataset_base(cfg, "MidiTokenizedDataset")
     return create_datasets(train_split, validation_split, cfg, NextTokenDataset)
 
 
@@ -262,8 +262,9 @@ def main(cfg: DictConfig):
     tokens_per_batch = cfg.data.batch_size * cfg.data.sequence_length
     tokens_per_iter = cfg.data.gradient_accumulation_steps * ddp_world_size * tokens_per_batch
     print(f"tokens per iteration will be: {tokens_per_iter:,}")
-    tokens_in_dataset = train_dataset.dataset.num_rows * train_dataset.sequence_length
-    print(f"total tokens in the training dataset will be: {tokens_in_dataset:,}")
+    if cfg.task != "next_token_prediction":
+        tokens_in_dataset = train_dataset.dataset.num_rows * train_dataset.sequence_length
+        print(f"total tokens in the training dataset will be: {tokens_in_dataset:,}")
 
     if master_process:
         os.makedirs(out_dir, exist_ok=True)
@@ -271,7 +272,7 @@ def main(cfg: DictConfig):
     torch.backends.cuda.matmul.allow_tf32 = True  # allow tf32 on matmul
     torch.backends.cudnn.allow_tf32 = True  # allow tf32 on cudnn
 
-    torch.set_num_threads(math.floor(cfg.system.dataloader_workers / ddp_world_size))
+    torch.set_num_threads(math.floor(cfg.system.data_workers / ddp_world_size))
 
     device_type = "cuda" if "cuda" in device else "cpu"  # for later use in torch.autocast
 
@@ -285,7 +286,7 @@ def main(cfg: DictConfig):
         batch_size=cfg.data.batch_size,
         shuffle=True,
         pin_memory=device_type == "cuda",
-        num_workers=cfg.system.dataloader_workers // ddp_world_size,
+        num_workers=cfg.system.data_workers // ddp_world_size,
         device=device,
     )
 
@@ -294,7 +295,7 @@ def main(cfg: DictConfig):
         batch_size=cfg.data.batch_size,
         shuffle=False,
         pin_memory=device_type == "cuda",
-        num_workers=cfg.system.dataloader_workers // ddp_world_size,
+        num_workers=cfg.system.data_workers // ddp_world_size,
         device=device,
     )
 

@@ -10,16 +10,14 @@ from data.next_token_dataset import NextTokenDataset
 
 def main():
     dataset_names = [
-        "MidiSequenceDataset",
+        "MidiTokenizedDataset",
     ]
     dataset_name = st.selectbox(label="dataset", options=dataset_names)
     dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
     with st.form(key="config_form"):
         base_dataset_name = st.text_input(label="base_dataset_name", value="roszcz/maestro-sustain-v2")
         extra_datasets = st.text_input(label="extra_datasets (comma separated)", value="")
-        notes_per_record = st.number_input(label="notes_per_record", min_value=1, value=60)
-        step = st.number_input(label="step", min_value=1, value=60)
-        pause_detection_threshold = st.number_input(label="pause_detection_threshold", value=4)
+        pause_detection_threshold = st.number_input(label="pause_detection_threshold", value=2)
         sequence_length = st.number_input(label="sequence_length", min_value=1, value=5000, step=500)
 
         st.form_submit_button(label="Submit")
@@ -35,8 +33,6 @@ def main():
     config = {
         "base_dataset_name": base_dataset_name,
         "extra_datasets": extra_datasets_list,
-        "notes_per_record": notes_per_record,
-        "step": step,
         "pause_detection_threshold": pause_detection_threshold,
     }
 
@@ -60,9 +56,7 @@ def main():
         tokenizer=tokenizer,
         sequence_length=sequence_length,
     )
-    total_tokens = config["notes_per_record"] * dataset.num_rows
     st.write(f"rows: {dataset.num_rows}")
-    st.write(f"total notes: {total_tokens}")
     with st.expander("config"):
         st.write(config)
 

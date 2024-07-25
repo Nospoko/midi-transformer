@@ -3,10 +3,12 @@ import json
 import datasets
 import numpy as np
 import fortepyan as ff
+from midi_tokenizers.no_loss_tokenizer import ExponentialTimeTokenizer
 from datasets import Split, Dataset, DatasetInfo, GeneratorBasedBuilder
 
+from artifacts import special_tokens
 from data.augmentation import augment_dataset
-from midi_datasets.MidiSequenceDatasetConfig import BUILDER_CONFIGS, MidiSequenceDatasetConfig
+from midi_datasets.MidiTokenizedDatasetConfig import BUILDER_CONFIGS, MidiTokenizedDatasetConfig
 
 # NOTE: If you make some changes here, you might want to delete your huggingface cache
 # at ~/.cache/huggingface/ to rebuild the datasets
@@ -16,7 +18,7 @@ Dataset with MIDI files, divided into source_notes and target_notes with equal s
 """
 
 
-class MidiSequenceDataset(GeneratorBasedBuilder):
+class MidiTokenizedDataset(GeneratorBasedBuilder):
     """
     Dataset builder for sub-sequence-prediction MIDI datasets.
 
@@ -34,7 +36,7 @@ class MidiSequenceDataset(GeneratorBasedBuilder):
         return DatasetInfo(description=_DESC)
 
     # Define the configuration class and available configurations
-    BUILDER_CONFIG_CLASS = MidiSequenceDatasetConfig
+    BUILDER_CONFIG_CLASS = MidiTokenizedDatasetConfig
     BUILDER_CONFIGS = BUILDER_CONFIGS
     DEFAULT_CONFIG_NAME = "basic-no-overlap"
 
@@ -58,42 +60,12 @@ class MidiSequenceDataset(GeneratorBasedBuilder):
         validation_shards = [base["validation"].shard(n_shards, it) for it in range(n_shards)]
         test_shards = [base["test"].shard(n_shards, it) for it in range(n_shards)]
 
+        self.tokenizer = self.get_tokenzier()
         return [
             datasets.SplitGenerator(name=Split.TRAIN, gen_kwargs={"dataset_shards": train_shards}),
             datasets.SplitGenerator(name=Split.TEST, gen_kwargs={"dataset_shards": test_shards}),
             datasets.SplitGenerator(name=Split.VALIDATION, gen_kwargs={"dataset_shards": validation_shards}),
         ]
-
-    def piece_to_records(self, piece: ff.MidiPiece) -> list[dict]:
-        """
-        Splits a tokenized MIDI piece into smaller records of fixed length.
-
-        Parameters:
-            piece (ff.MidiPiece): Tokenized MIDI piece to split.
-
-        Returns:
-            list[dict]: List of records containing fixed-length sequences of tokens.
-        """
-        rs = np.random.RandomState(np.random.MT19937(np.random.SeedSequence(4)))
-        n_notes = len(piece.df.pitch)
-        # Some sequences might be too short
-        if n_notes <= self.config.notes_per_record:
-            return []
-        n_samples = 1 + (n_notes - self.config.notes_per_record) // self.config.step
-        piece_idxs = range(n_notes - self.config.notes_per_record)
-        start_points = rs.choice(piece_idxs, size=n_samples, replace=False)
-
-        prepared_records = []
-        for start in start_points:
-            start = int(start)
-            finish = start + self.config.notes_per_record
-            part = piece[start:finish]
-            record = self.create_record(part)
-            if not self.validate_record(record=record):
-                continue
-            prepared_records.append(record)
-
-        return prepared_records
 
     def filter_pauses(self, piece: ff.MidiPiece) -> list[ff.MidiPiece]:
         """
@@ -136,23 +108,26 @@ class MidiSequenceDataset(GeneratorBasedBuilder):
             for it, record in enumerate(dataset):
                 piece = ff.MidiPiece.from_huggingface(dict(record))
                 pieces = self.filter_pauses(piece)
-                all_records = sum([self.piece_to_records(piece) for piece in pieces], [])
+                all_records = [self.create_record(piece) for piece in pieces]
                 for jt, sequence in enumerate(all_records):
                     key = f"{it}_{jt}_{shard_id}"
                     yield key, sequence
-
-    def validate_record(self, record: dict):
-        if len(record["notes"]) == self.config.notes_per_record:
-            return True
-        return False
 
     def create_record(self, piece: ff.MidiPiece) -> tuple[dict, bool]:
         """
         Method that defines a record in the dataset.
         """
+        notes = piece.df
+        encoding = self.tokenizer.encode(notes=notes)
+
         record = {
-            "notes": piece.df,
+            "note_token_ids": encoding,
             "source": json.dumps(piece.source),
         }
 
         return record
+
+    def get_tokenzier(self) -> ExponentialTimeTokenizer:
+        tokenizer_parameters = self.config.tokenizer_parameters
+        tokenizer_parameters |= {"special_tokens": special_tokens}
+        return ExponentialTimeTokenizer(**self.config.tokenizer_parameters)
