@@ -1,3 +1,4 @@
+import os
 import json
 
 import pandas as pd
@@ -7,6 +8,7 @@ import streamlit_pianoroll
 from streamlit.errors import DuplicateWidgetID
 
 import data.database_manager as database_manager
+from dashboards.common.components import download_button
 
 
 def main():
@@ -18,12 +20,18 @@ def main():
         st.header("Model Predictions")
 
         models_df = database_manager.get_all_models()
-        model_names = models_df["name"].tolist()
+        model_names = models_df["name"].unique().tolist()
 
         selected_model_name = st.selectbox("Select Model", model_names, key="model")
 
         if selected_model_name:
-            selected_model = models_df[models_df["name"] == selected_model_name].iloc[0]
+            selected_models = models_df[models_df["name"] == selected_model_name]
+            model_losses = selected_models["best_val_loss"].tolist()
+
+            selected_model_loss = st.selectbox(label="Select loss", options=model_losses)
+            selected_model = selected_models[selected_models["best_val_loss"] == selected_model_loss].iloc[0]
+            st.json(selected_model.to_dict(), expanded=False)
+
             if pd.notna(selected_model["wandb_link"]):
                 st.link_button("View Model on W&B", url=selected_model["wandb_link"])
             else:
@@ -47,9 +55,10 @@ def main():
                 if not predictions_df.empty:
                     for _, row in predictions_df.iterrows():
                         parameters = database_manager.get_parameters(row["parameters_id"]).iloc[0].to_dict()
-                        prompt = database_manager.get_prompt(row["prompt_id"]).iloc[0]
+                        prompt_id = row["prompt_id"]
+                        prompt = database_manager.get_prompt(prompt_id=prompt_id).iloc[0]
 
-                        st.json(parameters, expanded=False)
+                        st.json(parameters | {"created_at": row["created_at"]}, expanded=False)
                         prompt_notes = json.loads(prompt["prompt_notes"])
                         prompt_notes_df = pd.DataFrame(prompt_notes)
 
@@ -62,7 +71,23 @@ def main():
                             streamlit_pianoroll.from_fortepyan(piece=prompt_piece, secondary_piece=generated_piece)
                         except DuplicateWidgetID:
                             st.write("Duplicate widget")
+                        out_piece = ff.MidiPiece(pd.concat([prompt_notes_df, generated_notes_df]))
+                        # Allow download of the full MIDI with context\
+                        midi_name = f"{selected_model_name}_{selected_model_loss:.2f}_variations_on_{prompt_id}"
+                        full_midi_path = f"tmp/{midi_name}.mid"
+                        out_piece.to_midi().write(full_midi_path)
+                        with open(full_midi_path, "rb") as file:
+                            st.markdown(
+                                download_button(
+                                    file.read(),
+                                    full_midi_path.split("/")[-1],
+                                    "Download midi with context",
+                                ),
+                                unsafe_allow_html=True,
+                            )
+                        os.unlink(full_midi_path)
                         st.divider()  # Add a divider between predictions
+
                 else:
                     st.write("No predictions found for this prompt and model combination.")
 

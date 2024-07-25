@@ -18,7 +18,7 @@ HF_WRITE_TOKEN=optional_write_token
 #### Run training
 For example:
 ```shell
-PYTHONPATH=. torchrun --nproc-per-node=2 \
+OMP_NUM_THREADS=32 PYTHONPATH=. torchrun --nproc-per-node=2 \
 gpt2/train.py --config-name=gpt2_pretraining \
 data.batch_size=32 \
 data.gradient_accumulation_steps=8 \

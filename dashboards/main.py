@@ -17,8 +17,8 @@ load_dotenv()
 
 def main():
     options = [
-        "generate_records",
         "browse generated",
+        "generate_records",
         "validation_examples_manager",
         "gpt_review",
         "extracted_voice_gpt_review",

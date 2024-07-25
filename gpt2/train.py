@@ -17,10 +17,13 @@ $ torchrun --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr=123.456.123
 """
 
 import os
+import sys
 import math
 import time
+import signal
 import datetime
 from typing import Any
+from functools import partial
 from contextlib import nullcontext
 
 import hydra
@@ -69,6 +72,9 @@ class CyclicalDataLoader:
             batch_size=self.batch_size,
             pin_memory=self.pin_memory,
             num_workers=32,
+            # I am suspecting an issue similar to https://github.com/Lightning-AI/pytorch-lightning/issues/18149
+            # The solution is to change multiprocessing ctx from 'fork' to 'spawn'
+            multiprocessing_context="spawn",
             shuffle=shuffle,
         )
         self.iterator = iter(self.dataloader)
@@ -164,6 +170,16 @@ def setup_device(cfg: DictConfig):
 
 @hydra.main(config_path="configs", config_name="gpt2_pretraining", version_base=None)
 def main(cfg: DictConfig):
+    sigint_flag = False
+
+    def signal_handler(sigint_flag, sig, frame):
+        if sigint_flag[0]:
+            sys.exit()
+        print("You pressed Ctrl-C! Press exaint to sys.exit()")
+        sigint_flag[0] = True
+
+    signal.signal(signal.SIGINT, partial(signal_handler, [sigint_flag]))
+
     model_args = dict(
         n_layer=cfg.model.n_layer,
         n_head=cfg.model.n_head,
@@ -257,6 +273,8 @@ def main(cfg: DictConfig):
     torch.manual_seed(1337 + seed_offset)
     torch.backends.cuda.matmul.allow_tf32 = True  # allow tf32 on matmul
     torch.backends.cudnn.allow_tf32 = True  # allow tf32 on cudnn
+
+    torch.set_num_threads(math.floor(cfg.system.dataloader_workers / ddp_world_size))
 
     device_type = "cuda" if "cuda" in device else "cpu"  # for later use in torch.autocast
 
@@ -430,7 +448,7 @@ def main(cfg: DictConfig):
             log_open_files()
             losses = estimate_loss()
             print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-            if losses["val"] < best_val_loss or cfg.always_save_checkpoint:
+            if losses["val"] < best_val_loss:
                 best_val_loss = losses["val"]
                 checkpoint = {
                     "model": raw_model.state_dict(),
@@ -458,6 +476,8 @@ def main(cfg: DictConfig):
                     )
                     model.train()
                     os.unlink(".generate")
+                print(f"saving checkpoint to {out_dir}")
+                torch.save(checkpoint, os.path.join(out_dir, run_name + "last.pt"))
             if cfg.logging.wandb_log:
                 wandb.log(
                     {
@@ -498,7 +518,7 @@ def main(cfg: DictConfig):
         iter_num += 1
         local_iter_num += 1
 
-        if iter_num == cfg.optimizer.max_iters:
+        if iter_num == cfg.optimizer.max_iters or sigint_flag:
             break
 
     if ddp:

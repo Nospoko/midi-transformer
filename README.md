@@ -72,6 +72,10 @@ To train the model, use the following command:
 ```bash
 python -m gpt2.train
 ```
+If you are using ddp:
+```bash
+OMP_NUM_THREADS=32 PYTHONPATH=. torchrun gpt2/train.py
+```
 
 ### Use AwesomeTokensDataset
 To use the `AwesomeTokensDataset`, first run:
@@ -85,16 +89,6 @@ This creates a pre-trained tokenizer JSON in the `pretrained/awesome_tokenizers`
 ### Augmentation
 We use pitch_shift and change_speed augmentation techniques, sequentially (pitch_shift, then change_speed).
 
-### Dataset Sizes
-
-| Dataset                        | Train tokens | Test tokens | Validation tokens |
-|--------------------------------|--------------|-------------|-------------------|
-| Basic AwesomeTokensDataset     | 9,674,752   | 1,347,584  | 1,110,528        |
-| Giant AwesomeTokensDataset     | 78,107,136   | 1,347,584  | 1,110,528          |
-| Basic ExponentialTimeTokenDataset |    25,981,952 |     3,607,040  | 2,966,016   |
-| Giant ExponentialTimeTokenDataset |   206,0451,84 |    3,607,040  | 2,966,016   |
-
----
 
 ## Important Links
 - **Maestro Dataset**: [Link to dataset](https://magenta.tensorflow.org/datasets/maestro)
