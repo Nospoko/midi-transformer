@@ -71,10 +71,7 @@ class CyclicalDataLoader:
             self.dataset,
             batch_size=self.batch_size,
             pin_memory=self.pin_memory,
-            num_workers=32,
-            # I am suspecting an issue similar to https://github.com/Lightning-AI/pytorch-lightning/issues/18149
-            # The solution is to change multiprocessing ctx from 'fork' to 'spawn'
-            multiprocessing_context="spawn",
+            num_workers=num_workers,
             shuffle=shuffle,
         )
         self.iterator = iter(self.dataloader)
@@ -288,7 +285,7 @@ def main(cfg: DictConfig):
         batch_size=cfg.data.batch_size,
         shuffle=True,
         pin_memory=device_type == "cuda",
-        num_workers=cfg.system.dataloader_workers,
+        num_workers=cfg.system.dataloader_workers // ddp_world_size,
         device=device,
     )
 
@@ -297,7 +294,7 @@ def main(cfg: DictConfig):
         batch_size=cfg.data.batch_size,
         shuffle=False,
         pin_memory=device_type == "cuda",
-        num_workers=cfg.system.dataloader_workers,
+        num_workers=cfg.system.dataloader_workers // ddp_world_size,
         device=device,
     )
 
