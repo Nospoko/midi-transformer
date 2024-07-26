@@ -109,6 +109,7 @@ class MidiTokenizedDataset(GeneratorBasedBuilder):
                 piece = ff.MidiPiece.from_huggingface(dict(record))
                 pieces = self.filter_pauses(piece)
                 all_records = [self.create_record(piece) for piece in pieces]
+                all_records = [record for record in all_records if record["note_token_ids"] is not None]
                 for jt, sequence in enumerate(all_records):
                     key = f"{it}_{jt}_{shard_id}"
                     yield key, sequence
@@ -118,8 +119,10 @@ class MidiTokenizedDataset(GeneratorBasedBuilder):
         Method that defines a record in the dataset.
         """
         notes = piece.df
-        encoding = self.tokenizer.encode(notes=notes)
-
+        try:
+            encoding = self.tokenizer.encode(notes=notes)
+        except:
+            encoding = None
         record = {
             "note_token_ids": encoding,
             "source": json.dumps(piece.source),

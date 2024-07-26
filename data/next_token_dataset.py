@@ -50,20 +50,20 @@ class NextTokenDataset(MidiDataset):
         full_encoding = record["note_token_ids"]
         n_tokens = len(full_encoding)
 
-        if n_tokens < self.sequence_length:
-            padding = [self.tokenizer.pad_token_id] * (self.sequence_length - n_tokens)
+        if n_tokens <= self.sequence_length:
+            padding = [self.tokenizer.pad_token_id] * (self.sequence_length + 1 - n_tokens)
             full_encoding = full_encoding + padding
-            n_tokens = self.sequence_length
+            n_tokens = self.sequence_length + 1
 
-        start = self.rs.randint(n_tokens - self.sequence_length + 1)
+        start = self.rs.randint(n_tokens - self.sequence_length)
         encoding = full_encoding[start : start + self.sequence_length + 1]
 
         # The inputs to the transformer will be the offset sequence
         source_encoding = encoding[:-1]
         target_encoding = encoding[1:]
 
-        source_token_ids = torch.tensor(source_encoding, dtype=torch.int64)
-        target_token_ids = torch.tensor(target_encoding, dtype=torch.int64)
+        source_token_ids = torch.tensor(source_encoding[: self.sequence_length], dtype=torch.int64)
+        target_token_ids = torch.tensor(target_encoding[: self.sequence_length], dtype=torch.int64)
         target_mask = target_token_ids != self.tokenizer.pad_token_id
 
         out = {

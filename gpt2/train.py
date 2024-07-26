@@ -115,7 +115,9 @@ def prepare_dataset_base(cfg: DictConfig, dataset_name: str) -> tuple[Dataset, D
     train_split: Dataset = dataset["train"]
     validation_split: Dataset = dataset["validation"]
     validation_split.shuffle(seed=1337)
-    validation_split = validation_split.select(range(cfg.data.batch_size * cfg.eval_iters))
+
+    if validation_split.num_rows > cfg.data.batch_size * cfg.eval_iters:
+        validation_split = validation_split.select(range(cfg.data.batch_size * cfg.eval_iters))
     return train_split, validation_split
 
 

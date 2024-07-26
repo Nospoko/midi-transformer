@@ -7,7 +7,7 @@ defaults:
   - _self_
 
 data:
-  tokenizer_parameters: ${dataset.tokenzier_parameters}
+  tokenizer_parameters: ${dataset.tokenizer_parameters}
 
 out_dir: 'checkpoints'
 eval_interval: 100
