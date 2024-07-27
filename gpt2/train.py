@@ -214,7 +214,7 @@ def main(cfg: DictConfig):
     # First load checkpoint if init_from midi_gpt2*
     if cfg.init_from.startswith("midi-gpt2"):
         # resume training from a checkpoint.
-        ckpt_path = os.path.join("checkpoints/pretraining", cfg.init_from)
+        ckpt_path = os.path.join("checkpoints/", cfg.init_from)
         checkpoint = torch.load(ckpt_path, map_location=device)
         checkpoint_model_args = checkpoint["model_args"]
         checkpoint_cfg = OmegaConf.create(checkpoint["config"])
@@ -476,8 +476,33 @@ def main(cfg: DictConfig):
                     )
                     model.train()
                     os.unlink(".generate")
-                print(f"saving checkpoint to {out_dir}")
-                torch.save(checkpoint, os.path.join(out_dir, run_name + "last.pt"))
+
+            checkpoint = {
+                "model": raw_model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "model_args": model_args,
+                "iter_num": iter_num,
+                "best_val_loss": best_val_loss.item(),
+                "config": config,
+                "wandb": wandb_link,
+                "total_tokens": total_tokens,
+            }
+            print(f"saving checkpoint to {out_dir}")
+            torch.save(checkpoint, os.path.join(out_dir, run_name + "last.pt"))
+            if os.path.exists(".generate_last"):
+                model.eval()
+                run_generation_step(
+                    model=raw_model,
+                    tokenizer=tokenizer,
+                    checkpoint=checkpoint,
+                    run_name=run_name,
+                    validation_examples=validation_examples,
+                    device=device,
+                    ctx=ctx,
+                    model_config=gptconf,
+                )
+                model.train()
+                os.unlink(".generate")
             if cfg.logging.wandb_log:
                 wandb.log(
                     {
