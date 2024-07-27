@@ -121,7 +121,7 @@ class MidiTokenizedDataset(GeneratorBasedBuilder):
         notes = piece.df
         try:
             encoding = self.tokenizer.encode(notes=notes)
-        except ValueError:
+        except KeyError:
             encoding = None
         record = {
             "note_token_ids": encoding,
