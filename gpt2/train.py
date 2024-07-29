@@ -220,8 +220,14 @@ def main(cfg: DictConfig):
         checkpoint_cfg = OmegaConf.create(checkpoint["config"])
 
         cfg.model = checkpoint_cfg.model
+        batch_size = cfg.data.batch_size
+        gradient_accumulation_steps = cfg.data.gradient_accumulation_steps
         cfg.data = checkpoint_cfg.data
-        cfg.data.tokenizer_parameters = checkpoint_cfg.dataset.tokenizer_parameters
+        cfg.data.batch_size = batch_size
+        cfg.data.gradient_accumulation_steps = gradient_accumulation_steps
+
+        if "tokenizer_parameters" in checkpoint_cfg.dataset:
+            cfg.data.tokenizer_parameters = checkpoint_cfg.dataset.tokenizer_parameters
         cfg.system.dtype = checkpoint_cfg.system.dtype
 
         train_dataset, val_dataset, out_dir = get_dataset_for_task(cfg=cfg)
@@ -249,6 +255,7 @@ def main(cfg: DictConfig):
                 state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
 
         model.load_state_dict(state_dict)
+        state_dict = None
 
     elif cfg.init_from == "scratch":
         train_dataset, val_dataset, out_dir = get_dataset_for_task(cfg=cfg)
