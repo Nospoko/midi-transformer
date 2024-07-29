@@ -1,5 +1,6 @@
 import os
 import sys
+
 import torch
 from dotenv import load_dotenv
 from huggingface_hub import hf_hub_download
@@ -9,6 +10,7 @@ HF_READ_TOKEN = os.environ.get("HF_READ_TOKEN")
 
 MODELS_DIR = "checkpoints"
 REPO_ID = "wmatejuk/midi-transformers"
+
 
 def download_model(repo_id, filename):
     """Download a model from Hugging Face Hub."""
@@ -20,6 +22,7 @@ def download_model(repo_id, filename):
         print(f"Error downloading {filename} from {repo_id}: {str(e)}")
         return None
 
+
 def load_model(model_path):
     """Load a PyTorch model from a file."""
     try:
@@ -29,6 +32,7 @@ def load_model(model_path):
     except Exception as e:
         print(f"Error loading model from {model_path}: {str(e)}")
         return None
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:

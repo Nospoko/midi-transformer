@@ -241,7 +241,10 @@ def generate_subsequence_iteratively(
     # Iterate through the piece, generating bass notes in steps
     while time + time_step <= end:
         # Calculate the start offset for the bass notes in this step
-        start_offset = it * time_step
+        if len(step_target_notes) > 0:
+            start_offset = max(step_target_notes.end.max(), step_prompt_notes.end.max())
+        else:
+            start_offset = it * time_step
         it += 1
         step_prompt_notes.start -= start_offset
         step_prompt_notes.end -= start_offset

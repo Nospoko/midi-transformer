@@ -35,6 +35,9 @@ class NextTokenDataset(MidiDataset):
         self.sequence_length = sequence_length
         self.rs = np.random.RandomState(np.random.MT19937(np.random.SeedSequence(4)))
 
+    def __len__(self):
+        return len(self.dataset) * 100
+
     def __getitem__(self, idx: int) -> dict:
         """
         Randomly sample a record at the specified index and prepare it for next token prediction.
@@ -45,6 +48,8 @@ class NextTokenDataset(MidiDataset):
         Returns:
             dict: A dictionary containing the source and target token ids for next token prediction.
         """
+        # This allows one batch to contain samples from the same piece.
+        idx = idx // 100
         record = self.dataset[idx]
         # Random samplig ftw!!!!!!!!!
         full_encoding = record["note_token_ids"]
