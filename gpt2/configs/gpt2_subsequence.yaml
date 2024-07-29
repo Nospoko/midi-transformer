@@ -3,7 +3,7 @@ defaults:
   - data: finetuning
   - dataset: bassextracted
   - logging: subsequence
-  - lr: pretraining-large
+  - lr: finetuning
   - _self_
 
 out_dir: 'checkpoints'

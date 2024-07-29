@@ -11,6 +11,10 @@ import data.database_manager as database_manager
 from dashboards.common.components import download_button
 
 
+def format_number(number):
+    return f"{number:,}"
+
+
 def main():
     st.title("MIDI Transformers Database Browser")
 
@@ -26,10 +30,14 @@ def main():
 
         if selected_model_name:
             selected_models = models_df[models_df["name"] == selected_model_name]
-            model_losses = selected_models["best_val_loss"].tolist()
+            model_tokens = selected_models["total_tokens"].tolist()
 
-            selected_model_loss = st.selectbox(label="Select loss", options=model_losses)
-            selected_model = selected_models[selected_models["best_val_loss"] == selected_model_loss].iloc[0]
+            selected_model_tokens = st.selectbox(
+                label="Select tokens",
+                options=model_tokens,
+                format_func=format_number,
+            )
+            selected_model = selected_models[selected_models["total_tokens"] == selected_model_tokens].iloc[0]
             st.json(selected_model.to_dict(), expanded=False)
 
             if pd.notna(selected_model["wandb_link"]):
@@ -73,7 +81,7 @@ def main():
                             st.write("Duplicate widget")
                         out_piece = ff.MidiPiece(pd.concat([prompt_notes_df, generated_notes_df]))
                         # Allow download of the full MIDI with context\
-                        midi_name = f"{selected_model_name}_{selected_model_loss:.2f}_variations_on_{prompt_id}"
+                        midi_name = f"{selected_model_name}_{selected_model_tokens:.2f}_variations_on_{prompt_id}"
                         full_midi_path = f"tmp/{midi_name}.mid"
                         out_piece.to_midi().write(full_midi_path)
                         with open(full_midi_path, "rb") as file:

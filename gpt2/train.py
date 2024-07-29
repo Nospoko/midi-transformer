@@ -94,7 +94,7 @@ def get_dataset_for_task(cfg: DictConfig) -> tuple[Any, Any, str]:
     task_to_dataset = {
         "next_token_prediction": prepare_next_token_datasets,
         "bass_prediction": prepare_subsequence_datasets,
-        "from_bass_prediction": prepare_reverse_bass_datasets,
+        "reverse_bass_prediction": prepare_reverse_bass_datasets,
     }
     prepare_function = task_to_dataset.get(cfg.task)
     if prepare_function:
@@ -221,6 +221,7 @@ def main(cfg: DictConfig):
 
         cfg.model = checkpoint_cfg.model
         cfg.data = checkpoint_cfg.data
+        cfg.data.tokenizer_parameters = checkpoint_cfg.dataset.tokenizer_parameters
         cfg.system.dtype = checkpoint_cfg.system.dtype
 
         train_dataset, val_dataset, out_dir = get_dataset_for_task(cfg=cfg)
@@ -502,7 +503,7 @@ def main(cfg: DictConfig):
                     model_config=gptconf,
                 )
                 model.train()
-                os.unlink(".generate")
+                os.unlink(".generate_last")
             if cfg.logging.wandb_log:
                 wandb.log(
                     {

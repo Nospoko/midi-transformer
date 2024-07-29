@@ -37,7 +37,7 @@ def main():
 
 def show_validation_prompts():
     st.header("Validation Prompts in dataset")
-    task_options = ["bass_prediction", "no_bass_prediction", "next_token_prediction"]
+    task_options = ["bass_prediction", "reverse_bass_prediction", "next_token_prediction"]
     task = st.selectbox("task", options=task_options)
     validation_prompts = database_manager.get_validation_examples_for_task(task=task)
     for idx, row in validation_prompts.iterrows():

@@ -53,7 +53,7 @@ class MidiSequenceDataset(GeneratorBasedBuilder):
         )
 
         # Enable multiprocessing by splitting the dataset into shards
-        n_shards = 32
+        n_shards = 64
         train_shards = [dataset.shard(n_shards, it) for it in range(n_shards)]
         validation_shards = [base["validation"].shard(n_shards, it) for it in range(n_shards)]
         test_shards = [base["test"].shard(n_shards, it) for it in range(n_shards)]
