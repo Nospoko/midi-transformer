@@ -421,7 +421,7 @@ def generate(
         model_config = model.config
     for _ in range(max_new_tokens):
         # if the sequence context is growing too long we must crop it at block_size
-        idx_cond = idx if idx.size(1) <= model_config.block_size else idx[:, model_config.block_size :]
+        idx_cond = idx if idx.size(1) <= model_config.block_size else idx[:, -model_config.block_size :]
         # forward the model to get the logits for the index in the sequence
         logits, _ = model(idx_cond)
         # pluck the logits at the final step and scale by desired temperature
