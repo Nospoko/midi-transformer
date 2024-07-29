@@ -412,7 +412,7 @@ def get_unique_values(column, table):
 
 
 def get_all_models() -> pd.DataFrame:
-    query = f"SELECT * FROM {models_table}"
+    query = f"SELECT * FROM {models_table} ORDER BY created_at DESC"
     df = database_cnx.read_sql(sql=query)
     return df
 

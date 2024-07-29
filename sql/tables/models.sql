@@ -9,5 +9,6 @@ CREATE TABLE models (
     configs JSON,  -- model, dataset, data, lr, optimizer, system.dtype
     training_task VARCHAR(255), -- next_token_prediction, bass_prediction,
     wandb_link TEXT,
+    created_at DATE NULL,
     UNIQUE(name, iter_num, training_task)
 );
