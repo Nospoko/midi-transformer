@@ -246,8 +246,8 @@ def generate_subsequence_iteratively(
         else:
             start_offset = it * time_step
         it += 1
-        step_prompt_notes.start -= start_offset
-        step_prompt_notes.end -= start_offset
+        step_prompt_notes.start -= step_prompt_notes.start.min()
+        step_prompt_notes.end -= step_prompt_notes.start.min()
 
         step_target_notes = step_target_notes[(step_target_notes.start > 0) & (step_target_notes.end > 0)]
         # Tokenize the current step's prompt and target notes
