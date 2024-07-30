@@ -239,10 +239,11 @@ def generate_subsequence_iteratively(
         step_target_notes = pd.DataFrame(columns=prompt_notes.columns)
     it = 0
     # Iterate through the piece, generating bass notes in steps
+    target_notes = pd.DataFrame()
     while time + time_step <= end:
         # Calculate the start offset for the bass notes in this step
-        if len(step_target_notes) > 0:
-            start_offset = max(step_target_notes.end.max(), step_prompt_notes.end.max())
+        if len(target_notes) > 0:
+            start_offset = target_notes.end.max()
         else:
             start_offset = it * time_step
         it += 1
