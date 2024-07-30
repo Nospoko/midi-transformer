@@ -41,7 +41,6 @@ def run_generation_step(
         checkpoint=checkpoint,
         run_name=run_name,
     )
-    generations = []
     for example in validation_examples:
         generated_notes = generate_from_validation_example(
             model=model,
@@ -59,10 +58,7 @@ def run_generation_step(
             "model_id": model_id,
             "generated_notes": generated_notes.to_json(),
         }
-
-        generations.append(generated_info)
-
-    database_manager.insert_validation_generations_batch(generations=generations)
+        database_manager.insert_validation_generations_batch(generations=[generated_info])
     print(f"Populated dataset with {len(validation_examples)} generations!")
 
 
