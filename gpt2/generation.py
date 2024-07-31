@@ -247,6 +247,7 @@ def generate_subsequence_iteratively(
         step_prompt_notes.end -= start_offset
 
         step_target_notes = step_target_notes[(step_target_notes.start > 0) & (step_target_notes.end > 0)]
+
         # Tokenize the current step's prompt and target notes
         step_sequence = tokenizer.tokenize(step_prompt_notes)
         step_target = tokenizer.tokenize(step_target_notes)
@@ -280,13 +281,11 @@ def generate_subsequence_iteratively(
         target_tokens = out_tokens[predict_command_position:].copy()
 
         # Convert target tokens back to notes
-        output_bass_notes = tokenizer.untokenize(target_tokens)
+        output_target_notes = tokenizer.untokenize(target_tokens)
 
         # Select only the newly generated notes within the current time step
-        notes_after_context = output_bass_notes.start > target_context_duration
-        notes_within_step = output_bass_notes.end < target_context_duration + time_step
-        valid_new_notes = notes_after_context & notes_within_step
-        target_notes = output_bass_notes[valid_new_notes].copy()
+        notes_within_step = output_target_notes.end < target_context_duration + time_step
+        target_notes = output_target_notes[notes_within_step].copy()
         step_target_notes = target_notes.copy()
 
         # Adjust the start and end times of the bass notes

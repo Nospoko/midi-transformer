@@ -41,6 +41,7 @@ def main(model_path: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run model generation on validation examples.")
     parser.add_argument("model_path", type=str, help="Path to the model checkpoint")
+    parser.add_argument("device", type=str, help="Device to perform calculations on")
     args = parser.parse_args()
 
-    main(args.model_path)
+    main(args.model_path, args.device)
