@@ -84,7 +84,12 @@ def select_generation_parameters() -> (
                 value=120.0,
                 help="Time step for creating prompts",
             )
-            task_options = ["bass_prediction", "reverse_bass_prediction", "next_token_prediction"]
+            task_options = [
+                "bass_prediction",
+                "reverse_bass_prediction",
+                "next_token_prediction",
+                "high_median_prediction",
+            ]
             task = st.selectbox(label="task", options=task_options)
             prompt_context_duration = st.number_input(
                 "Prompt Context Duration",

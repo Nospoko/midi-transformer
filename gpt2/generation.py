@@ -111,6 +111,59 @@ def prepare_subsequence_prediction_prompts(
     return prompts
 
 
+def prepare_high_median_prompts(
+    record: dict,
+    time_step: float,
+    prompt_duration: float,
+    target_context_duration: float,
+) -> list[dict]:
+    """
+    Prepare prompts for high_median_prediction tasks,
+    in a format acceptable in the database.
+    """
+    time = 0
+
+    notes = pd.DataFrame(record["notes"])
+    source = json.loads(record["source"])
+    if "midi_filename" in source.keys():
+        midi_name = source["midi_filename"]
+    elif "youtube_id" in source.keys():
+        midi_name = source["youtube_id"]
+    else:
+        midi_name = hashlib.sha256(record["source"])
+
+    prompts = []
+    while time + prompt_duration < notes.end.max():
+        start = time
+        end = time + prompt_duration
+
+        fragment = notes[(notes.start > start) & (notes.end < end)].copy()
+        fragment_start = fragment.start.min()
+        fragment_end = fragment.start.max()
+
+        fragment.end -= fragment_start
+        fragment.start -= fragment_start
+        median = fragment.pitch.median()
+        extracted_ids = fragment.pitch >= median
+        source_notes = fragment[~extracted_ids]
+        target_notes = fragment[extracted_ids]
+        target_prompt = target_notes[target_notes.end < target_context_duration]
+        if len(fragment) == 0:
+            continue
+        prompt = {
+            "source_notes": source_notes,
+            "target_prompt": target_prompt,
+            "prompt_notes": pd.concat([source_notes, target_prompt]),
+            "start_time": fragment_start,
+            "end_time": fragment_end,
+            "midi_name": midi_name,
+            "source": record["source"],
+        }
+        prompts.append(prompt)
+        time += time_step
+    return prompts
+
+
 def generate_bass(
     model: GPT,
     tokenizer: ExponentialTokenizer | AwesomeTokenizer,

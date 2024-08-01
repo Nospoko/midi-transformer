@@ -37,7 +37,12 @@ def main():
 
 def show_validation_prompts():
     st.header("Validation Prompts in dataset")
-    task_options = ["bass_prediction", "reverse_bass_prediction", "next_token_prediction"]
+    task_options = [
+        "bass_prediction",
+        "reverse_bass_prediction",
+        "next_token_prediction",
+        "high_median_prediction",
+    ]
     task = st.selectbox("task", options=task_options)
     validation_prompts = database_manager.get_validation_examples_for_task(task=task)
     for idx, row in validation_prompts.iterrows():
@@ -102,7 +107,7 @@ def show_prompt_generator():
     with col3:
         prediction_task = st.selectbox(
             "Extraction Type",
-            options=["bass_prediction", "reverse_bass_prediction", "-"],
+            options=["bass_prediction", "reverse_bass_prediction", "high_median_prediction", "-"],
             help="Select the type of notes to extract",
         )
 
@@ -115,7 +120,6 @@ def show_prompt_generator():
 
     _, generation_parameters, prompt_duration, prompt_creation_time_step = select_generation_parameters()
     task = generation_parameters["task"]
-
     st.header("Generated prompt")
     prompts: list[dict] = []
 
@@ -126,6 +130,13 @@ def show_prompt_generator():
                     record=record,
                     prompt_duration=prompt_duration,
                     time_step=prompt_creation_time_step,
+                )
+            elif task == "high_median_prediction":
+                prompts += generation.prepare_high_median_prompts(
+                    record=record,
+                    prompt_duration=prompt_duration,
+                    time_step=prompt_creation_time_step,
+                    target_context_duration=generation_parameters["target_context_duration"],
                 )
             else:
                 prompts += generation.prepare_subsequence_prediction_prompts(
@@ -145,6 +156,7 @@ def show_prompt_generator():
                 streamlit_pianoroll.from_fortepyan(piece=source_piece)
             except DuplicateWidgetID:
                 st.write("Duplicate widget")
+
         else:
             source_notes = prompt.pop("source_notes")
             target_notes = prompt.pop("target_prompt")
