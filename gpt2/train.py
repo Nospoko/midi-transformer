@@ -32,13 +32,15 @@ import psutil
 from dotenv import load_dotenv
 from torch.utils.data import DataLoader
 from hydra.utils import to_absolute_path
-from datasets import Dataset, load_dataset
 from omegaconf import OmegaConf, DictConfig
 from torch.nn.parallel import DistributedDataParallel as DDP
+from datasets import Dataset, load_dataset, concatenate_datasets
 from torch.distributed import init_process_group, destroy_process_group
 
 import wandb
 from gpt2.model import GPT, GPTConfig
+from data.augmentation import augment_dataset
+from data.median_dataset import MedianDataset
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
 from gpt2.utils import load_tokenizer, run_generation_step, prepare_validation_examples_for_task
@@ -95,6 +97,7 @@ def get_dataset_for_task(cfg: DictConfig) -> tuple[Any, Any, str]:
         "next_token_prediction": prepare_next_token_datasets,
         "bass_prediction": prepare_subsequence_datasets,
         "reverse_bass_prediction": prepare_reverse_bass_datasets,
+        "high_median_prediction": prepare_median_datasets,
     }
     prepare_function = task_to_dataset.get(cfg.task)
     if prepare_function:
@@ -140,7 +143,7 @@ def create_datasets(
         sequence_length=cfg.data.sequence_length,
         loss_masking=cfg.loss_masking,
     )
-    return train_dataset, val_dataset, to_absolute_path(cfg.out_dir)
+    return train_dataset, val_dataset
 
 
 def prepare_reverse_bass_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
@@ -156,6 +159,39 @@ def prepare_next_token_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
 def prepare_subsequence_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
     train_split, validation_split = prepare_dataset_base(cfg, "BassPredictionDataset")
     return create_datasets(train_split, validation_split, cfg, SubSequenceMidiDataset)
+
+
+def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
+    base = load_dataset(cfg.dataset.base_dataset_name)
+    other_datasets = [load_dataset(path, split="train") for path in cfg.dataset.extra_datasets]
+    other_datasets.append(base["train"])
+
+    # Concatenate all datasets and apply augmentation
+    dataset = concatenate_datasets(other_datasets)
+    dataset = augment_dataset(
+        dataset=dataset,
+        max_pitch_shift=cfg.dataset.augmentation["max_pitch_shift"],
+        speed_change_factors=cfg.dataset.augmentation["speed_change_factors"],
+    )
+    train_split: Dataset = dataset["train"]
+    validation_split: Dataset = base["validation"]
+
+    tokenizer = load_tokenizer(cfg)
+    train_dataset = MedianDataset(
+        dataset=train_split,
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+        loss_masking=cfg.loss_masking,
+        notes_per_record=cfg.dataset.notes_per_record,
+    )
+    val_dataset = MedianDataset(
+        dataset=validation_split,
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+        loss_masking=cfg.loss_masking,
+        notes_per_record=cfg.dataset.notes_per_record,
+    )
+    return train_dataset, val_dataset
 
 
 def setup_device(cfg: DictConfig):
@@ -230,7 +266,8 @@ def main(cfg: DictConfig):
             cfg.data.tokenizer_parameters = checkpoint_cfg.dataset.tokenizer_parameters
         cfg.system.dtype = checkpoint_cfg.system.dtype
 
-        train_dataset, val_dataset, out_dir = get_dataset_for_task(cfg=cfg)
+        train_dataset, val_dataset = get_dataset_for_task(cfg=cfg)
+        out_dir = to_absolute_path(cfg.out_dir)
         tokenizer = train_dataset.tokenizer
         pad_token_id = tokenizer.token_to_id["<PAD>"]
         config = OmegaConf.to_container(cfg=cfg)
@@ -258,7 +295,8 @@ def main(cfg: DictConfig):
         state_dict = None
 
     elif cfg.init_from == "scratch":
-        train_dataset, val_dataset, out_dir = get_dataset_for_task(cfg=cfg)
+        train_dataset, val_dataset = get_dataset_for_task(cfg=cfg)
+        out_dir = to_absolute_path(cfg.out_dir)
         tokenizer = train_dataset.tokenizer
         pad_token_id = tokenizer.token_to_id["<PAD>"]
         config = OmegaConf.to_container(cfg=cfg)

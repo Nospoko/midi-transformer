@@ -1,4 +1,4 @@
-placeholder_tokens = [f"<SENTINEL_{idx}>" for idx in range(100)]
+placeholder_tokens = [f"<SENTINEL_{idx}>" for idx in range(98)]
 special_tokens = [
     "<PAD>",
     "<CLS>",
@@ -27,6 +27,7 @@ special_tokens = [
     "<NO_ALTO>",
     "<NO_SOPRANO>",
     "<NO_TREBLE>",
+    "<LOW_FROM_MEDIAN>" "<HIGH_FROM_MEDIAN>",
 ] + placeholder_tokens
 
 
@@ -43,6 +44,7 @@ prediction_task_to_token_pair = {
     "mp_prediction": ("<MP>", "<NO_MP>"),
     "mf_prediction": ("<MF>", "<NO_MF>"),
     "f_prediction": ("<F>", "<NO_F>"),
+    "high_median_prediction": ("<LOW_FROM_MEDIAN>", "<HIGH_FROM_MEDIAN>"),
 }
 
 voice_task_to_range = {
