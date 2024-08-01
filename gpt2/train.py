@@ -92,7 +92,7 @@ class CyclicalDataLoader:
         return x, y, mask
 
 
-def get_dataset_for_task(cfg: DictConfig) -> tuple[Any, Any, str]:
+def get_dataset_for_task(cfg: DictConfig) -> tuple[Any, Any]:
     task_to_dataset = {
         "next_token_prediction": prepare_next_token_datasets,
         "bass_prediction": prepare_subsequence_datasets,
@@ -146,22 +146,22 @@ def create_datasets(
     return train_dataset, val_dataset
 
 
-def prepare_reverse_bass_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
+def prepare_reverse_bass_datasets(cfg: DictConfig) -> tuple[Any, Any]:
     train_split, validation_split = prepare_dataset_base(cfg, "ReverseBassPredictionDataset")
     return create_datasets(train_split, validation_split, cfg, SubSequenceMidiDataset)
 
 
-def prepare_next_token_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
+def prepare_next_token_datasets(cfg: DictConfig) -> tuple[Any, Any]:
     train_split, validation_split = prepare_dataset_base(cfg, "MidiTokenizedDataset")
     return create_datasets(train_split, validation_split, cfg, NextTokenDataset)
 
 
-def prepare_subsequence_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
+def prepare_subsequence_datasets(cfg: DictConfig) -> tuple[Any, Any]:
     train_split, validation_split = prepare_dataset_base(cfg, "BassPredictionDataset")
     return create_datasets(train_split, validation_split, cfg, SubSequenceMidiDataset)
 
 
-def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any, str]:
+def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any]:
     base = load_dataset(cfg.dataset.base_dataset_name)
     other_datasets = [load_dataset(path, split="train") for path in cfg.dataset.extra_datasets]
     other_datasets.append(base["train"])
