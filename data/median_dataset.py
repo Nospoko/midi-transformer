@@ -29,6 +29,7 @@ class MedianDataset(MidiDataset):
             num_notes = len(record["notes"]["pitch"]) - self.notes_per_record
             for start_point in range(num_notes):
                 self.record_ids |= {current_idx: (record_id, start_point)}
+                current_idx += 1
 
         self.length = current_idx
 

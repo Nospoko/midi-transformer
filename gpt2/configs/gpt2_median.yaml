@@ -1,11 +1,13 @@
 defaults:
   - model: gpt2 # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
   - data: finetuning
-  - dataset: bassextracted
+  - dataset: median
   - logging: subsequence
   - lr: finetuning
   - _self_
 
+data:
+  tokenizer_parameters: ${dataset.tokenizer_parameters}
 out_dir: 'checkpoints'
 eval_interval: 100
 

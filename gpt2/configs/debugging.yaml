@@ -1,7 +1,7 @@
 defaults:
   - model: gpt2_small # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
-  - data: pretraining
-  - dataset: tokenized
+  - data: finetuning
+  - dataset: median
   - logging: subsequence
   - lr: pretraining
   - _self_
@@ -12,7 +12,7 @@ eval_iters: 2
 eval_only: false  # if True, script exits right after the first eval
 always_save_checkpoint: false  # if True, always save a checkpoint after each eval
 init_from: 'scratch'  # 'scratch' or 'midi-gpt2*'
-task: next_token_prediction
+task: high_median_prediction
 loss_masking: pretraining
 
 optimizer:
@@ -34,7 +34,6 @@ system:
 
 data:
   batch_size: 4
-  tokenizer_parameters: ${dataset.tokenizer_parameters}
 model:
   n_layer: 1
   n_embd: 5
