@@ -11,8 +11,9 @@ import data.database_manager as database_manager
 from dashboards.common.components import download_button
 
 
-def format_number(number):
-    return f"{number:,}"
+def format_model_params(model_params):
+    total_tokens, model_loss = model_params
+    return f"{total_tokens:,}, best_val_loss: {model_loss}"
 
 
 def main():
@@ -31,12 +32,14 @@ def main():
         if selected_model_name:
             selected_models = models_df[models_df["name"] == selected_model_name]
             model_tokens = selected_models["total_tokens"].tolist()
+            model_losses = selected_models["best_val_loss"].tolist()
 
-            selected_model_tokens = st.selectbox(
+            selected_model_params = st.selectbox(
                 label="Select tokens",
-                options=model_tokens,
-                format_func=format_number,
+                options=zip(model_tokens, model_losses),
+                format_func=format_model_params,
             )
+            selected_model_tokens, _ = selected_model_params
             selected_model = selected_models[selected_models["total_tokens"] == selected_model_tokens].iloc[0]
             st.json(selected_model.to_dict(), expanded=False)
 
@@ -72,7 +75,20 @@ def main():
 
                         generated_notes = json.loads(row["generated_notes"])
                         generated_notes_df = pd.DataFrame(generated_notes)
-                        generated_piece = ff.MidiPiece(df=generated_notes_df)
+
+                        # Keep only the rows that are in generated_notes but not in prompt_notes
+                        columns_to_compare = generated_notes_df.columns.tolist()
+                        merged = generated_notes_df.merge(
+                            prompt_notes_df,
+                            on=columns_to_compare,
+                            how="outer",
+                            indicator=True,
+                        )
+                        generated_notes_unique = merged[merged["_merge"] == "left_only"].drop("_merge", axis=1)
+                        generated_notes_unique = generated_notes_unique.reset_index(drop=True)
+                        generated_notes_unique = generated_notes_unique.drop("duration", axis=1)
+                        st.dataframe(generated_notes_unique)
+                        generated_piece = ff.MidiPiece(df=generated_notes_unique)
 
                         prompt_piece = ff.MidiPiece(df=prompt_notes_df)
                         try:

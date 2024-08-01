@@ -7,8 +7,7 @@ import torch
 import gpt2.utils as gpt2_utils
 
 
-def main(model_path: str):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+def main(model_path: str, device: str):
     checkpoint = torch.load(f=model_path, map_location=device)
 
     cfg = gpt2_utils.load_cfg(checkpoint=checkpoint)
