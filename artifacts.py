@@ -27,7 +27,8 @@ special_tokens = [
     "<NO_ALTO>",
     "<NO_SOPRANO>",
     "<NO_TREBLE>",
-    "<LOW_FROM_MEDIAN>" "<HIGH_FROM_MEDIAN>",
+    "<LOW_FROM_MEDIAN>",
+    "<HIGH_FROM_MEDIAN>",
 ] + placeholder_tokens
 
 
