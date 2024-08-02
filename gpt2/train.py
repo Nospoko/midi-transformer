@@ -164,16 +164,20 @@ def prepare_subsequence_datasets(cfg: DictConfig) -> tuple[Any, Any]:
 def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any]:
     base = load_dataset(cfg.dataset.base_dataset_name)
     other_datasets = [load_dataset(path, split="train") for path in cfg.dataset.extra_datasets]
+    num_proc = os.cpu_count() - 4
     other_datasets.append(base["train"])
-
+    augmented_datasets = []
+    for dataset in other_datasets:
+        dataset = augment_dataset(
+            dataset=dataset,
+            max_pitch_shift=cfg.dataset.augmentation["max_pitch_shift"],
+            speed_change_factors=cfg.dataset.augmentation["speed_change_factors"],
+            data_workers=num_proc,
+        )
+        augmented_datasets.append(dataset)
+        
     # Concatenate all datasets and apply augmentation
-    dataset = concatenate_datasets(other_datasets)
-    dataset = augment_dataset(
-        dataset=dataset,
-        max_pitch_shift=cfg.dataset.augmentation["max_pitch_shift"],
-        speed_change_factors=cfg.dataset.augmentation["speed_change_factors"],
-        data_workers=cfg.system.data_workers,
-    )
+    dataset = concatenate_datasets(augmented_datasets)
     train_split: Dataset = dataset
     validation_split: Dataset = base["validation"]
 
