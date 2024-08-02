@@ -404,6 +404,19 @@ def generate_continuation(
     return generated_notes
 
 
+def get_border_value(
+    prompt_notes: pd.DataFrame,
+    parameters: dict,
+) -> int:
+    """
+    Calculate which value is the highest among the source notes to establish which point is a median.
+    """
+    beginning_time = parameters["target_context_duration"]
+    source_notes_after_beginnning = prompt_notes[prompt_notes.start > beginning_time]
+    border_pitch = source_notes_after_beginnning.pitch.max()
+    return border_pitch
+
+
 def generate_from_validation_example(
     model: GPT,
     tokenizer: AwesomeTokenizer | ExponentialTokenizer,
@@ -430,9 +443,13 @@ def generate_from_validation_example(
             model_config=model_config,
         )
 
-    low, high = get_voice_task_range(parameters["task"])
+    if parameters["task"] == "high_median_prediction":
+        median = get_border_value(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = prompt_notes.pitch > median
+    else:
+        low, high = get_voice_task_range(parameters["task"])
+        target_note_ids = (prompt_notes.pitch < high) & (prompt_notes.pitch > low)
 
-    target_note_ids = (prompt_notes.pitch < high) & (prompt_notes.pitch > low)
     source_notes = prompt_notes[~target_note_ids]
     target_notes = prompt_notes[target_note_ids]
 

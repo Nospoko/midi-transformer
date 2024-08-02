@@ -1,6 +1,8 @@
 from typing import Literal
+from bisect import bisect_right
 
 import torch
+import numpy as np
 import pandas as pd
 from datasets import Dataset as HuggingFaceDataset
 
@@ -31,16 +33,22 @@ class MedianDataset(MidiDataset):
         for record in self.dataset:
             self.record_lengths.append(get_length(record))
         self.length = sum(self.record_lengths)
+        self.cumulative_lengths = np.cumsum(self.record_lengths)
 
     def __len__(self):
         return self.length
 
     def _index_to_record_and_start(self, idx):
-        for record_id, length in enumerate(self.record_lengths):
-            if idx < length:
-                return record_id, idx
-            idx -= length
-        raise IndexError("Index out of range")
+        if idx < 0 or idx >= self.length:
+            raise IndexError("Index out of range")
+
+        # Binary search to find the record
+        record_id = bisect_right(self.cumulative_lengths, idx)
+
+        # Calculate the start point within the record
+        start_point = idx - (self.cumulative_lengths[record_id - 1] if record_id > 0 else 0)
+
+        return record_id, start_point
 
     def __getitem__(self, idx: int) -> dict:
         record_id, start_point = self._index_to_record_and_start(idx)
