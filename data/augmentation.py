@@ -110,7 +110,9 @@ def apply_speed_change(batch: dict, speed_change_factors: list[float]) -> dict:
     return batch
 
 
-def augment_dataset(dataset: Dataset, speed_change_factors: list[float] = None, max_pitch_shift: int = 5) -> Dataset:
+def augment_dataset(
+    dataset: Dataset, speed_change_factors: list[float] = None, max_pitch_shift: int = 5, data_workers=None
+) -> Dataset:
     """
     Augment the dataset by applying pitch shift and speed change augmentations using all available CPUs.
 
@@ -130,6 +132,8 @@ def augment_dataset(dataset: Dataset, speed_change_factors: list[float] = None, 
         num_cpus -= 4  # Use all CPUs except 4
     else:
         num_cpus -= 1
+    if data_workers is not None:
+        num_cpus = data_workers
 
     pitch_shift_args = {
         "max_pitch_shift": max_pitch_shift,

@@ -20,24 +20,31 @@ class MedianDataset(MidiDataset):
         super().__init__(dataset=dataset, tokenizer=tokenizer, loss_masking=loss_masking)
         self.sequence_length = sequence_length
         self.notes_per_record = notes_per_record
-        self._build_indicies()
+        self.length = 0
+        self._build_record_lengths()
 
-    def _build_indicies(self):
-        self.record_ids = {}
-        current_idx = 0
-        for record_id, record in enumerate(self.dataset):
-            num_notes = len(record["notes"]["pitch"]) - self.notes_per_record
-            for start_point in range(num_notes):
-                self.record_ids |= {current_idx: (record_id, start_point)}
-                current_idx += 1
+    def _build_record_lengths(self):
+        def get_length(record):
+            return len(record["notes"]["pitch"]) - self.notes_per_record + 1
 
-        self.length = current_idx
+        self.record_lengths = []
+        for record in self.dataset:
+            self.record_lengths.append(get_length(record))
+        self.length = sum(self.record_lengths)
 
     def __len__(self):
         return self.length
 
+    def _index_to_record_and_start(self, idx):
+        for record_id, length in enumerate(self.record_lengths):
+            if idx < length:
+                return record_id, idx
+            idx -= length
+        raise IndexError("Index out of range")
+
     def __getitem__(self, idx: int) -> dict:
-        record_id, start_point = self.record_ids[idx]
+        record_id, start_point = self._index_to_record_and_start(idx)
+
         record = self.dataset[record_id]
 
         notes = pd.DataFrame(record["notes"])
@@ -48,8 +55,8 @@ class MedianDataset(MidiDataset):
         notes.end = notes.end - offset
 
         median = notes.pitch.median()
-        source_notes = notes[notes.pitch <= median]
-        target_notes = notes[notes.pitch > median]
+        source_notes = notes[notes.pitch < median]
+        target_notes = notes[notes.pitch >= median]
 
         source_prefix = "<LOW_FROM_MEDIAN>"
         target_prefix = "<HIGH_FROM_MEDIAN>"

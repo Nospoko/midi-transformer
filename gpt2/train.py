@@ -172,6 +172,7 @@ def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any]:
         dataset=dataset,
         max_pitch_shift=cfg.dataset.augmentation["max_pitch_shift"],
         speed_change_factors=cfg.dataset.augmentation["speed_change_factors"],
+        data_workers=cfg.system.data_workers,
     )
     train_split: Dataset = dataset
     validation_split: Dataset = base["validation"]
