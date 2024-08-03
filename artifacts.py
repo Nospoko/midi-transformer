@@ -45,7 +45,7 @@ prediction_task_to_token_pair = {
     "mp_prediction": ("<MP>", "<NO_MP>"),
     "mf_prediction": ("<MF>", "<NO_MF>"),
     "f_prediction": ("<F>", "<NO_F>"),
-    "high_median_prediction": ("<LOW_FROM_MEDIAN>", "<HIGH_FROM_MEDIAN>"),
+    "high_median_prediction": ("<HIGH_FROM_MEDIAN>", "<LOW_FROM_MEDIAN>"),
 }
 
 voice_task_to_range = {

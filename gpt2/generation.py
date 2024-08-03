@@ -282,7 +282,7 @@ def generate_subsequence_iteratively(
     # Initialize the first step with notes within the prompt and target context durations
     step_prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration].copy()
     step_target_notes = target_notes[target_notes.end < target_context_duration].copy()
-    # Initialize the list of all bass notes with the initial target notes
+    # Initialize the list of all target notes with the initial target notes
     all_target_notes = [step_target_notes]
     time = 0
     end = prompt_notes.end.max()

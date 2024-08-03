@@ -1,6 +1,6 @@
 defaults:
   - model: gpt2 # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
-  - data: finetuning
+  - data: median
   - dataset: median
   - logging: subsequence
   - lr: finetuning

@@ -32,14 +32,13 @@ import psutil
 from dotenv import load_dotenv
 from torch.utils.data import DataLoader
 from hydra.utils import to_absolute_path
+from datasets import Dataset, load_dataset
 from omegaconf import OmegaConf, DictConfig
 from torch.nn.parallel import DistributedDataParallel as DDP
-from datasets import Dataset, load_dataset, concatenate_datasets
 from torch.distributed import init_process_group, destroy_process_group
 
 import wandb
 from gpt2.model import GPT, GPTConfig
-from data.augmentation import augment_dataset
 from data.median_dataset import MedianDataset
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
@@ -162,24 +161,7 @@ def prepare_subsequence_datasets(cfg: DictConfig) -> tuple[Any, Any]:
 
 
 def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any]:
-    base = load_dataset(cfg.dataset.base_dataset_name)
-    other_datasets = [load_dataset(path, split="train") for path in cfg.dataset.extra_datasets]
-    num_proc = os.cpu_count() - 4
-    other_datasets.append(base["train"])
-    augmented_datasets = []
-    for dataset in other_datasets:
-        dataset = augment_dataset(
-            dataset=dataset,
-            max_pitch_shift=cfg.dataset.augmentation["max_pitch_shift"],
-            speed_change_factors=cfg.dataset.augmentation["speed_change_factors"],
-            data_workers=num_proc,
-        )
-        augmented_datasets.append(dataset)
-        
-    # Concatenate all datasets and apply augmentation
-    dataset = concatenate_datasets(augmented_datasets)
-    train_split: Dataset = dataset
-    validation_split: Dataset = base["validation"]
+    train_split, validation_split = prepare_dataset_base(cfg, "AugmentedDataset")
 
     tokenizer = load_tokenizer(cfg)
     train_dataset = MedianDataset(
@@ -187,14 +169,14 @@ def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any]:
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
         loss_masking=cfg.loss_masking,
-        notes_per_record=cfg.dataset.notes_per_record,
+        notes_per_record=cfg.data.notes_per_record,
     )
     val_dataset = MedianDataset(
         dataset=validation_split,
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
         loss_masking=cfg.loss_masking,
-        notes_per_record=cfg.dataset.notes_per_record,
+        notes_per_record=cfg.data.notes_per_record,
     )
     return train_dataset, val_dataset
 
