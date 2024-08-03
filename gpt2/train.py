@@ -161,7 +161,19 @@ def prepare_subsequence_datasets(cfg: DictConfig) -> tuple[Any, Any]:
 
 
 def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any]:
-    train_split, validation_split = prepare_dataset_base(cfg, "AugmentedDataset")
+    dataset_config = OmegaConf.to_container(cfg.dataset)
+    # TODO: better config handling
+    dataset_config.pop("notes_per_record")
+    dataset_path = to_absolute_path("./midi_datasets/AugmentedDataset")
+
+    dataset = load_dataset(
+        dataset_path,
+        trust_remote_code=True,
+        num_proc=cfg.system.data_workers,
+        **dataset_config,
+    )
+    train_split: Dataset = dataset["train"]
+    validation_split: Dataset = dataset["validation"]
 
     tokenizer = load_tokenizer(cfg)
     train_dataset = MedianDataset(
@@ -169,14 +181,14 @@ def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any]:
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
         loss_masking=cfg.loss_masking,
-        notes_per_record=cfg.data.notes_per_record,
+        notes_per_record=cfg.dataset.notes_per_record,
     )
     val_dataset = MedianDataset(
         dataset=validation_split,
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
         loss_masking=cfg.loss_masking,
-        notes_per_record=cfg.data.notes_per_record,
+        notes_per_record=cfg.dataset.notes_per_record,
     )
     return train_dataset, val_dataset
 
