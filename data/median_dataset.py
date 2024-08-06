@@ -21,22 +21,21 @@ class MedianDataset(MidiDataset):
         self.sequence_length = sequence_length
         self.notes_per_record = notes_per_record
         self.length = 0
+        self.record_lengths = []
         self._build_record_lengths()
 
     def _build_record_lengths(self):
         def get_length(record):
-            return len(record["notes"]["pitch"]) - self.notes_per_record + 1
+            self.record_lengths.append(len(record["notes"]["pitch"]) - self.notes_per_record + 1)
 
-        self.record_lengths = []
-        for record in self.dataset:
-            self.record_lengths.append(get_length(record))
-        self.length = sum(self.record_lengths)
+        self.dataset.map(get_length)
+        self.length = sum(self.record_lengths.values())
 
     def __len__(self):
         return self.length
 
     def _index_to_record_and_start(self, idx):
-        for record_id, length in enumerate(self.record_lengths):
+        for record_id, length in self.record_lengths.items():
             if idx < length:
                 return record_id, idx
             idx -= length
