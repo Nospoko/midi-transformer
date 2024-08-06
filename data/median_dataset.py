@@ -1,4 +1,6 @@
 from typing import Literal
+from functools import partial
+from multiprocessing import Manager
 
 import torch
 import pandas as pd
@@ -25,17 +27,26 @@ class MedianDataset(MidiDataset):
         self._build_record_lengths()
 
     def _build_record_lengths(self):
-        def get_length(record):
-            self.record_lengths.append(len(record["notes"]["pitch"]) - self.notes_per_record + 1)
+        def get_length(record, notes_per_record, shared_list):
+            length = len(record["notes"]["pitch"]) - notes_per_record + 1
+            shared_list.append(length)
 
-        self.dataset.map(get_length)
-        self.length = sum(self.record_lengths.values())
+        with Manager() as manager:
+            shared_list = manager.list()
+            get_length_partial = partial(get_length, notes_per_record=self.notes_per_record, shared_list=shared_list)
+
+            self.dataset.map(get_length_partial, num_proc=32, desc="Building record lengths")
+
+            self.record_lengths = list(shared_list)
+
+        self.length = sum(self.record_lengths)
+        print(self.length)
 
     def __len__(self):
         return self.length
 
     def _index_to_record_and_start(self, idx):
-        for record_id, length in self.record_lengths.items():
+        for record_id, length in enumerate(self.record_lengths):
             if idx < length:
                 return record_id, idx
             idx -= length

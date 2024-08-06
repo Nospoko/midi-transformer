@@ -17,13 +17,10 @@ $ torchrun --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr=123.456.123
 """
 
 import os
-import sys
 import math
 import time
-import signal
 import datetime
 from typing import Any
-from functools import partial
 from contextlib import nullcontext
 
 import hydra
@@ -204,16 +201,6 @@ def setup_device(cfg: DictConfig):
 
 @hydra.main(config_path="configs", config_name="gpt2_pretraining", version_base=None)
 def main(cfg: DictConfig):
-    sigint_flag = False
-
-    def signal_handler(sigint_flag, sig, frame):
-        if sigint_flag[0]:
-            sys.exit()
-        print("You pressed Ctrl-C! Press exaint to sys.exit()")
-        sigint_flag[0] = True
-
-    signal.signal(signal.SIGINT, partial(signal_handler, [sigint_flag]))
-
     model_args = dict(
         n_layer=cfg.model.n_layer,
         n_head=cfg.model.n_head,
@@ -588,7 +575,7 @@ def main(cfg: DictConfig):
         iter_num += 1
         local_iter_num += 1
 
-        if iter_num == cfg.optimizer.max_iters or sigint_flag:
+        if iter_num == cfg.optimizer.max_iters:
             break
 
     if ddp:
