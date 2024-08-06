@@ -36,11 +36,9 @@ class MedianDataset(MidiDataset):
             get_length_partial = partial(get_length, notes_per_record=self.notes_per_record, shared_list=shared_list)
 
             self.dataset.map(get_length_partial, num_proc=32, desc="Building record lengths")
-
             self.record_lengths = list(shared_list)
 
         self.length = sum(self.record_lengths)
-        print(self.length)
 
     def __len__(self):
         return self.length
