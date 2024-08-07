@@ -136,6 +136,7 @@ def generate_music(
                 prompts += generation.prepare_high_median_prompts(
                     record=record,
                     prompt_duration=prompt_duration,
+                    target_context_duration=generation_parameters["target_context_duration"],
                     time_step=prompt_creation_time_step,
                 )
             else:
