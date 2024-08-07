@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 from hydra.utils import to_absolute_path
 from datasets import Dataset, load_dataset
 from omegaconf import OmegaConf, DictConfig
-from torch.utils.data import DataLoader, DistributedSampler
+from torch.utils.data import Sampler, DataLoader
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
@@ -39,6 +39,7 @@ from gpt2.model import GPT, GPTConfig
 from data.median_dataset import MedianDataset
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
+from data.memory_efficient_random_sampler import MemoryEfficientRandomSampler
 from gpt2.utils import load_tokenizer, run_generation_step, prepare_validation_examples_for_task
 
 load_dotenv()
@@ -53,7 +54,7 @@ class CyclicalDataLoader:
     def __init__(
         self,
         dataset: SubSequenceMidiDataset | NextTokenDataset,
-        sampler: DistributedSampler,
+        sampler: Sampler,
         batch_size: int,
         shuffle: bool = False,
         pin_memory: bool = False,
@@ -306,14 +307,8 @@ def main(cfg: DictConfig):
     # note: float16 data type will automatically use a GradScaler
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
     ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
-    train_sampler = DistributedSampler(
-        dataset=train_dataset,
-        shuffle=True,
-        seed=4 + seed_offset,
-    )
-    val_sampler = DistributedSampler(
-        dataset=val_dataset,
-        shuffle=False,
+    train_sampler = MemoryEfficientRandomSampler(
+        data_source=train_dataset,
         seed=4 + seed_offset,
     )
     # Create the loaders
@@ -329,7 +324,7 @@ def main(cfg: DictConfig):
 
     val_loader = CyclicalDataLoader(
         val_dataset,
-        sampler=val_sampler,
+        sampler=None,
         batch_size=cfg.data.batch_size,
         shuffle=False,
         pin_memory=device_type == "cuda",
