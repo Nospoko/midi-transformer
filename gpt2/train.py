@@ -27,10 +27,10 @@ import hydra
 import torch
 import psutil
 from dotenv import load_dotenv
-from torch.utils.data import DataLoader
 from hydra.utils import to_absolute_path
 from datasets import Dataset, load_dataset
 from omegaconf import OmegaConf, DictConfig
+from torch.utils.data import DataLoader, DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
 
@@ -39,7 +39,6 @@ from gpt2.model import GPT, GPTConfig
 from data.median_dataset import MedianDataset
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
-from data.distributed_midi_sampler import DistributedMidiSampler
 from gpt2.utils import load_tokenizer, run_generation_step, prepare_validation_examples_for_task
 
 load_dotenv()
@@ -54,7 +53,7 @@ class CyclicalDataLoader:
     def __init__(
         self,
         dataset: SubSequenceMidiDataset | NextTokenDataset,
-        sampler: DistributedMidiSampler,
+        sampler: DistributedSampler,
         batch_size: int,
         shuffle: bool = False,
         pin_memory: bool = False,
@@ -307,14 +306,15 @@ def main(cfg: DictConfig):
     # note: float16 data type will automatically use a GradScaler
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
     ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
-    train_sampler = DistributedMidiSampler(
-        dataset_length=len(train_dataset),
+    train_sampler = DistributedSampler(
+        dataset=train_dataset,
         shuffle=True,
-        seed=1337 + seed_offset,
+        seed=4 + seed_offset,
     )
-    val_sampler = DistributedMidiSampler(
-        dataset_length=len(val_dataset),
+    val_sampler = DistributedSampler(
+        dataset=val_dataset,
         shuffle=False,
+        seed=4 + seed_offset,
     )
     # Create the loaders
     train_loader = CyclicalDataLoader(
