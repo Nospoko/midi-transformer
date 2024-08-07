@@ -30,7 +30,7 @@ class MedianDataset(MidiDataset):
         def get_length(record, notes_per_record, shared_list):
             length = len(record["notes"]["pitch"]) - notes_per_record + 1
             # Make sure not to have lengths less than 0
-            shared_list.append(min(length, 0))
+            shared_list.append(max(length, 0))
 
         with Manager() as manager:
             shared_list = manager.list()
