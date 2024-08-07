@@ -161,8 +161,6 @@ def prepare_subsequence_datasets(cfg: DictConfig) -> tuple[Any, Any]:
 
 def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any]:
     dataset_config = OmegaConf.to_container(cfg.dataset)
-    # TODO: better config handling
-    dataset_config.pop("notes_per_record")
     dataset_path = to_absolute_path("./midi_datasets/AugmentedDataset")
 
     dataset = load_dataset(
@@ -180,14 +178,14 @@ def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any]:
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
         loss_masking=cfg.loss_masking,
-        notes_per_record=cfg.dataset.notes_per_record,
+        notes_per_record=cfg.data.notes_per_record,
     )
     val_dataset = MedianDataset(
         dataset=validation_split,
         tokenizer=tokenizer,
         sequence_length=cfg.data.sequence_length,
         loss_masking=cfg.loss_masking,
-        notes_per_record=cfg.dataset.notes_per_record,
+        notes_per_record=cfg.data.notes_per_record,
     )
     return train_dataset, val_dataset
 
@@ -223,8 +221,8 @@ def main(cfg: DictConfig):
 
         # World_size number of processes will be training simultaneously, so we can scale
         # down the desired gradient accumulation iterations per process proportionally
-        assert cfg.data.gradient_accumulation_steps % ddp_world_size == 0
-        cfg.data.gradient_accumulation_steps //= ddp_world_size
+        assert cfg.optimizer.gradient_accumulation_steps % ddp_world_size == 0
+        cfg.optimizer.gradient_accumulation_steps //= ddp_world_size
 
     else:
         # If not ddp, we are running on a single gpu, and one process
@@ -245,13 +243,12 @@ def main(cfg: DictConfig):
 
         cfg.model = checkpoint_cfg.model
         batch_size = cfg.data.batch_size
-        gradient_accumulation_steps = cfg.data.gradient_accumulation_steps
+        gradient_accumulation_steps = cfg.optimizer.gradient_accumulation_steps
         cfg.data = checkpoint_cfg.data
         cfg.data.batch_size = batch_size
-        cfg.data.gradient_accumulation_steps = gradient_accumulation_steps
+        cfg.optimizer.gradient_accumulation_steps = gradient_accumulation_steps
+        cfg.tokenizer = checkpoint_cfg.tokenizer
 
-        if "tokenizer_parameters" in checkpoint_cfg.dataset:
-            cfg.data.tokenizer_parameters = checkpoint_cfg.dataset.tokenizer_parameters
         cfg.system.dtype = checkpoint_cfg.system.dtype
 
         train_dataset, val_dataset = get_dataset_for_task(cfg=cfg)
@@ -296,7 +293,7 @@ def main(cfg: DictConfig):
         model = GPT(config=gptconf, pad_token_id=pad_token_id)
 
     tokens_per_batch = cfg.data.batch_size * cfg.data.sequence_length
-    tokens_per_iter = cfg.data.gradient_accumulation_steps * ddp_world_size * tokens_per_batch
+    tokens_per_iter = cfg.optimizer.gradient_accumulation_steps * ddp_world_size * tokens_per_batch
     print(f"tokens per iteration will be: {tokens_per_iter:,}")
     if cfg.task != "next_token_prediction":
         tokens_in_dataset = train_dataset.dataset.num_rows * train_dataset.sequence_length
@@ -452,18 +449,18 @@ def main(cfg: DictConfig):
         # and using the GradScaler if data type is float16
         t00 = time.time()
         n_iter_tokens = 0
-        for micro_step in range(cfg.data.gradient_accumulation_steps):
+        for micro_step in range(cfg.optimizer.gradient_accumulation_steps):
             if ddp:
                 # in DDP training we only need to sync gradients at the last micro step.
                 # the official way to do this is with model.no_sync() context manager, but
                 # I really dislike that this bloats the code and forces us to repeat code
                 # looking at the source of that context manager, it just toggles this variable
-                model.require_backward_grad_sync = micro_step == cfg.data.gradient_accumulation_steps - 1
+                model.require_backward_grad_sync = micro_step == cfg.optimizer.gradient_accumulation_steps - 1
             with ctx:
                 n_iter_tokens += X.numel()
                 logits, loss = model(X, Y, mask)
                 # scale the loss to account for gradient accumulation
-                loss = loss / cfg.data.gradient_accumulation_steps
+                loss = loss / cfg.optimizer.gradient_accumulation_steps
 
             # immediately async prefetch next batch while model is doing the forward pass on the GPU
             X, Y, mask = get_batch("train")
@@ -566,8 +563,8 @@ def main(cfg: DictConfig):
         if local_iter_num % cfg.logging.log_interval == 0 and master_process:
             # get loss as float. note: this is a CPU-GPU sync point
             # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
-            lossf = loss.item() * cfg.data.gradient_accumulation_steps
-            mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
+            lossf = loss.item() * cfg.optimizer.gradient_accumulation_steps
+            mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.optimizer.gradient_accumulation_steps, dt)
             running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
             tps = tokens_in_step / t_forward_backward
 

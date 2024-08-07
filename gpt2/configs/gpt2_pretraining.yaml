@@ -1,9 +1,11 @@
 defaults:
   - model: gpt2 # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
-  - data: pretraining
+  - data: default
   - dataset: tokenized
   - logging: pretraining
   - lr: pretraining
+  - optimizer: default
+  - tokenizer: exponential
   - _self_
 
 data:
@@ -18,14 +20,6 @@ always_save_checkpoint: false  # if True, always save a checkpoint after each ev
 init_from: 'scratch'  # 'scratch' or 'resume' or 'midi-gpt2*'
 task: next_token_prediction
 loss_masking: pretraining
-
-optimizer:
-  learning_rate: ${lr.learning_rate} # max learning rate
-  weight_decay: 0.1
-  max_iters: ${data.max_iters} # define max_iters in data but leave the parameter here as well
-  beta1: 0.9
-  beta2: 0.95
-  grad_clip: 1.0  # clip gradients at this value, or disable if == 0.0
 
 ddp:
   backend: 'nccl'  # 'nccl', 'gloo', etc.

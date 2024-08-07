@@ -68,10 +68,10 @@ def load_cfg(checkpoint: dict) -> DictConfig:
 
 
 def load_tokenizer(cfg: DictConfig):
-    tokenizer_parameters = OmegaConf.to_container(cfg.data.tokenizer_parameters)
+    tokenizer_parameters = OmegaConf.to_container(cfg.tokenizer.tokenizer_parameters)
     tokenizer_parameters |= {"special_tokens": special_tokens}
 
-    if cfg.data.tokenizer == "AwesomeMidiTokenizer":
+    if cfg.tokenizer.tokenizer == "AwesomeMidiTokenizer":
         min_time_unit = tokenizer_parameters["min_time_unit"]
         n_velocity_bins = tokenizer_parameters["min_velocity_bins"]
         tokenizer_path = to_absolute_path(

@@ -21,10 +21,10 @@ For example:
 OMP_NUM_THREADS=32 PYTHONPATH=. torchrun --nproc-per-node=2 \
 gpt2/train.py --config-name=gpt2_pretraining \
 data.batch_size=32 \
-data.gradient_accumulation_steps=8 \
-data.max_iters=12000 \
+optimizer.gradient_accumulation_steps=8 \
+optimizer.max_iters=12000 \
 data.sequence_length=1024 \
-dataset.notes_per_record=128 \
+data.notes_per_record=128 \
 dataset.step=48 \
 dataset.extra_datasets="['roszcz/giant-midi-sustain-v2']" \
 dataset.augmentation.max_pitch_shift=0 \
