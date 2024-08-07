@@ -39,6 +39,7 @@ from gpt2.model import GPT, GPTConfig
 from data.median_dataset import MedianDataset
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
+from data.distributed_midi_sampler import DistributedMidiSampler
 from gpt2.utils import load_tokenizer, run_generation_step, prepare_validation_examples_for_task
 
 load_dotenv()
@@ -52,7 +53,8 @@ def log_open_files():
 class CyclicalDataLoader:
     def __init__(
         self,
-        dataset: NextTokenDataset | SubSequenceMidiDataset,
+        dataset: SubSequenceMidiDataset | NextTokenDataset,
+        sampler: DistributedMidiSampler,
         batch_size: int,
         shuffle: bool = False,
         pin_memory: bool = False,
@@ -65,13 +67,12 @@ class CyclicalDataLoader:
         self.pin_memory = pin_memory
         self.num_workers = num_workers
         self.device = device
-        # TODO: Implement different shuffling or random sampling method
         self.dataloader = DataLoader(
-            self.dataset,
+            dataset=dataset,
+            sampler=sampler,
             batch_size=self.batch_size,
             pin_memory=self.pin_memory,
             num_workers=num_workers,
-            shuffle=False,
         )
         self.iterator = iter(self.dataloader)
 
@@ -314,10 +315,19 @@ def main(cfg: DictConfig):
     # note: float16 data type will automatically use a GradScaler
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
     ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
-
+    train_sampler = DistributedMidiSampler(
+        dataset_length=len(train_dataset),
+        shuffle=True,
+        seed=1337 + seed_offset,
+    )
+    val_sampler = DistributedMidiSampler(
+        dataset_length=len(val_dataset),
+        shuffle=False,
+    )
     # Create the loaders
     train_loader = CyclicalDataLoader(
         train_dataset,
+        sampler=train_sampler,
         batch_size=cfg.data.batch_size,
         shuffle=True,
         pin_memory=device_type == "cuda",
@@ -327,6 +337,7 @@ def main(cfg: DictConfig):
 
     val_loader = CyclicalDataLoader(
         val_dataset,
+        sampler=val_sampler,
         batch_size=cfg.data.batch_size,
         shuffle=False,
         pin_memory=device_type == "cuda",
@@ -425,6 +436,7 @@ def main(cfg: DictConfig):
     total_tokens = 0
     # training loop
     X, Y, mask = get_batch("train")  # fetch the very first batch
+    print(X[:5, :5])
     t0 = time.time()
     local_iter_num = 0  # number of iterations in the lifetime of this process
     raw_model = model.module if ddp else model  # unwrap DDP container if needed
