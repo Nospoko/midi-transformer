@@ -242,7 +242,8 @@ def main(cfg: DictConfig):
         checkpoint_cfg = OmegaConf.create(checkpoint["config"])
 
         cfg.model = checkpoint_cfg.model
-        cfg.tokenizer = checkpoint_cfg.tokenizer
+        if "tokenizer" in checkpoint_cfg:
+            cfg.tokenizer = checkpoint_cfg.tokenizer
 
         cfg.system.dtype = checkpoint_cfg.system.dtype
 
