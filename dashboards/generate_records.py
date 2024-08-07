@@ -97,7 +97,7 @@ def dataset_configuration():
     with col3:
         prediction_task = st.selectbox(
             "Extraction Type",
-            options=["bass_prediction", "reverse_bass_prediction", "-"],
+            options=["bass_prediction", "reverse_bass_prediction", "high_median_prediction", "-"],
             help="Select the type of notes to extract",
         )
 
@@ -128,6 +128,12 @@ def generate_music(
         for record in dataset:
             if task == "next_token_prediction":
                 prompts += generation.prepare_next_token_prediction_prompts(
+                    record=record,
+                    prompt_duration=prompt_duration,
+                    time_step=prompt_creation_time_step,
+                )
+            elif task == "high_median_prediction":
+                prompts += generation.prepare_high_median_prompts(
                     record=record,
                     prompt_duration=prompt_duration,
                     time_step=prompt_creation_time_step,

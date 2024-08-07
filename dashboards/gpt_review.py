@@ -111,10 +111,6 @@ def main():
         # Decode and display the original piece
 
         notes = prepare_record(record=record, start=start, end=end)
-
-        notes_pressed_at_end = notes[(notes.start < end) & (notes.end > end)]
-        n_notes_pressed = len(notes_pressed_at_end)
-
         piece = ff.MidiPiece(notes, source=source)
 
         if not run:
@@ -126,10 +122,6 @@ def main():
         note_token_ids = tokenizer.encode(
             notes=notes,
         )
-        # Cut the notes to end the sequence roughly at the exact timestamp.
-        # This should help with model performance and generate better sounding sequences
-        if n_notes_pressed > 0:
-            note_token_ids = note_token_ids[: -3 * n_notes_pressed]
         input_sequence = torch.tensor(
             [note_token_ids],
             device=device,
