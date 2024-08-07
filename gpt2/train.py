@@ -242,11 +242,6 @@ def main(cfg: DictConfig):
         checkpoint_cfg = OmegaConf.create(checkpoint["config"])
 
         cfg.model = checkpoint_cfg.model
-        batch_size = cfg.data.batch_size
-        gradient_accumulation_steps = cfg.optimizer.gradient_accumulation_steps
-        cfg.data = checkpoint_cfg.data
-        cfg.data.batch_size = batch_size
-        cfg.optimizer.gradient_accumulation_steps = gradient_accumulation_steps
         cfg.tokenizer = checkpoint_cfg.tokenizer
 
         cfg.system.dtype = checkpoint_cfg.system.dtype
