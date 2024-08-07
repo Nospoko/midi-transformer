@@ -65,12 +65,13 @@ class CyclicalDataLoader:
         self.pin_memory = pin_memory
         self.num_workers = num_workers
         self.device = device
+        # TODO: Implement different shuffling or random sampling method
         self.dataloader = DataLoader(
             self.dataset,
             batch_size=self.batch_size,
             pin_memory=self.pin_memory,
             num_workers=num_workers,
-            shuffle=shuffle,
+            shuffle=False,
         )
         self.iterator = iter(self.dataloader)
 

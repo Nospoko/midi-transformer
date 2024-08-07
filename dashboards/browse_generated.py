@@ -77,7 +77,8 @@ def main():
                         generated_notes_df = pd.DataFrame(generated_notes)
 
                         # Keep only the rows that are in generated_notes but not in prompt_notes
-                        columns_to_compare = generated_notes_df.columns.tolist()
+                        columns_to_compare = ["start", "end", "pitch"]
+
                         merged = generated_notes_df.merge(
                             prompt_notes_df,
                             on=columns_to_compare,
@@ -86,8 +87,9 @@ def main():
                         )
                         generated_notes_unique = merged[merged["_merge"] == "left_only"].drop("_merge", axis=1)
                         generated_notes_unique = generated_notes_unique.reset_index(drop=True)
-                        generated_notes_unique = generated_notes_unique.drop("duration", axis=1)
-                        st.dataframe(generated_notes_unique)
+                        generated_notes_unique = generated_notes_unique.rename({"velocity_x": "velocity"}, axis=1)
+                        generated_notes_unique = generated_notes_unique[["start", "end", "pitch", "velocity"]]
+
                         generated_piece = ff.MidiPiece(df=generated_notes_unique)
 
                         prompt_piece = ff.MidiPiece(df=prompt_notes_df)
@@ -115,7 +117,6 @@ def main():
                 else:
                     st.write("No predictions found for this prompt and model combination.")
 
-    # The rest of the tabs remain unchanged
     with tab2:
         st.header("Models")
         models_df = database_manager.get_all_models()
