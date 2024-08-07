@@ -23,29 +23,34 @@ class MedianDataset(MidiDataset):
         self.sequence_length = sequence_length
         self.notes_per_record = notes_per_record
         self.length = 0
-        self.record_lengths = []
+        self.record_lengths = {}
         self._build_record_lengths()
 
     def _build_record_lengths(self):
-        def get_length(record, notes_per_record, shared_list):
+        def get_length(record, idx, notes_per_record, shared_dict):
             length = len(record["notes"]["pitch"]) - notes_per_record + 1
             # Make sure not to have lengths less than 0
-            shared_list.append(max(length, 0))
+            shared_dict[idx] = max(length, 0)
 
         with Manager() as manager:
-            shared_list = manager.list()
-            get_length_partial = partial(get_length, notes_per_record=self.notes_per_record, shared_list=shared_list)
+            shared_dict = manager.dict()
+            get_length_partial = partial(get_length, notes_per_record=self.notes_per_record, shared_dict=shared_dict)
 
-            self.dataset.map(get_length_partial, num_proc=32, desc="Building record lengths")
-            self.record_lengths = list(shared_list)
+            self.dataset.map(
+                get_length_partial,
+                num_proc=32,
+                desc="Building record lengths",
+                with_indices=True,
+            )
+            self.record_lengths = dict(shared_dict)
 
-        self.length = sum(self.record_lengths)
+        self.length = sum(self.record_lengths.values())
 
     def __len__(self):
         return self.length
 
     def _index_to_record_and_start(self, idx):
-        for record_id, length in enumerate(self.record_lengths):
+        for record_id, length in self.record_lengths.items():
             if idx < length:
                 return record_id, idx
             idx -= length

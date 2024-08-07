@@ -10,6 +10,7 @@ from dashboards.hf_midi_dataset_review import main as hf_datasets_review
 from dashboards.validation_examples_manager import main as validation_manager
 from dashboards.extracted_voice_gpt_review import main as extracted_voice_gpt_review
 from dashboards.subsequence_dataset_review import main as subsequense_dataset_review
+from dashboards.fully_sampled_dataset_review import main as fully_sampled_dataset_review
 from dashboards.hf_subsequence_dataset_review import main as hf_subsequence_dataset_review
 
 load_dotenv()
@@ -27,6 +28,7 @@ def main():
         "augmentation_review",
         "midi_dataset_review",
         "subsequence_dataset_review",
+        "fully_sampled_dataset_review",
         "evaluation",
     ]
     display_mode = st.selectbox(label="display mode", options=options)
@@ -52,6 +54,8 @@ def main():
             subsequense_dataset_review()
         case "generate_records":
             generate_records()
+        case "fully_sampled_dataset_review":
+            fully_sampled_dataset_review()
 
 
 if __name__ == "__main__":
