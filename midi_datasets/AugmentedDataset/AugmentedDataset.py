@@ -106,12 +106,14 @@ class AugmentedDataset(GeneratorBasedBuilder):
                 piece = ff.MidiPiece.from_huggingface(dict(record))
                 pieces = self.filter_pauses(piece)
                 all_records = [self.create_record(piece) for piece in pieces]
-                all_records = [record for record in all_records if self.validate_record(recod=record)]
+                all_records = [record for record in all_records if self.validate_record(record=record)]
                 for jt, sequence in enumerate(all_records):
                     key = f"{it}_{jt}_{shard_id}"
                     yield key, sequence
 
     def validate_record(self, record: dict):
+        if len(record["notes"]["pitch"]) < 2:
+            return False
         if min(record["notes"]["pitch"]) < 21 or max(record["notes"]["pitch"]) > 109:
             return False
         return True
