@@ -312,6 +312,11 @@ def main(cfg: DictConfig):
         data_source=train_dataset,
         seed=4 + seed_offset,
     )
+    val_sampler = MemoryEfficientRandomSampler(
+        data_source=val_dataset,
+        seed=4 + seed_offset,
+        num_samples=cfg.data.batch_size * cfg.eval_iters,
+    )
     # Create the loaders
     train_loader = CyclicalDataLoader(
         train_dataset,
@@ -325,7 +330,7 @@ def main(cfg: DictConfig):
 
     val_loader = CyclicalDataLoader(
         val_dataset,
-        sampler=None,
+        sampler=val_sampler,
         batch_size=cfg.data.batch_size,
         shuffle=False,
         pin_memory=device_type == "cuda",
