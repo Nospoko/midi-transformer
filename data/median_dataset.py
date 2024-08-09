@@ -19,6 +19,7 @@ class MedianDataset(MidiDataset):
         notes_per_record: int,
         loss_masking: Literal["finetuning", "pretraining"] = "pretraining",
     ):
+        # Initialize the parent class and set instance variables
         super().__init__(dataset=dataset, tokenizer=tokenizer, loss_masking=loss_masking)
         self.sequence_length = sequence_length
         self.notes_per_record = notes_per_record
@@ -27,14 +28,20 @@ class MedianDataset(MidiDataset):
         self._build_record_lengths()
 
     def _build_record_lengths(self):
+        # Helper function to calculate the length of each record
         def get_length(record, idx, notes_per_record, shared_dict):
             length = len(record["notes"]["pitch"]) - notes_per_record + 1
-            # Make sure not to have lengths less than 0
+            # Ensure length is not negative
             shared_dict[idx] = max(length, 0)
 
+        # Use HuggingFace's .map method for simplicity and multiprocessing.Manager for shared recources
         with Manager() as manager:
             shared_dict = manager.dict()
-            get_length_partial = partial(get_length, notes_per_record=self.notes_per_record, shared_dict=shared_dict)
+            get_length_partial = partial(
+                get_length,
+                notes_per_record=self.notes_per_record,
+                shared_dict=shared_dict,
+            )
 
             self.dataset.map(
                 get_length_partial,
@@ -44,12 +51,15 @@ class MedianDataset(MidiDataset):
             )
             self.record_lengths = dict(shared_dict)
 
+        # Calculate total dataset length
         self.length = sum(self.record_lengths.values())
 
     def __len__(self):
+        # Return the total length of the dataset
         return self.length
 
     def _index_to_record_and_start(self, idx):
+        # Convert global index to record ID and start point within that record
         for record_id, length in self.record_lengths.items():
             if idx < length:
                 return record_id, idx
@@ -57,24 +67,31 @@ class MedianDataset(MidiDataset):
         raise IndexError("Index out of range")
 
     def __getitem__(self, idx: int) -> dict:
+        # Get the record ID and start point for the given index
         record_id, start_point = self._index_to_record_and_start(idx)
 
+        # Retrieve the record from the dataset
         record = self.dataset[record_id]
 
+        # Convert notes to a DataFrame and select the desired range
         notes = pd.DataFrame(record["notes"])
         notes = notes.iloc[start_point : start_point + self.notes_per_record]
 
+        # Normalize start and end times
         offset = notes.start.min()
         notes.start = notes.start - offset
         notes.end = notes.end - offset
 
+        # Split notes based on median pitch
         median = notes.pitch.median()
         source_notes = notes[notes.pitch < median]
         target_notes = notes[notes.pitch >= median]
 
+        # Define prefix tokens for source and target
         source_prefix = "<LOW_FROM_MEDIAN>"
         target_prefix = "<HIGH_FROM_MEDIAN>"
 
+        # Encode source and target notes
         prompt_token_ids = self.tokenizer.encode(
             notes=source_notes,
             prefix_tokens=[source_prefix],
@@ -84,22 +101,26 @@ class MedianDataset(MidiDataset):
             prefix_tokens=[target_prefix],
         )
         encoding = prompt_token_ids + target_token_ids
-        # Concatenating tokens so had to move padding here again
-        # I think this is good place for paddig btw, because we do not need it during inference anyway
-        # and this class is for loading data for training - which is the only scenario where we need padding
 
+        # Add padding to reach the desired sequence length
         padding_size = self.sequence_length - len(encoding) + 1
         padding = [self.tokenizer.pad_token_id] * padding_size
         encoding = encoding + padding
-        # The inputs to the transformer will be the offset sequence
+
+        # Create source and target encodings
         source_encoding = encoding[:-1]
         target_encoding = encoding[1:]
 
+        # Convert encodings to tensors
         source_token_ids = torch.tensor(source_encoding[: self.sequence_length], dtype=torch.int64)
         target_token_ids = torch.tensor(target_encoding[: self.sequence_length], dtype=torch.int64)
+
+        # Create target mask
         target_mask = target_token_ids != self.tokenizer.pad_token_id
         if self.loss_masking == "finetuning":
             target_mask[: len(prompt_token_ids)] = False
+
+        # Prepare the output dictionary
         out = {
             "source_token_ids": source_token_ids,
             "target_token_ids": target_token_ids,
