@@ -58,7 +58,9 @@ def load_model_and_tokenizer():
                 map_location=device,
             )
 
-        run_name = os.path.basename(checkpoint_path)
+        run_name: str = os.path.basename(checkpoint_path)
+        run_name = run_name.removesuffix(".pt")
+
         model_registration, _ = database_manager.register_model_from_checkpoint(
             checkpoint=checkpoint,
             run_name=run_name,
