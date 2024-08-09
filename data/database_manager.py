@@ -197,7 +197,7 @@ def insert_generated_notes(
     generated_notes: pd.DataFrame,
 ):
     generated_notes = generated_notes.to_json()
-    prompt["prompt_notes"] = prompt["prompt_notes"].to_json()
+    prompt["prompt_notes"] = prompt["prompt_notes"].to_dict()
 
     # Get or create IDs
     parameters_id = register_generation_parameters(parameters)
