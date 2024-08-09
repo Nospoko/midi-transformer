@@ -197,7 +197,6 @@ def generate_music(
 
 def main():
     st.title("🎵 Music Generation Dashboard for populating the database")
-
     cfg, checkpoint, tokenizer, device, ctx, model_registration = load_model_and_tokenizer()
 
     tab1, tab2, tab3 = st.tabs(["Dataset Selection", "Generation Parameters", "Results"])
@@ -229,6 +228,7 @@ def main():
                 prompt_creation_time_step=prompt_creation_time_step,
                 prediction_task=prediction_task,
             )
+    del checkpoint
 
 
 if __name__ == "__main__":
