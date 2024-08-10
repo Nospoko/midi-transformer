@@ -1,11 +1,11 @@
 defaults:
   - model: gpt2_small # "gpt2_minimal", "gpt2_medium", "gpt2_large", "gpt2_xl"
   - data: default
+  - tokenizer: exponential
   - dataset: sliced
   - logging: pretraining
   - lr: pretraining-small
   - optimizer: default
-  - tokenizer: exponential
   - _self_
 
 out_dir: 'checkpoints'

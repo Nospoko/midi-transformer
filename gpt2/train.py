@@ -106,6 +106,8 @@ def get_dataset_for_task(cfg: DictConfig) -> tuple[Any, Any]:
 def prepare_dataset_base(cfg: DictConfig, dataset_name: str) -> tuple[Dataset, Dataset]:
     dataset_config = OmegaConf.to_container(cfg.dataset)
     dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
+    if dataset_name == "MidiTokenizedDataset":
+        dataset_config["tokenizer_parameters"] = OmegaConf.to_container(cfg.tokenizer.tokenizer_parameters)
 
     dataset = load_dataset(
         dataset_path,
