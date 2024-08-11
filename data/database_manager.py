@@ -21,6 +21,7 @@ model_dtype = {
     "name": sa.String(255),
     "milion_parameters": sa.Integer,
     "best_val_loss": sa.Float,
+    "train_loss": sa.Float,
     "total_tokens": sa.Integer,
     "configs": sa.JSON,
     "training_task": sa.String(255),
@@ -526,6 +527,8 @@ def register_model_from_checkpoint(
         model_registration |= {"wandb_link": checkpoint["wandb"]}
     if "total_tokens" in checkpoint.keys():
         model_registration |= {"total_tokens": checkpoint["total_tokens"]}
+    if "train_loss" in checkpoint.keys():
+        model_registration |= {"train_loss": float(checkpoint["train_loss"])}
     if base_model_id is not None:
         model_registration |= {"base_model_id": base_model_id}
 
