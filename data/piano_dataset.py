@@ -8,6 +8,7 @@ from datasets import Dataset as HuggingFaceDataset
 
 from data.dataset import MidiDataset
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
+from data.tasks import get_task_generator, get_source_task_token, get_target_task_token
 
 
 class PianoDataset(MidiDataset):
@@ -25,7 +26,7 @@ class PianoDataset(MidiDataset):
         self.sequence_length = sequence_length
         self.notes_per_record = notes_per_record
         self.length = 0
-        self.record_lengths = {}
+        self.record_data = {}
         self.tasks = tasks
         self.num_tasks = len(self.tasks)
         self._build_records()
@@ -56,27 +57,27 @@ class PianoDataset(MidiDataset):
                 desc="Building record lengths",
                 with_indices=True,
             )
-            self.record_lengths = dict(shared_dict)
+            self.record_data = dict(shared_dict)
 
         # Calculate total dataset length
-        self.length = sum(self.record_lengths.values())
+        self.length = sum([record["length"] for record in self.record_data.values()])
 
     def __len__(self):
         # Return the total length of the dataset
         return self.length
 
-    def _index_to_record_and_start(self, idx):
+    def _index_to_record(self, idx):
         # Convert global index to record ID and start point within that record
-        for record_id, length in self.record_lengths.items():
-            if idx < length:
-                return record_id, idx
-            idx -= length
+        for record_data in self.record_data.values():
+            if idx < record_data["length"]:
+                return record_data["record_id"], idx, record_data["task"]
+            idx -= record_data["length"]
         raise IndexError("Index out of range")
 
     def __getitem__(self, idx: int) -> dict:
         # TODO: different implementations for each task
         # Get the record ID and start point for the given index
-        record_id, start_point = self._index_to_record_and_start(idx)
+        record_id, start_point, task = self._index_to_record(idx)
 
         # Retrieve the record from the dataset
         record = self.dataset[record_id]
@@ -90,14 +91,11 @@ class PianoDataset(MidiDataset):
         notes.start = notes.start - offset
         notes.end = notes.end - offset
 
-        # Split notes based on median pitch
-        median = notes.pitch.median()
-        source_notes = notes[notes.pitch < median]
-        target_notes = notes[notes.pitch >= median]
+        task_generator = get_task_generator(task=task)
+        source_notes, target_notes = task_generator(notes)
 
-        # Define prefix tokens for source and target
-        source_prefix = "<LOW_FROM_MEDIAN>"
-        target_prefix = "<HIGH_FROM_MEDIAN>"
+        source_prefix = get_source_task_token(task=task)
+        target_prefix = get_target_task_token(task=task)
 
         # Encode source and target notes
         prompt_token_ids = self.tokenizer.encode(

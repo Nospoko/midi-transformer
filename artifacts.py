@@ -1,4 +1,4 @@
-placeholder_tokens = [f"<SENTINEL_{idx}>" for idx in range(98)]
+placeholder_tokens = [f"<SENTINEL_{idx}>" for idx in range(84)]
 special_tokens = [
     "<PAD>",
     "<CLS>",
@@ -29,8 +29,24 @@ special_tokens = [
     "<NO_TREBLE>",
     "<LOW_FROM_MEDIAN>",
     "<HIGH_FROM_MEDIAN>",
+    "<ABOVE_LOW_QUARTILE>",
+    "<BELOW_LOW_QUARTILE>",
+    "<ABOVE_HIGH_QUARTILE>",
+    "<BELOW_HIGH_QUARTILE>",
+    "<MIDDLE_QUARTILES>",
+    "<EXTREME_QUARTILES>",
+    "<LOUD>",
+    "<SOFT>",
+    "<ABOVE_SOFT>",
+    "<VERY_SOFT>",
+    "<VERY_LOUD>",
+    "<BELOW_LOUD>",
+    "<MODERATE_VELOCITY>",
+    "<EXTREME_VELOCITY>",
 ] + placeholder_tokens
 
+
+# New task definitions are in data/tasks.py
 
 prediction_task_to_token_pair = {
     "bass_prediction": ("<BASS>", "<NO_BASS>"),
@@ -45,7 +61,21 @@ prediction_task_to_token_pair = {
     "mp_prediction": ("<MP>", "<NO_MP>"),
     "mf_prediction": ("<MF>", "<NO_MF>"),
     "f_prediction": ("<F>", "<NO_F>"),
+    # Dynamically calculated pitch tasks
     "high_median_prediction": ("<HIGH_FROM_MEDIAN>", "<LOW_FROM_MEDIAN>"),
+    "low_median_prediction": ("<LOW_FROM_MEDIAN>", "<HIGH_FROM_MEDIAN>"),
+    "above_low_quartile_prediction": ("<ABOVE_LOW_QUARTILE>", "<BELOW_LOW_QUARTILE>"),
+    "above_high_quartile_prediction": ("<ABOVE_HIGH_QUARTILE>", "<BELOW_HIGH_QUARTILE>"),
+    "below_low_quartile_prediction": ("<BELOW_LOW_QUARTILE>", "<ABOVE_LOW_QUARTILE>"),
+    "below_high_quartile_prediction": ("<BELOW_HIGH_QUARTILE", "<ABOVE_HIGH_QUARTILE>"),
+    "middle_quartiles_prediction": ("<MIDDLE_QUARTILES>", "<EXTREME_QUARTILES>"),
+    "extreme_quartiles_prediction": ("<EXTREME_QUARTILES>", "<MIDDLE_QUARTILES>"),
+    # Velocity tasks
+    "loud_prediction": ("<LOUD>", "<SOFT>"),
+    "very_soft_prediction": ("<ABOVE_VERY_SOFT>", "<VERY_SOFT>"),
+    "very_loud_prediction": ("<VERY_LOUD>", "<BELOW_VERY_LOUD>"),
+    "soft_prediction": ("<SOFT>", "<LOUD>"),
+    "moderate_velocity_prediction": ("<MODERATE_VELOCITY>", "<EXTREME_VELOCITY>"),
 }
 
 voice_task_to_range = {

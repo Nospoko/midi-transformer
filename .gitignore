@@ -7,3 +7,4 @@ checkpoints*
 pretrained*
 .env
 notes*
+.csv
