@@ -36,6 +36,7 @@ from torch.distributed import init_process_group, destroy_process_group
 
 import wandb
 from gpt2.model import GPT, GPTConfig
+from data.piano_dataset import PianoDataset
 from data.median_dataset import MedianDataset
 from data.next_token_dataset import NextTokenDataset
 from data.subsequence_dataset import SubSequenceMidiDataset
@@ -96,6 +97,7 @@ def get_dataset_for_task(cfg: DictConfig) -> tuple[Any, Any]:
         "bass_prediction": prepare_subsequence_datasets,
         "reverse_bass_prediction": prepare_reverse_bass_datasets,
         "high_median_prediction": prepare_median_datasets,
+        "multi": prepare_piano_dataset,
     }
     prepare_function = task_to_dataset.get(cfg.task)
     if prepare_function:
@@ -188,6 +190,39 @@ def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any]:
         sequence_length=cfg.data.sequence_length,
         loss_masking=cfg.loss_masking,
         notes_per_record=cfg.data.notes_per_record,
+    )
+    return train_dataset, val_dataset
+
+
+def prepare_piano_dataset(cfg: DictConfig) -> tuple[Any, Any]:
+    dataset_config = OmegaConf.to_container(cfg.dataset)
+    dataset_path = to_absolute_path("./midi_datasets/AugmentedDataset")
+
+    dataset = load_dataset(
+        dataset_path,
+        trust_remote_code=True,
+        num_proc=cfg.system.data_workers,
+        **dataset_config,
+    )
+    train_split: Dataset = dataset["train"]
+    validation_split: Dataset = dataset["validation"]
+
+    tokenizer = load_tokenizer(cfg)
+    train_dataset = PianoDataset(
+        dataset=train_split,
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+        loss_masking=cfg.loss_masking,
+        notes_per_record=cfg.data.notes_per_record,
+        tasks=cfg.tasks,
+    )
+    val_dataset = PianoDataset(
+        dataset=validation_split,
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+        loss_masking=cfg.loss_masking,
+        notes_per_record=cfg.data.notes_per_record,
+        tasks=cfg.tasks,
     )
     return train_dataset, val_dataset
 

@@ -115,6 +115,23 @@ prediction_task_to_token_pair = {
     "soft_prediction": ("<SOFT>", "<LOUD>"),
     "moderate_velocity_prediction": ("<MODERATE_VELOCITY>", "<EXTREME_VELOCITY>"),
 }
+all_tasks = [
+    # Dynamically calculated pitch tasks
+    "high_median_prediction",
+    "low_median_prediction",
+    "above_low_quartile_prediction",
+    "above_high_quartile_prediction",
+    "below_low_quartile_prediction",
+    "below_high_quartile_prediction",
+    "middle_quartiles_prediction",
+    "extreme_quartiles_prediction",
+    # Velocity tasks
+    "loud_prediction",
+    "very_soft_prediction",
+    "very_loud_prediction",
+    "soft_prediction",
+    "moderate_velocity_prediction",
+]
 
 
 task_generators = {
