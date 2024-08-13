@@ -89,6 +89,22 @@ def select_generation_parameters() -> (
                 "reverse_bass_prediction",
                 "next_token_prediction",
                 "high_median_prediction",
+                # Dynamically calculated pitch tasks
+                "above_median_prediction",
+                "low_median_prediction",
+                "above_low_quartile_prediction",
+                "above_high_quartile_prediction",
+                "below_low_quartile_prediction",
+                "below_high_quartile_prediction",
+                "middle_quartiles_prediction",
+                "extreme_quartiles_prediction",
+                # Velocity tasks
+                "loud_prediction",
+                "very_soft_prediction",
+                "very_loud_prediction",
+                "soft_prediction",
+                "moderate_velocity_prediction",
+                "extreme_velocity_precition",
             ]
             task = st.selectbox(label="task", options=task_options)
             prompt_context_duration = st.number_input(

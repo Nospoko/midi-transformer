@@ -12,7 +12,6 @@ from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 
 
 def prepare_validation_examples_for_task(cfg: DictConfig) -> list[dict]:
-    validation_examples = database_manager.get_validation_examples_for_task(task=cfg["task"])
     prepared_examles = []
 
     def process_row(row):
@@ -22,6 +21,14 @@ def prepare_validation_examples_for_task(cfg: DictConfig) -> list[dict]:
         }
         prepared_examles.append(example)
 
+    if cfg["task"] == "multi":
+        for task in cfg["tasks"]:
+            validation_examples = database_manager.get_validation_examples_for_task(task=task)
+            validation_examples.apply(process_row, axis=1)
+        return
+
+    validation_examples = database_manager.get_validation_examples_for_task(task=cfg["task"])
+    prepared_examles = []
     validation_examples.apply(process_row, axis=1)
 
     return prepared_examles

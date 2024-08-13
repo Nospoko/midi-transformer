@@ -6,6 +6,7 @@ import streamlit as st
 import streamlit_pianoroll
 from streamlit.errors import DuplicateWidgetID
 
+from data.tasks import all_tasks
 import gpt2.generation as generation
 import data.database_manager as database_manager
 import dashboards.common.utils as dashboard_utils
@@ -42,7 +43,8 @@ def show_validation_prompts():
         "reverse_bass_prediction",
         "next_token_prediction",
         "high_median_prediction",
-    ]
+    ] + all_tasks
+
     task = st.selectbox("task", options=task_options)
     validation_prompts = database_manager.get_validation_examples_for_task(task=task)
     for idx, row in validation_prompts.iterrows():
@@ -107,7 +109,13 @@ def show_prompt_generator():
     with col3:
         prediction_task = st.selectbox(
             "Extraction Type",
-            options=["bass_prediction", "reverse_bass_prediction", "high_median_prediction", "-"],
+            options=[
+                "bass_prediction",
+                "reverse_bass_prediction",
+                "high_median_prediction",
+                "-",
+            ]
+            + all_tasks,
             help="Select the type of notes to extract",
         )
 
@@ -138,10 +146,18 @@ def show_prompt_generator():
                     time_step=prompt_creation_time_step,
                     target_context_duration=generation_parameters["target_context_duration"],
                 )
-            else:
+            elif task == "reverse_bass_prediction" or task == "bass_prediction":
                 prompts += generation.prepare_subsequence_prediction_prompts(
                     record=record,
                     prediction_task=prediction_task,
+                    prompt_duration=prompt_duration,
+                    time_step=prompt_creation_time_step,
+                    target_context_duration=generation_parameters["target_context_duration"],
+                )
+            else:
+                prompts += generation.prepare_dynamically_splitted_prompts(
+                    record=record,
+                    task=prediction_task,
                     prompt_duration=prompt_duration,
                     time_step=prompt_creation_time_step,
                     target_context_duration=generation_parameters["target_context_duration"],

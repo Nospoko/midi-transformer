@@ -3,10 +3,12 @@ import hashlib
 from contextlib import AbstractContextManager
 
 import torch
+import numpy as np
 import pandas as pd
 from torch.nn import functional as F
 
 from gpt2.model import GPT
+from data.tasks import get_task_generator
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 from artifacts import get_voice_task_range, get_source_task_token, get_target_task_token
 
@@ -94,6 +96,58 @@ def prepare_subsequence_prediction_prompts(
         extracted_ids = (fragment.pitch >= low) & (fragment.pitch < high)
         source_notes = fragment[~extracted_ids]
         target_notes = fragment[extracted_ids]
+        target_prompt = target_notes[target_notes.end < target_context_duration]
+        if len(fragment) == 0:
+            continue
+        prompt = {
+            "source_notes": source_notes,
+            "target_prompt": target_prompt,
+            "prompt_notes": pd.concat([source_notes, target_prompt]),
+            "start_time": fragment_start,
+            "end_time": fragment_end,
+            "midi_name": midi_name,
+            "source": record["source"],
+        }
+        prompts.append(prompt)
+        time += time_step
+    return prompts
+
+
+def prepare_dynamically_splitted_prompts(
+    record: dict,
+    time_step: float,
+    prompt_duration: float,
+    target_context_duration: float,
+    task: str,
+) -> list[dict]:
+    """
+    Prepare prompts for prediction tasks,
+    in a format acceptable in the database.
+    """
+    time = 0
+
+    notes = pd.DataFrame(record["notes"])
+    source = json.loads(record["source"])
+    if "midi_filename" in source.keys():
+        midi_name = source["midi_filename"]
+    elif "youtube_id" in source.keys():
+        midi_name = source["youtube_id"]
+    else:
+        midi_name = hashlib.sha256(record["source"])
+    task_generator = get_task_generator(task=task)
+    prompts = []
+    while time + prompt_duration < notes.end.max():
+        start = time
+        end = time + prompt_duration
+
+        fragment = notes[(notes.start > start) & (notes.end < end)].copy()
+        fragment_start = fragment.start.min()
+        fragment_end = fragment.start.max()
+
+        fragment.end -= fragment_start
+        fragment.start -= fragment_start
+        source_notes, target_notes = task_generator(fragment)
+
         target_prompt = target_notes[target_notes.end < target_context_duration]
         if len(fragment) == 0:
             continue
@@ -404,7 +458,18 @@ def generate_continuation(
     return generated_notes
 
 
-def get_border_value(
+def get_border_velocities(
+    prompt_notes: pd.DataFrame,
+    parameters: dict,
+) -> int:
+    beginning_time = parameters["target_context_duration"]
+    source_notes_after_beginnning = prompt_notes[prompt_notes.start > beginning_time]
+    border_velocity_high = source_notes_after_beginnning.velocity.max()
+    border_velocity_low = source_notes_after_beginnning.velocity.min()
+    return border_velocity_low, border_velocity_high
+
+
+def get_border_pitches(
     prompt_notes: pd.DataFrame,
     parameters: dict,
 ) -> int:
@@ -413,8 +478,9 @@ def get_border_value(
     """
     beginning_time = parameters["target_context_duration"]
     source_notes_after_beginnning = prompt_notes[prompt_notes.start > beginning_time]
-    border_pitch = source_notes_after_beginnning.pitch.max()
-    return border_pitch
+    border_pitch_high = source_notes_after_beginnning.pitch.max()
+    border_pitch_low = source_notes_after_beginnning.pitch.min()
+    return border_pitch_low, border_pitch_high
 
 
 def generate_from_validation_example(
@@ -444,11 +510,28 @@ def generate_from_validation_example(
         )
 
     if parameters["task"] == "high_median_prediction":
-        median = get_border_value(prompt_notes=prompt_notes, parameters=parameters)
+        _, median = get_border_pitches(prompt_notes=prompt_notes, parameters=parameters)
         target_note_ids = prompt_notes.pitch > median
-    else:
+    elif "above" in parameters["task"]:
+        _, border = get_border_pitches(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = prompt_notes.pitch > border
+    elif "below" in parameters["task"]:
+        border, _ = get_border_pitches(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = prompt_notes.pitch < border
+    elif "extreme_quartiles" in parameters["task"]:
+        low, high = get_border_pitches(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = (prompt_notes.pitch < low) | (prompt_notes.pitch > high)
+    elif parameters["task"] == "soft_prediction":
+        low_velocity, _ = get_border_velocities(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = prompt_notes.velocity < low_velocity
+    elif parameters["task"] == "loud_prediction":
+        _, high_velocity = get_border_velocities(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = prompt_notes.velocity > high_velocity
+    elif parameters["task"] in ["reverse_bass_prediction, bass_prediction"]:
         low, high = get_voice_task_range(parameters["task"])
         target_note_ids = (prompt_notes.pitch < high) & (prompt_notes.pitch > low)
+    else:
+        target_note_ids = np.zeros_like(prompt_notes.pitch)
 
     source_notes = prompt_notes[~target_note_ids]
     target_notes = prompt_notes[target_note_ids]

@@ -43,7 +43,7 @@ def low_median_prediction(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFra
     return source_notes, target_notes
 
 
-def middle_quantiles_prediction(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+def middle_quartiles_prediction(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     q1 = notes.pitch.quantile(0.25)
     q3 = notes.pitch.quantile(0.75)
     source_notes = notes[(notes.pitch < q1) | (notes.pitch >= q3)]
@@ -95,12 +95,22 @@ def moderate_velocity_prediction(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.
     return source_notes, target_notes
 
 
+def extreme_velocity_prediction(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    q1 = notes.velocity.quantile(0.25)
+    q3 = notes.velocity.quantile(0.75)
+    target_notes = notes[(notes.velocity < q1) | (notes.velocity >= q3)]
+    source_notes = notes[(notes.velocity >= q1) & (notes.velocity < q3)]
+    return source_notes, target_notes
+
+
 prediction_task_to_token_pair = {
     # Two outdated tasks
     "bass_prediction": ("<BASS>", "<NO_BASS>"),
     "reverse_bass_prediction": ("<NO_BASS>", "<BASS>"),
-    # Dynamically calculated pitch tasks
+    # One task with outdated name
     "high_median_prediction": ("<HIGH_FROM_MEDIAN>", "<LOW_FROM_MEDIAN>"),
+    # Dynamically calculated pitch tasks for PIANO dataset
+    "above_median_prediction": ("<HIGH_FROM_MEDIAN>", "<LOW_FROM_MEDIAN>"),
     "low_median_prediction": ("<LOW_FROM_MEDIAN>", "<HIGH_FROM_MEDIAN>"),
     "above_low_quartile_prediction": ("<ABOVE_LOW_QUARTILE>", "<BELOW_LOW_QUARTILE>"),
     "above_high_quartile_prediction": ("<ABOVE_HIGH_QUARTILE>", "<BELOW_HIGH_QUARTILE>"),
@@ -114,10 +124,12 @@ prediction_task_to_token_pair = {
     "very_loud_prediction": ("<VERY_LOUD>", "<BELOW_VERY_LOUD>"),
     "soft_prediction": ("<SOFT>", "<LOUD>"),
     "moderate_velocity_prediction": ("<MODERATE_VELOCITY>", "<EXTREME_VELOCITY>"),
+    "extreme_velocity_prediction": ("<EXTREME_VELOCITY>", "<MODERATE_VELOCITY>"),
 }
 all_tasks = [
     # Dynamically calculated pitch tasks
     "high_median_prediction",
+    "above_median_prediction",
     "low_median_prediction",
     "above_low_quartile_prediction",
     "above_high_quartile_prediction",
@@ -131,23 +143,25 @@ all_tasks = [
     "very_loud_prediction",
     "soft_prediction",
     "moderate_velocity_prediction",
+    "extreme_velocity_precition",
 ]
 
 
 task_generators = {
-    "high_median_prediction": high_median_prediction,
+    "above_median_prediction": high_median_prediction,
     "above_low_quartile_prediction": above_low_quartile_prediction,
     "above_high_quartile_prediction": above_high_quartile_prediction,
     "below_low_quartile_prediction": below_low_quartile_prediction,
     "below_high_quartile_prediction": below_high_quartile_prediction,
-    "low_median_prediction": low_median_prediction,
-    "middle_quantiles_prediction": middle_quantiles_prediction,
-    "extreme_quantiles_prediction": extreme_quartiles_prediction,
+    "below_median_prediction": low_median_prediction,
+    "middle_quartiles_prediction": middle_quartiles_prediction,
+    "extreme_quartiles_prediction": extreme_quartiles_prediction,
     "loud_prediction": loud_prediction,
     "very_soft_prediction": very_soft_prediction,
     "very_loud_prediction": very_loud_prediction,
     "soft_prediction": soft_prediction,
     "moderate_velocity_prediction": moderate_velocity_prediction,
+    "extreme_velocity_prediction": extreme_velocity_prediction,
 }
 
 
