@@ -49,7 +49,7 @@ def run_generation_step(
         run_name=run_name,
     )
     for example in validation_examples:
-        generated_notes = generate_from_validation_example(
+        generated_notes, tokenized_prompt = generate_from_validation_example(
             model=model,
             tokenizer=tokenizer,
             prompt=example["prompt"],
@@ -63,6 +63,7 @@ def run_generation_step(
             "parameters_id": example["generation_parameters"]["parameters_id"],
             "prompt_id": example["prompt"]["prompt_id"],
             "model_id": model_id,
+            "tokenized_prompt": tokenized_prompt.to_json(),
             "generated_notes": generated_notes.to_json(),
         }
         database_manager.insert_validation_generations_batch(generations=[generated_info])

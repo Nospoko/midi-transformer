@@ -333,6 +333,8 @@ def generate_subsequence_iteratively(
     the given prompt and previously generated notes. The generation continues until
     the end of the prompt notes is reached.
     """
+    # Tokenize prompt at the beginning to standarize tokenization during generation.
+    prompt_notes = tokenizer.untokenize(tokenizer.tokenize(prompt_notes))
     # Initialize the first step with notes within the prompt and target context durations
     step_prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration].copy()
     step_target_notes = target_notes[target_notes.end < target_context_duration].copy()
@@ -412,7 +414,8 @@ def generate_subsequence_iteratively(
         step_target_notes.end -= time_step
 
     # Combine all generated bass notes and return
-    return pd.concat(all_target_notes).reset_index(drop=True)
+    target_notes = pd.concat(all_target_notes[1:]).reset_index(drop=True)
+    return target_notes, prompt_notes
 
 
 def generate_continuation(
@@ -536,7 +539,7 @@ def generate_from_validation_example(
     source_notes = prompt_notes[~target_note_ids]
     target_notes = prompt_notes[target_note_ids]
 
-    generated_notes = generate_subsequence_iteratively(
+    generated_notes, tokenized_prompt = generate_subsequence_iteratively(
         model=model,
         tokenizer=tokenizer,
         prompt_notes=source_notes,
@@ -551,7 +554,7 @@ def generate_from_validation_example(
         ctx=ctx,
         model_config=model_config,
     )
-    return generated_notes
+    return generated_notes, tokenized_prompt
 
 
 @torch.no_grad()

@@ -123,8 +123,8 @@ prediction_task_to_token_pair = {
     "very_soft_prediction": ("<ABOVE_VERY_SOFT>", "<VERY_SOFT>"),
     "very_loud_prediction": ("<VERY_LOUD>", "<BELOW_VERY_LOUD>"),
     "soft_prediction": ("<SOFT>", "<LOUD>"),
-    "moderate_velocity_prediction": ("<MODERATE_VELOCITY>", "<EXTREME_VELOCITY>"),
-    "extreme_velocity_prediction": ("<EXTREME_VELOCITY>", "<MODERATE_VELOCITY>"),
+    "moderate_velocity_prediction": ("<MODERATE_VOLUME>", "<EXTREME_VOLUME>"),
+    "extreme_velocity_prediction": ("<EXTREME_VOLUME>", "<MODERATE_VOLUME>"),
 }
 all_tasks = [
     # Dynamically calculated pitch tasks

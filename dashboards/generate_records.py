@@ -170,7 +170,7 @@ def generate_music(
             else:
                 source_notes = prompt.pop("source_notes")
                 target_prompt = prompt.pop("target_prompt")
-                target_notes = generation.generate_subsequence_iteratively(
+                target_notes, tokenized_prompt = generation.generate_subsequence_iteratively(
                     model=model,
                     tokenizer=tokenizer,
                     prompt_notes=source_notes,

@@ -43,6 +43,7 @@ generated_notes_dtype = {
     "parameters_id": sa.Integer,
     "prompt_id": sa.Integer,
     "model_id": sa.Integer,
+    "tokenized_prompt": sa.JSON,
     "generated_notes": sa.JSON,
 }
 
@@ -196,8 +197,10 @@ def insert_generated_notes(
     prompt: dict,
     parameters: dict,
     generated_notes: pd.DataFrame,
+    tokenized_prompt: pd.DataFrame,
 ):
     generated_notes = generated_notes.to_json()
+    tokenized_prompt = tokenized_prompt.to_json()
     prompt["prompt_notes"] = prompt["prompt_notes"].to_dict()
 
     # Get or create IDs
@@ -222,6 +225,7 @@ def insert_generated_notes(
             "prompt_id": prompt_id,
             "model_id": model_id,
             "generated_notes": generated_notes,
+            "tokenized_prompt": tokenized_prompt,
         }
         # Insert the generation data
         df = pd.DataFrame([generation_data])

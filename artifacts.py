@@ -41,8 +41,8 @@ special_tokens = [
     "<VERY_SOFT>",
     "<VERY_LOUD>",
     "<BELOW_LOUD>",
-    "<MODERATE_VELOCITY>",
-    "<EXTREME_VELOCITY>",
+    "<MODERATE_VOLUME>",
+    "<EXTREME_VOLUME>",
 ] + placeholder_tokens
 
 
@@ -75,7 +75,7 @@ prediction_task_to_token_pair = {
     "very_soft_prediction": ("<ABOVE_VERY_SOFT>", "<VERY_SOFT>"),
     "very_loud_prediction": ("<VERY_LOUD>", "<BELOW_VERY_LOUD>"),
     "soft_prediction": ("<SOFT>", "<LOUD>"),
-    "moderate_velocity_prediction": ("<MODERATE_VELOCITY>", "<EXTREME_VELOCITY>"),
+    "moderate_velocity_prediction": ("<MODERATE_VOLUME>", "<EXTREME_VOLUME>"),
 }
 
 voice_task_to_range = {

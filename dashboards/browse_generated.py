@@ -70,9 +70,12 @@ def main():
                         prompt = database_manager.get_prompt(prompt_id=prompt_id).iloc[0]
 
                         st.json(parameters | {"created_at": row["created_at"]}, expanded=False)
-                        prompt_notes_json: str = prompt["prompt_notes"]
-                        prompt_notes_json = prompt_notes_json
-                        prompt_notes = json.loads(prompt_notes_json)
+                        if row["tokenzied_prompt_notes"] is None:
+                            prompt_notes_json: str = prompt["prompt_notes"]
+                            prompt_notes_json = prompt_notes_json
+                            prompt_notes = json.loads(prompt_notes_json)
+                        else:
+                            prompt_notes = row["tokenized_prompt_notes"]
                         # Due to error in early dataset manager implementation, some records are json-dumped strings...
                         if isinstance(prompt_notes, str):
                             prompt_notes = json.loads(prompt_notes)
