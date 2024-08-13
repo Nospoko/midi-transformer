@@ -14,7 +14,23 @@ eval_iters: 2
 eval_only: false  # if True, script exits right after the first eval
 always_save_checkpoint: false  # if True, always save a checkpoint after each eval
 init_from: 'scratch'  # 'scratch' or 'midi-gpt2*'
-task: high_median_prediction
+task: multi
+tasks:
+  - "above_median_prediction"  # Dynamically calculated pitch tasks
+  - "below_median_prediction"
+  - "above_low_quartile_prediction"
+  - "above_high_quartile_prediction"
+  - "below_low_quartile_prediction"
+  - "below_high_quartile_prediction"
+  - "middle_quartiles_prediction"
+  - "extreme_quartiles_prediction"
+  - "loud_prediction"  # Velocity tasks
+  - "very_soft_prediction"
+  - "very_loud_prediction"
+  - "soft_prediction"
+  - "moderate_velocity_prediction"
+  - "extreme_velocity_prediction"
+
 loss_masking: pretraining
 
 ddp:

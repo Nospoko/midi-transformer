@@ -37,10 +37,10 @@ special_tokens = [
     "<EXTREME_QUARTILES>",
     "<LOUD>",
     "<SOFT>",
-    "<ABOVE_SOFT>",
+    "<ABOVE_VERY_SOFT>",
     "<VERY_SOFT>",
     "<VERY_LOUD>",
-    "<BELOW_LOUD>",
+    "<BELOW_VERY_LOUD>",
     "<MODERATE_VOLUME>",
     "<EXTREME_VOLUME>",
 ] + placeholder_tokens

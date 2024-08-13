@@ -111,11 +111,11 @@ prediction_task_to_token_pair = {
     "high_median_prediction": ("<HIGH_FROM_MEDIAN>", "<LOW_FROM_MEDIAN>"),
     # Dynamically calculated pitch tasks for PIANO dataset
     "above_median_prediction": ("<HIGH_FROM_MEDIAN>", "<LOW_FROM_MEDIAN>"),
-    "low_median_prediction": ("<LOW_FROM_MEDIAN>", "<HIGH_FROM_MEDIAN>"),
+    "below_median_prediction": ("<LOW_FROM_MEDIAN>", "<HIGH_FROM_MEDIAN>"),
     "above_low_quartile_prediction": ("<ABOVE_LOW_QUARTILE>", "<BELOW_LOW_QUARTILE>"),
     "above_high_quartile_prediction": ("<ABOVE_HIGH_QUARTILE>", "<BELOW_HIGH_QUARTILE>"),
     "below_low_quartile_prediction": ("<BELOW_LOW_QUARTILE>", "<ABOVE_LOW_QUARTILE>"),
-    "below_high_quartile_prediction": ("<BELOW_HIGH_QUARTILE", "<ABOVE_HIGH_QUARTILE>"),
+    "below_high_quartile_prediction": ("<BELOW_HIGH_QUARTILE>", "<ABOVE_HIGH_QUARTILE>"),
     "middle_quartiles_prediction": ("<MIDDLE_QUARTILES>", "<EXTREME_QUARTILES>"),
     "extreme_quartiles_prediction": ("<EXTREME_QUARTILES>", "<MIDDLE_QUARTILES>"),
     # Velocity tasks
@@ -126,6 +126,8 @@ prediction_task_to_token_pair = {
     "moderate_velocity_prediction": ("<MODERATE_VOLUME>", "<EXTREME_VOLUME>"),
     "extreme_velocity_prediction": ("<EXTREME_VOLUME>", "<MODERATE_VOLUME>"),
 }
+
+
 all_tasks = [
     # Dynamically calculated pitch tasks
     "high_median_prediction",

@@ -44,6 +44,8 @@ def run_generation_step(
     ctx: AbstractContextManager,
     model_config=None,
 ):
+    if validation_examples is None:
+        return
     _, model_id = database_manager.register_model_from_checkpoint(
         checkpoint=checkpoint,
         run_name=run_name,
