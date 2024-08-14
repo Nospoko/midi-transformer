@@ -1,4 +1,4 @@
-placeholder_tokens = [f"<SENTINEL_{idx}>" for idx in range(84)]
+placeholder_tokens = [f"<SENTINEL_{idx}>" for idx in range(78)]
 special_tokens = [
     "<PAD>",
     "<CLS>",
