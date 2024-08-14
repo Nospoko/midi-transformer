@@ -1,4 +1,134 @@
+import numpy as np
 import pandas as pd
+
+
+def add_noise_to_notes(notes: pd.DataFrame, attribute: str, noise_level: float = 0.1) -> pd.DataFrame:
+    """
+    Add random noise to the specified attribute of the notes DataFrame.
+    """
+    if attribute not in ["velocity", "pitch", "start", "end", "time"]:
+        raise ValueError("Attribute must be one of 'velocity', 'pitch', 'start', 'end', or 'time'")
+
+    noisy_notes = notes.copy()
+
+    if attribute in ["velocity", "pitch"]:
+        attr_range = noisy_notes[attribute].max() - noisy_notes[attribute].min()
+        noise = np.random.normal(0, noise_level * attr_range, len(noisy_notes))
+        noisy_notes[attribute] += noise.astype(int)
+
+        # Ensure values stay within valid ranges
+        if attribute == "velocity":
+            noisy_notes[attribute] = noisy_notes[attribute].clip(0, 127)
+        elif attribute == "pitch":
+            noisy_notes[attribute] = noisy_notes[attribute].clip(21, 109)
+
+    elif attribute in ["start", "end"]:
+        max_time = noisy_notes["end"].max()
+        noise = np.random.normal(0, noise_level * max_time, len(noisy_notes))
+        noisy_notes[attribute] += noise
+
+        if attribute == "start":
+            # Ensure start times are not negative and end times are after start times
+            noisy_notes["start"] = noisy_notes["start"].clip(0)
+            noisy_notes["end"] = noisy_notes["start"] + noisy_notes["duration"]
+
+        elif attribute == "end":
+            noisy_notes["end"].clip(0)
+            noisy_notes["start"] = noisy_notes["end"] - noisy_notes["duration"]
+            noisy_notes["start"].clip(0)
+
+    elif attribute == "time":
+        max_time = noisy_notes["end"].max()
+        duration_range = noisy_notes["duration"].max() - noisy_notes["duration"].min()
+        duration_noise = np.random.normal(0, noise_level * duration_range, len(noisy_notes))
+        start_noise = np.random.normal(0, noise_level * max_time, len(noisy_notes))
+
+        noisy_notes["start"] += start_noise
+        noisy_notes["start"].clip(0)
+        noisy_notes["duration"] += duration_noise
+        noisy_notes["duration"].clip(0)
+
+        noisy_notes["end"] = noisy_notes["start"] + noisy_notes["duration"]
+
+    return noisy_notes
+
+
+def add_comprehensive_noise(notes: pd.DataFrame, noise_level: float = 0.1) -> pd.DataFrame:
+    """
+    Add random noise to time, pitch, and velocity of the notes DataFrame simultaneously.
+    """
+    noisy_notes = notes.copy()
+
+    # Add noise to velocity
+    velocity_range = noisy_notes["velocity"].max() - noisy_notes["velocity"].min()
+    velocity_noise = np.random.normal(0, noise_level * velocity_range, len(noisy_notes))
+    noisy_notes["velocity"] += velocity_noise.astype(int)
+    noisy_notes["velocity"] = noisy_notes["velocity"].clip(0, 127)
+
+    # Add noise to pitch
+    pitch_range = noisy_notes["pitch"].max() - noisy_notes["pitch"].min()
+    pitch_noise = np.random.normal(0, noise_level * pitch_range, len(noisy_notes))
+    noisy_notes["pitch"] += pitch_noise.astype(int)
+    noisy_notes["pitch"] = noisy_notes["pitch"].clip(21, 109)
+
+    # Add noise to time (start and duration)
+    max_time = noisy_notes["end"].max()
+    duration_range = noisy_notes["duration"].max() - noisy_notes["duration"].min()
+
+    start_noise = np.random.normal(0, noise_level * max_time, len(noisy_notes))
+    duration_noise = np.random.normal(0, noise_level * duration_range, len(noisy_notes))
+
+    noisy_notes["start"] += start_noise
+    noisy_notes["start"] = noisy_notes["start"].clip(0)
+    noisy_notes["duration"] += duration_noise
+    noisy_notes["duration"] = noisy_notes["duration"].clip(0)
+    noisy_notes["end"] = noisy_notes["start"] + noisy_notes["duration"]
+
+    return noisy_notes
+
+
+def comprehensive_denoising(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Create a prediction task where the source is the original notes and the target is comprehensively noisy notes.
+    """
+    noisy_notes = add_comprehensive_noise(notes, noise_level=0.1)
+    return notes, noisy_notes
+
+
+def velocity_denoising(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    noisy_notes = add_noise_to_notes(
+        notes=notes,
+        attribute="velocity",
+        noise_level=0.1,
+    )
+    return notes, noisy_notes
+
+
+def pitch_denoising(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    noisy_notes = add_noise_to_notes(
+        notes=notes,
+        attribute="pitch",
+        noise_level=0.1,
+    )
+    return notes, noisy_notes
+
+
+def start_time_denoising(notes: pd.DataFrame) -> tuple[pd.DataFrame]:
+    noisy_notes = add_noise_to_notes(
+        notes=notes,
+        attribute="start",
+        noise_level=0.1,
+    )
+    return notes, noisy_notes
+
+
+def time_denoising(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    noisy_notes = add_noise_to_notes(
+        notes=notes,
+        attribute="time",
+        noise_level=0.1,
+    )
+    return notes, noisy_notes
 
 
 def high_median_prediction(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -125,6 +255,12 @@ prediction_task_to_token_pair = {
     "soft_prediction": ("<SOFT>", "<LOUD>"),
     "moderate_velocity_prediction": ("<MODERATE_VOLUME>", "<EXTREME_VOLUME>"),
     "extreme_velocity_prediction": ("<EXTREME_VOLUME>", "<MODERATE_VOLUME>"),
+    # Denoising tasks
+    "velocity_denoising": ("<CLEAN>", "<NOISY_VELOCITY>"),
+    "pitch_denoising": ("<CLEAN>", "<NOISY_PITCH>"),
+    "start_time_denoising": ("<CLEAN>", "<NOISY_START_TIME>"),
+    "time_denoising": ("<CLEAN>", "<NOISY_TIME>"),
+    "comprehensive_denoising": ("<CLEAN>", "<NOISY>"),
 }
 
 
@@ -146,6 +282,11 @@ all_tasks = [
     "soft_prediction",
     "moderate_velocity_prediction",
     "extreme_velocity_precition",
+    "velocity_denoising",
+    "pitch_denoising",
+    "start_time_denoising",
+    "time_denoising",
+    "comprehensive_denoising",
 ]
 
 
@@ -164,6 +305,11 @@ task_generators = {
     "soft_prediction": soft_prediction,
     "moderate_velocity_prediction": moderate_velocity_prediction,
     "extreme_velocity_prediction": extreme_velocity_prediction,
+    "velocity_denoising": velocity_denoising,
+    "pitch_denoising": pitch_denoising,
+    "start_time_denoising": start_time_denoising,
+    "time_denoising": time_denoising,
+    "comprehensive_denoising": comprehensive_denoising,
 }
 
 
