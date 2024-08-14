@@ -309,29 +309,39 @@ def generate_subsequence_iteratively(
     model_config=None,
 ) -> pd.DataFrame:
     """
-    Generate subsequence of notes iteratively using the given model and tokenizer.
+    Generate a subsequence of notes iteratively using the given model and tokenizer.
+
+    This method implements an iterative approach to music generation, where new notes
+    are predicted in fixed time steps based on both the original prompt and previously
+    generated content. It uses a sliding window technique to maintain context throughout
+    the generation process.
+
+    The generation involves taking a conditioning sequence of tokenized notes and
+    completing the sequence for a specified duration, feeding the predictions back
+    into the model at each time step. This allows for coherent, context-aware
+    generation of musical sequences.
 
     Args:
         model (GPT): The GPT model for generation.
         tokenizer (ExponentialTokenizer | AwesomeTokenizer): The tokenizer for encoding/decoding notes.
         prompt_notes (pd.DataFrame): DataFrame containing prompt notes.
-        target_notes (pd.DataFrame): DataFrame containing target notes.
-        prompt_context_duration (float): Duration of the prompt context.
-        target_context_duration (float): Duration of the target context.
+        target_notes (pd.DataFrame): DataFrame containing initial target notes.
+        prompt_context_duration (float): Duration of the prompt context window.
+        target_context_duration (float): Duration of the target context window.
         time_step (float): Time step for each iteration of generation.
         device (torch.device): The device to run the model on.
+        ctx (AbstractContextManager): Context manager for the generation process.
         temperature (float, optional): Temperature for sampling. Defaults to 1.0.
-        max_new_tokens (int, optional): Maximum number of new tokens to generate. Defaults to 512.
+        max_new_tokens (int, optional): Maximum number of new tokens to generate per step. Defaults to 512.
+        prediction_task (str, optional): Type of prediction task. Defaults to "bass_prediction".
+        model_config (optional): Configuration for the model. Defaults to None.
 
     Returns:
-        Tuple[pd.DataFrame, List[Tuple[ff.MidiPiece, ff.MidiPiece]]]:
-            - DataFrame containing all generated bass notes.
-            - List of tuples, each containing a pair of MidiPieces (source_piece, bass_prompt_piece) for debugging.
+        pd.DataFrame: DataFrame containing all generated target notes.
 
-    The function generates subsequence of notes iteratively, using the provided model and tokenizer.
-    It processes the input in steps, generating new notes for each time step based on
+    The function processes the input in steps, generating new notes for each time step based on
     the given prompt and previously generated notes. The generation continues until
-    the end of the prompt notes is reached.
+    the end of the prompt notes is reached, resulting in a complete musical sequence.
     """
     # Tokenize prompt at the beginning to standarize tokenization during generation.
     prompt_notes = tokenizer.untokenize(tokenizer.tokenize(prompt_notes))

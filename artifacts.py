@@ -43,6 +43,12 @@ special_tokens = [
     "<BELOW_VERY_LOUD>",
     "<MODERATE_VOLUME>",
     "<EXTREME_VOLUME>",
+    "<CLEAN>",
+    "<NOISY_VELOCITY>",
+    "<NOISY_PITCH>",
+    "<NOISY_START_TIME>",
+    "<NOISY_TIME>",
+    "<NOISY>",
 ] + placeholder_tokens
 
 
