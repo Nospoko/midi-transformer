@@ -20,7 +20,7 @@ def add_noise_to_notes(notes: pd.DataFrame, attribute: str, noise_level: float =
         if attribute == "velocity":
             noisy_notes[attribute] = noisy_notes[attribute].clip(0, 127)
         elif attribute == "pitch":
-            noisy_notes[attribute] = noisy_notes[attribute].clip(21, 109)
+            noisy_notes[attribute] = noisy_notes[attribute].clip(21, 108)
 
     elif attribute in ["start", "end"]:
         max_time = noisy_notes["end"].max()
@@ -33,21 +33,21 @@ def add_noise_to_notes(notes: pd.DataFrame, attribute: str, noise_level: float =
             noisy_notes["end"] = noisy_notes["start"] + noisy_notes["duration"]
 
         elif attribute == "end":
-            noisy_notes["end"].clip(0)
+            noisy_notes["end"] = noisy_notes["end"].clip(0)
             noisy_notes["start"] = noisy_notes["end"] - noisy_notes["duration"]
-            noisy_notes["start"].clip(0)
+            noisy_notes["start"] = noisy_notes["start"].clip(0)
 
     elif attribute == "time":
         max_time = noisy_notes["end"].max()
         duration_range = noisy_notes["duration"].max() - noisy_notes["duration"].min()
-        duration_noise = np.random.normal(0, noise_level * duration_range, len(noisy_notes))
+
         start_noise = np.random.normal(0, noise_level * max_time, len(noisy_notes))
+        duration_noise = np.random.normal(0, noise_level * duration_range, len(noisy_notes))
 
         noisy_notes["start"] += start_noise
-        noisy_notes["start"].clip(0)
+        noisy_notes["start"] = noisy_notes["start"].clip(0)
         noisy_notes["duration"] += duration_noise
-        noisy_notes["duration"].clip(0)
-
+        noisy_notes["duration"] = noisy_notes["duration"].clip(0)
         noisy_notes["end"] = noisy_notes["start"] + noisy_notes["duration"]
 
     return noisy_notes
@@ -69,7 +69,7 @@ def add_comprehensive_noise(notes: pd.DataFrame, noise_level: float = 0.1) -> pd
     pitch_range = noisy_notes["pitch"].max() - noisy_notes["pitch"].min()
     pitch_noise = np.random.normal(0, noise_level * pitch_range, len(noisy_notes))
     noisy_notes["pitch"] += pitch_noise.astype(int)
-    noisy_notes["pitch"] = noisy_notes["pitch"].clip(21, 109)
+    noisy_notes["pitch"] = noisy_notes["pitch"].clip(21, 108)
 
     # Add noise to time (start and duration)
     max_time = noisy_notes["end"].max()
