@@ -26,7 +26,7 @@ class PianoDataset(MidiDataset):
         self.sequence_length = sequence_length
         self.notes_per_record = notes_per_record
         self.length = 0
-        self.record_data = {}
+        self.record_lengths = {}
         self.tasks = tasks
         self.num_tasks = len(self.tasks)
         self._build_records()
@@ -35,12 +35,7 @@ class PianoDataset(MidiDataset):
         # Helper function to calculate the length of each record
         def get_record_definition(record, idx, notes_per_record, shared_dict):
             length = len(record["notes"]["pitch"]) - notes_per_record + 1
-            for task_id, task in enumerate(self.tasks):
-                shared_dict[idx * self.num_tasks + task_id] = {
-                    "record_id": idx,
-                    "length": max(length, 0),
-                    "task": task,
-                }
+            shared_dict[idx] = max(length, 0)
 
         # Use HuggingFace's .map method for simplicity and multiprocessing.Manager for shared recources
         with Manager() as manager:
@@ -57,10 +52,10 @@ class PianoDataset(MidiDataset):
                 desc="Building record lengths",
                 with_indices=True,
             )
-            self.record_data = dict(shared_dict)
+            self.record_lengths = dict(shared_dict)
 
         # Calculate total dataset length
-        self.length = sum([record["length"] for record in self.record_data.values()])
+        self.length = sum([record_length for record_length in self.record_lengths.values()]) * self.num_tasks
 
     def __len__(self):
         # Return the total length of the dataset
@@ -68,10 +63,15 @@ class PianoDataset(MidiDataset):
 
     def _index_to_record(self, idx):
         # Convert global index to record ID and start point within that record
-        for record_data in self.record_data.values():
-            if idx < record_data["length"]:
-                return record_data["record_id"], idx, record_data["task"]
-            idx -= record_data["length"]
+        # First get the task number
+        task_number = idx % self.num_tasks
+        task = self.tasks[task_number]
+        idx = idx // self.num_tasks
+
+        for record_id, record_length in self.record_lengths.items():
+            if idx < record_length:
+                return record_id, idx, task
+            idx -= record_length
         raise IndexError("Index out of range")
 
     def __getitem__(self, idx: int) -> dict:

@@ -68,7 +68,7 @@ def main():
         tasks = st.multiselect(
             label="Prediction Tasks",
             options=task_generators.keys(),
-            default=["high_median_prediction"],
+            default=["above_median_prediction"],
         )
 
         st.form_submit_button(label="Update Config")

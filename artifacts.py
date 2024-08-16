@@ -44,7 +44,7 @@ special_tokens = [
     "<MODERATE_VOLUME>",
     "<EXTREME_VOLUME>",
     "<CLEAN>",
-    "<NOISY_VELOCITY>",
+    "<NOISY_VOLUME>",
     "<NOISY_PITCH>",
     "<NOISY_START_TIME>",
     "<NOISY_TIME>",

@@ -99,7 +99,7 @@ def velocity_denoising(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]
     noisy_notes = add_noise_to_notes(
         notes=notes,
         attribute="velocity",
-        noise_level=0.1,
+        noise_level=0.3,
     )
     return notes, noisy_notes
 
@@ -108,7 +108,7 @@ def pitch_denoising(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     noisy_notes = add_noise_to_notes(
         notes=notes,
         attribute="pitch",
-        noise_level=0.1,
+        noise_level=0.05,
     )
     return notes, noisy_notes
 
@@ -117,7 +117,7 @@ def start_time_denoising(notes: pd.DataFrame) -> tuple[pd.DataFrame]:
     noisy_notes = add_noise_to_notes(
         notes=notes,
         attribute="start",
-        noise_level=0.1,
+        noise_level=0.05,
     )
     return notes, noisy_notes
 
@@ -126,7 +126,7 @@ def time_denoising(notes: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     noisy_notes = add_noise_to_notes(
         notes=notes,
         attribute="time",
-        noise_level=0.1,
+        noise_level=0.05,
     )
     return notes, noisy_notes
 
@@ -256,7 +256,7 @@ prediction_task_to_token_pair = {
     "moderate_velocity_prediction": ("<MODERATE_VOLUME>", "<EXTREME_VOLUME>"),
     "extreme_velocity_prediction": ("<EXTREME_VOLUME>", "<MODERATE_VOLUME>"),
     # Denoising tasks
-    "velocity_denoising": ("<CLEAN>", "<NOISY_VELOCITY>"),
+    "velocity_denoising": ("<CLEAN>", "<NOISY_VOLUME>"),
     "pitch_denoising": ("<CLEAN>", "<NOISY_PITCH>"),
     "start_time_denoising": ("<CLEAN>", "<NOISY_START_TIME>"),
     "time_denoising": ("<CLEAN>", "<NOISY_TIME>"),
