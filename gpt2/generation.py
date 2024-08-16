@@ -8,7 +8,7 @@ import pandas as pd
 from torch.nn import functional as F
 
 from gpt2.model import GPT
-from data.tasks import get_task_generator
+from data.tasks import Task
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 from artifacts import get_voice_task_range, get_source_task_token, get_target_task_token
 
@@ -134,7 +134,7 @@ def prepare_dynamically_splitted_prompts(
         midi_name = source["youtube_id"]
     else:
         midi_name = hashlib.sha256(record["source"])
-    task_generator = get_task_generator(task=task)
+    task_generator = Task.get_task(task_name=task)
     prompts = []
     while time + prompt_duration < notes.end.max():
         start = time
@@ -146,7 +146,7 @@ def prepare_dynamically_splitted_prompts(
 
         fragment.end -= fragment_start
         fragment.start -= fragment_start
-        source_notes, target_notes = task_generator(fragment)
+        source_notes, target_notes = task_generator.generate(fragment)
 
         target_prompt = target_notes[target_notes.end < target_context_duration]
         if len(fragment) == 0:

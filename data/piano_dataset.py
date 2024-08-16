@@ -6,9 +6,9 @@ import torch
 import pandas as pd
 from datasets import Dataset as HuggingFaceDataset
 
+from data.tasks import Task
 from data.dataset import MidiDataset
 from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
-from data.tasks import get_task_generator, get_source_task_token, get_target_task_token
 
 
 class PianoDataset(MidiDataset):
@@ -91,11 +91,11 @@ class PianoDataset(MidiDataset):
         notes.start = notes.start - offset
         notes.end = notes.end - offset
 
-        task_generator = get_task_generator(task=task)
-        source_notes, target_notes = task_generator(notes)
+        task_generator = Task.get_task(task_name=task)
+        source_notes, target_notes = task_generator.generate(notes=notes)
 
-        source_prefix = get_source_task_token(task=task)
-        target_prefix = get_target_task_token(task=task)
+        source_prefix = task_generator.source_token
+        target_prefix = task_generator.target_token
 
         # Encode source and target notes
         prompt_token_ids = self.tokenizer.encode(

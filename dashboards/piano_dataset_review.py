@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 from datasets import load_dataset
 
 from artifacts import special_tokens
+from data.tasks import Task, task_map
 from data.piano_dataset import PianoDataset
 from data.tokenizer import ExponentialTokenizer
-from data.tasks import task_generators, get_source_task_token, get_target_task_token
 
 
 @st.cache_data()
@@ -67,7 +67,7 @@ def main():
 
         tasks = st.multiselect(
             label="Prediction Tasks",
-            options=task_generators.keys(),
+            options=task_map.keys(),
             default=["above_median_prediction"],
         )
 
@@ -171,8 +171,9 @@ def main():
 
     src_tokens = [piano_dataset.tokenizer.vocab[token_id] for token_id in src_token_ids]
 
-    source_token = get_source_task_token(task)
-    target_token = get_target_task_token(task)
+    task_generator = Task.get_task(task_name=task)
+    source_token = task_generator.source_token
+    target_token = task_generator.target_token
     source_position = src_tokens.index(source_token)
     target_position = src_tokens.index(target_token)
 
