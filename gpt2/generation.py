@@ -1,0 +1,604 @@
+import json
+import hashlib
+from contextlib import AbstractContextManager
+
+import torch
+import numpy as np
+import pandas as pd
+from torch.nn import functional as F
+
+from gpt2.model import GPT
+from data.tasks import Task
+from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
+from artifacts import get_voice_task_range, get_source_task_token, get_target_task_token
+
+
+def prepare_next_token_prediction_prompts(
+    record: dict,
+    time_step: float,
+    prompt_duration: float,
+) -> list[dict]:
+    """
+    Prepare prompts for next_token_prediction, in format acceptable in the database.
+    """
+    notes = pd.DataFrame(record["notes"])
+    source = json.loads(record["source"])
+    if "midi_filename" in source.keys():
+        midi_name = source["midi_filename"]
+    elif "youtube_id" in source.keys():
+        midi_name = source["youtube_id"]
+    else:
+        midi_name = hashlib.sha256(record["source"])
+
+    prompts = []
+    time = 0
+    while time + prompt_duration < notes.end.max():
+        start = time
+        end = time + prompt_duration
+
+        fragment = notes[(notes.start > start) & (notes.end < end)].copy()
+        fragment_start = fragment.start.min()
+        fragment_end = fragment.start.max()
+
+        fragment.end -= fragment_start
+        fragment.start -= fragment_start
+
+        source_notes = fragment
+        if len(fragment) == 0:
+            continue
+        prompt = {
+            "prompt_notes": source_notes,
+            "start_time": fragment_start,
+            "end_time": fragment_end,
+            "midi_name": midi_name,
+            "source": record["source"],
+        }
+        prompts.append(prompt)
+        time += time_step
+    return prompts
+
+
+def prepare_subsequence_prediction_prompts(
+    record: dict,
+    prediction_task: str,
+    time_step: float,
+    prompt_duration: float,
+    target_context_duration: float,
+) -> list[dict]:
+    """
+    Prepare prompts for subsequence prediction tasks,
+    in a format acceptable in the database.
+    """
+    low, high = get_voice_task_range(task=prediction_task)
+    time = 0
+
+    notes = pd.DataFrame(record["notes"])
+    source = json.loads(record["source"])
+    if "midi_filename" in source.keys():
+        midi_name = source["midi_filename"]
+    elif "youtube_id" in source.keys():
+        midi_name = source["youtube_id"]
+    else:
+        midi_name = hashlib.sha256(record["source"])
+
+    prompts = []
+    while time + prompt_duration < notes.end.max():
+        start = time
+        end = time + prompt_duration
+
+        fragment = notes[(notes.start > start) & (notes.end < end)].copy()
+        fragment_start = fragment.start.min()
+        fragment_end = fragment.start.max()
+
+        fragment.end -= fragment_start
+        fragment.start -= fragment_start
+
+        extracted_ids = (fragment.pitch >= low) & (fragment.pitch < high)
+        source_notes = fragment[~extracted_ids]
+        target_notes = fragment[extracted_ids]
+        target_prompt = target_notes[target_notes.end < target_context_duration]
+        if len(fragment) == 0:
+            continue
+        prompt = {
+            "source_notes": source_notes,
+            "target_prompt": target_prompt,
+            "prompt_notes": pd.concat([source_notes, target_prompt]),
+            "start_time": fragment_start,
+            "end_time": fragment_end,
+            "midi_name": midi_name,
+            "source": record["source"],
+        }
+        prompts.append(prompt)
+        time += time_step
+    return prompts
+
+
+def prepare_dynamically_splitted_prompts(
+    record: dict,
+    time_step: float,
+    prompt_duration: float,
+    target_context_duration: float,
+    task: str,
+) -> list[dict]:
+    """
+    Prepare prompts for prediction tasks,
+    in a format acceptable in the database.
+    """
+    time = 0
+
+    notes = pd.DataFrame(record["notes"])
+    source = json.loads(record["source"])
+    if "midi_filename" in source.keys():
+        midi_name = source["midi_filename"]
+    elif "youtube_id" in source.keys():
+        midi_name = source["youtube_id"]
+    else:
+        midi_name = hashlib.sha256(record["source"])
+    task_generator = Task.get_task(task_name=task)
+    prompts = []
+    while time + prompt_duration < notes.end.max():
+        start = time
+        end = time + prompt_duration
+
+        fragment = notes[(notes.start > start) & (notes.end < end)].copy()
+        fragment_start = fragment.start.min()
+        fragment_end = fragment.start.max()
+
+        fragment.end -= fragment_start
+        fragment.start -= fragment_start
+        source_notes, target_notes = task_generator.generate(fragment)
+
+        target_prompt = target_notes[target_notes.end < target_context_duration]
+        if len(fragment) == 0:
+            continue
+        prompt = {
+            "source_notes": source_notes,
+            "target_prompt": target_prompt,
+            "prompt_notes": pd.concat([source_notes, target_prompt]),
+            "start_time": fragment_start,
+            "end_time": fragment_end,
+            "midi_name": midi_name,
+            "source": record["source"],
+        }
+        prompts.append(prompt)
+        time += time_step
+    return prompts
+
+
+def prepare_high_median_prompts(
+    record: dict,
+    time_step: float,
+    prompt_duration: float,
+    target_context_duration: float,
+) -> list[dict]:
+    """
+    Prepare prompts for high_median_prediction tasks,
+    in a format acceptable in the database.
+    """
+    time = 0
+
+    notes = pd.DataFrame(record["notes"])
+    source = json.loads(record["source"])
+    if "midi_filename" in source.keys():
+        midi_name = source["midi_filename"]
+    elif "youtube_id" in source.keys():
+        midi_name = source["youtube_id"]
+    else:
+        midi_name = hashlib.sha256(record["source"])
+
+    prompts = []
+    while time + prompt_duration < notes.end.max():
+        start = time
+        end = time + prompt_duration
+
+        fragment = notes[(notes.start > start) & (notes.end < end)].copy()
+        fragment_start = fragment.start.min()
+        fragment_end = fragment.start.max()
+
+        fragment.end -= fragment_start
+        fragment.start -= fragment_start
+        median = fragment.pitch.median()
+        extracted_ids = fragment.pitch >= median
+        source_notes = fragment[~extracted_ids]
+        target_notes = fragment[extracted_ids]
+        target_prompt = target_notes[target_notes.end < target_context_duration]
+        if len(fragment) == 0:
+            continue
+        prompt = {
+            "source_notes": source_notes,
+            "target_prompt": target_prompt,
+            "prompt_notes": pd.concat([source_notes, target_prompt]),
+            "start_time": fragment_start,
+            "end_time": fragment_end,
+            "midi_name": midi_name,
+            "source": record["source"],
+        }
+        prompts.append(prompt)
+        time += time_step
+    return prompts
+
+
+def generate_bass(
+    model: GPT,
+    tokenizer: ExponentialTokenizer | AwesomeTokenizer,
+    prompt_notes: pd.DataFrame,
+    prompt_bass: pd.DataFrame,
+    prompt_context_duration: float,
+    target_context_duration: float,
+    device: torch.device,
+    temperature: float = 1.0,
+    max_new_tokens: int = 512,
+) -> pd.DataFrame:
+    """
+    Generate bass notes using the given model and tokenizer.
+
+    Args:
+        model: The GPT model for generation
+        tokenizer: The tokenizer for encoding/decoding notes
+        prompt_notes: DataFrame containing prompt notes
+        target_notes: DataFrame containing target notes
+        prompt_context_duration: Duration of the prompt context
+        target_context_duration: Duration of the target context
+        device: The device to run the model on
+        temperature: Temperature for sampling
+        max_new_tokens: Maximum number of new tokens to generate
+
+    Returns:
+        DataFrame containing generated bass notes
+    """
+    prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration]
+    prompt_bass = prompt_bass[prompt_bass.end < target_context_duration]
+
+    # Handle the case where there's no target context
+    if target_context_duration == 0:
+        prompt_bass = pd.DataFrame(columns=prompt_notes.columns)
+
+    # Tokenize prompt and target notes
+    step_sequence = tokenizer.tokenize(prompt_notes)
+    step_bass = tokenizer.tokenize(prompt_bass)
+    # Combine prompt, bass marker, and target into input sequence
+    input_sequence = ["<NO_BASS>"] + step_sequence + ["<BASS>"] + step_bass
+    # Convert tokens to ids and prepare input tensor
+    input_token_ids = torch.tensor(
+        [[tokenizer.token_to_id[token] for token in input_sequence]],
+        device=device,
+        dtype=torch.int64,
+    )
+
+    # Generate new tokens using the model
+    output = generate(
+        model=model,
+        idx=input_token_ids,
+        temperature=temperature,
+        max_new_tokens=max_new_tokens,
+    )
+
+    # Convert output to numpy array and decode tokens
+    output = output[0].cpu().numpy()
+    out_tokens = [tokenizer.vocab[token_id] for token_id in output]
+
+    # Extract bass tokens (everything after the <BASS> marker)
+    bass_command_position = out_tokens.index("<BASS>")
+    bass_tokens = out_tokens[bass_command_position:].copy()
+
+    # Convert bass tokens back to notes
+    output_bass_notes = tokenizer.untokenize(bass_tokens)
+
+    # Select only the newly generated notes within the prompt duration
+    notes_after_context = output_bass_notes.start > target_context_duration
+    notes_within_step = output_bass_notes.end < prompt_context_duration
+    valid_new_notes = notes_after_context & notes_within_step
+    bass_notes = output_bass_notes[valid_new_notes].copy()
+
+    return bass_notes
+
+
+def generate_subsequence_iteratively(
+    model: GPT,
+    tokenizer: ExponentialTokenizer | AwesomeTokenizer,
+    prompt_notes: pd.DataFrame,
+    target_notes: pd.DataFrame,
+    prompt_context_duration: float,
+    target_context_duration: float,
+    time_step: float,
+    device: torch.device,
+    ctx: AbstractContextManager,
+    temperature: float = 1.0,
+    max_new_tokens: int = 512,
+    prediction_task: str = "bass_prediction",
+    model_config=None,
+) -> pd.DataFrame:
+    """
+    Generate a subsequence of notes iteratively using the given model and tokenizer.
+
+    This method implements an iterative approach to music generation, where new notes
+    are predicted in fixed time steps based on both the original prompt and previously
+    generated content. It uses a sliding window technique to maintain context throughout
+    the generation process.
+
+    The generation involves taking a conditioning sequence of tokenized notes and
+    completing the sequence for a specified duration, feeding the predictions back
+    into the model at each time step. This allows for coherent, context-aware
+    generation of musical sequences.
+
+    Args:
+        model (GPT): The GPT model for generation.
+        tokenizer (ExponentialTokenizer | AwesomeTokenizer): The tokenizer for encoding/decoding notes.
+        prompt_notes (pd.DataFrame): DataFrame containing prompt notes.
+        target_notes (pd.DataFrame): DataFrame containing initial target notes.
+        prompt_context_duration (float): Duration of the prompt context window.
+        target_context_duration (float): Duration of the target context window.
+        time_step (float): Time step for each iteration of generation.
+        device (torch.device): The device to run the model on.
+        ctx (AbstractContextManager): Context manager for the generation process.
+        temperature (float, optional): Temperature for sampling. Defaults to 1.0.
+        max_new_tokens (int, optional): Maximum number of new tokens to generate per step. Defaults to 512.
+        prediction_task (str, optional): Type of prediction task. Defaults to "bass_prediction".
+        model_config (optional): Configuration for the model. Defaults to None.
+
+    Returns:
+        pd.DataFrame: DataFrame containing all generated target notes.
+
+    The function processes the input in steps, generating new notes for each time step based on
+    the given prompt and previously generated notes. The generation continues until
+    the end of the prompt notes is reached, resulting in a complete musical sequence.
+    """
+    # Tokenize prompt at the beginning to standarize tokenization during generation.
+    prompt_notes = tokenizer.untokenize(tokenizer.tokenize(prompt_notes))
+    # Initialize the first step with notes within the prompt and target context durations
+    step_prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration].copy()
+    step_target_notes = target_notes[target_notes.end < target_context_duration].copy()
+    # Initialize the list of all target notes with the initial target notes
+    all_target_notes = [step_target_notes]
+    time = 0
+    end = prompt_notes.end.max()
+
+    # Handle the case where there's no target context
+    if target_context_duration == 0:
+        step_target_notes = pd.DataFrame(columns=prompt_notes.columns)
+    it = 0
+    # Iterate through the piece, generating bass notes in steps
+    while time <= end:
+        # Calculate the start offset for the bass notes in this step
+        start_offset = it * time_step
+        it += 1
+        step_prompt_notes.start -= start_offset
+        step_prompt_notes.end -= start_offset
+
+        step_target_notes = step_target_notes[(step_target_notes.start > 0) & (step_target_notes.end > 0)]
+
+        # Tokenize the current step's prompt and target notes
+        step_sequence = tokenizer.tokenize(step_prompt_notes)
+        step_target = tokenizer.tokenize(step_target_notes)
+
+        # Combine prompt, bass marker, and target into input sequence
+        source_task_token = get_source_task_token(prediction_task=prediction_task)
+        target_task_token = get_target_task_token(prediction_task=prediction_task)
+
+        input_sequence = [source_task_token] + step_sequence + [target_task_token] + step_target
+        # Convert tokens to ids and prepare input tensor
+        input_token_ids = torch.tensor(
+            [[tokenizer.token_to_id[token] for token in input_sequence]],
+            device=device,
+            dtype=torch.int64,
+        )
+        # Generate new tokens using the model
+        with ctx:
+            output = generate(
+                model=model,
+                model_config=model_config,
+                idx=input_token_ids,
+                temperature=temperature,
+                max_new_tokens=max_new_tokens,
+            )
+        # Convert output to numpy array and decode tokens
+        output = output[0].cpu().numpy()
+        out_tokens = [tokenizer.vocab[token_id] for token_id in output]
+
+        # Extract target tokens (everything after the target notes marker)
+        predict_command_position = out_tokens.index(target_task_token)
+        target_tokens = out_tokens[predict_command_position:].copy()
+
+        # Convert target tokens back to notes
+        output_target_notes = tokenizer.untokenize(target_tokens)
+
+        # Select only the newly generated notes within the current time step
+        notes_within_step = output_target_notes.end < target_context_duration + time_step
+        target_notes = output_target_notes[notes_within_step].copy()
+        step_target_notes = target_notes.copy()
+
+        # Adjust the start and end times of the bass notes
+        target_notes.start += start_offset
+        target_notes.end += start_offset
+        target_notes["duration"] = target_notes.end - target_notes.start
+
+        # Add the generated bass notes to the collection
+        all_target_notes.append(target_notes)
+        # Prepare for the next iteration:
+        # Select the prompt notes for the next time step
+        time = time + time_step
+        prompt_selector = (prompt_notes.start > time) & (prompt_notes.end < time + prompt_context_duration)
+        step_prompt_notes = prompt_notes[prompt_selector].copy()
+        step_target_notes = step_target_notes[step_target_notes.start > time_step]
+        step_target_notes.start -= time_step
+        step_target_notes.end -= time_step
+
+    # Combine all generated bass notes and return
+    target_notes = pd.concat(all_target_notes[1:]).reset_index(drop=True)
+    return target_notes, prompt_notes
+
+
+def generate_continuation(
+    model: GPT,
+    tokenizer: ExponentialTokenizer | AwesomeTokenizer,
+    prompt_notes: pd.DataFrame,
+    prompt_context_duration: float,
+    device: torch.device,
+    ctx: AbstractContextManager,
+    temperature: float = 1.0,
+    max_new_tokens: int = 512,
+    model_config=None,
+):
+    """
+    Generates continuation of prompt_notes.
+    """
+    prompt_notes = prompt_notes[prompt_notes.end < prompt_context_duration]
+
+    # Tokenize prompt and target notes
+    input_sequence = tokenizer.encode(prompt_notes)
+    # Convert tokens to ids and prepare input tensor
+    input_token_ids = torch.tensor(
+        [input_sequence],
+        device=device,
+        dtype=torch.int64,
+    )
+
+    # Generate new tokens using the model
+    with ctx:
+        output = generate(
+            model=model,
+            model_config=model_config,
+            idx=input_token_ids,
+            temperature=temperature,
+            max_new_tokens=max_new_tokens,
+        )
+
+    # Convert output to numpy array and decode tokens
+    output = output[0].cpu().numpy()
+    out_notes = tokenizer.decode(output)
+    generated_notes = out_notes.iloc[len(prompt_notes) :]
+
+    return generated_notes
+
+
+def get_border_velocities(
+    prompt_notes: pd.DataFrame,
+    parameters: dict,
+) -> int:
+    beginning_time = parameters["target_context_duration"]
+    source_notes_after_beginnning = prompt_notes[prompt_notes.start > beginning_time]
+    border_velocity_high = source_notes_after_beginnning.velocity.max()
+    border_velocity_low = source_notes_after_beginnning.velocity.min()
+    return border_velocity_low, border_velocity_high
+
+
+def get_border_pitches(
+    prompt_notes: pd.DataFrame,
+    parameters: dict,
+) -> int:
+    """
+    Calculate which value is the highest among the source notes to establish which point is a median.
+    """
+    beginning_time = parameters["target_context_duration"]
+    source_notes_after_beginnning = prompt_notes[prompt_notes.start > beginning_time]
+    border_pitch_high = source_notes_after_beginnning.pitch.max()
+    border_pitch_low = source_notes_after_beginnning.pitch.min()
+    return border_pitch_low, border_pitch_high
+
+
+def generate_from_validation_example(
+    model: GPT,
+    tokenizer: AwesomeTokenizer | ExponentialTokenizer,
+    prompt: dict,
+    parameters: dict,
+    device: torch.device,
+    ctx: AbstractContextManager,
+    model_config=None,
+):
+    """
+    Generates notes bassed on parameter["task"]
+    """
+    prompt_notes = pd.DataFrame(json.loads(prompt["prompt_notes"]))
+    if parameters["task"] == "next_token_prediction":
+        return generate_continuation(
+            model=model,
+            tokenizer=tokenizer,
+            prompt_notes=prompt_notes,
+            prompt_context_duration=parameters["prompt_context_duration"],
+            device=device,
+            temperature=parameters["temperature"],
+            max_new_tokens=parameters["max_new_tokens"],
+            ctx=ctx,
+            model_config=model_config,
+        )
+
+    if parameters["task"] == "high_median_prediction":
+        _, median = get_border_pitches(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = prompt_notes.pitch > median
+    elif "above" in parameters["task"]:
+        _, border = get_border_pitches(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = prompt_notes.pitch > border
+    elif "below" in parameters["task"]:
+        border, _ = get_border_pitches(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = prompt_notes.pitch < border
+    elif "extreme_quartiles" in parameters["task"]:
+        low, high = get_border_pitches(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = (prompt_notes.pitch < low) | (prompt_notes.pitch > high)
+    elif parameters["task"] == "soft_prediction":
+        low_velocity, _ = get_border_velocities(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = prompt_notes.velocity < low_velocity
+    elif parameters["task"] == "loud_prediction":
+        _, high_velocity = get_border_velocities(prompt_notes=prompt_notes, parameters=parameters)
+        target_note_ids = prompt_notes.velocity > high_velocity
+    elif parameters["task"] in ["reverse_bass_prediction, bass_prediction"]:
+        low, high = get_voice_task_range(parameters["task"])
+        target_note_ids = (prompt_notes.pitch < high) & (prompt_notes.pitch > low)
+    else:
+        target_note_ids = np.zeros_like(prompt_notes.pitch)
+
+    source_notes = prompt_notes[~target_note_ids]
+    target_notes = prompt_notes[target_note_ids]
+
+    generated_notes, tokenized_prompt = generate_subsequence_iteratively(
+        model=model,
+        tokenizer=tokenizer,
+        prompt_notes=source_notes,
+        target_notes=target_notes,
+        prompt_context_duration=parameters["prompt_context_duration"],
+        target_context_duration=parameters["target_context_duration"],
+        time_step=parameters["time_step"],
+        device=device,
+        prediction_task=parameters["task"],
+        temperature=parameters["temperature"],
+        max_new_tokens=parameters["max_new_tokens"],
+        ctx=ctx,
+        model_config=model_config,
+    )
+    return generated_notes, tokenized_prompt
+
+
+@torch.no_grad()
+def generate(
+    model,
+    idx,
+    max_new_tokens,
+    temperature=1.0,
+    top_k=None,
+    model_config=None,
+):
+    """
+    Take a conditioning sequence of indices idx (LongTensor of shape (b,t)) and complete
+    the sequence max_new_tokens times, feeding the predictions back into the model each time.
+    Most likely you'll want to make sure to be in model.eval() mode of operation for this.
+    """
+    if model_config is None:
+        # Model config has to be passed if using DDP
+        model_config = model.config
+    for _ in range(max_new_tokens):
+        # if the sequence context is growing too long we must crop it at block_size
+        idx_cond = idx if idx.size(1) <= model_config.block_size else idx[:, -model_config.block_size :]
+        # forward the model to get the logits for the index in the sequence
+        logits, _ = model(idx_cond)
+        # pluck the logits at the final step and scale by desired temperature
+        logits = logits[:, -1, :] / temperature
+        # optionally crop the logits to only the top k options
+        if top_k is not None:
+            v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+            logits[logits < v[:, [-1]]] = -float("Inf")
+        # apply softmax to convert logits to (normalized) probabilities
+        probs = F.softmax(logits, dim=-1)
+        # sample from the distribution
+        idx_next = torch.multinomial(probs, num_samples=1)
+        # append sampled index to the running sequence and continue
+        idx = torch.cat((idx, idx_next), dim=1)
+    return idx

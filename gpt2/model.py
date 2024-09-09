@@ -125,16 +125,16 @@ class GPTConfig:
 
 
 class GPT(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, pad_token_id: int = 0):
         super().__init__()
         assert config.vocab_size is not None
         assert config.block_size is not None
         self.config = config
-
+        self.pad_token_id = pad_token_id
         self.transformer = nn.ModuleDict(
             dict(
-                wte=nn.Embedding(config.vocab_size, config.n_embd),
-                wpe=nn.Embedding(config.block_size, config.n_embd),
+                wte=nn.Embedding(config.vocab_size, config.n_embd, padding_idx=self.pad_token_id),
+                wpe=nn.Embedding(config.block_size, config.n_embd, padding_idx=self.pad_token_id),
                 drop=nn.Dropout(config.dropout),
                 h=nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
                 ln_f=LayerNorm(config.n_embd, bias=config.bias),
@@ -177,7 +177,7 @@ class GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, idx, targets=None):
+    def forward(self, idx, targets=None, target_mask=None):
         device = idx.device
         b, t = idx.size()
         msg = f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
@@ -194,9 +194,12 @@ class GPT(nn.Module):
         x = self.transformer.ln_f(x)
 
         if targets is not None:
+            if target_mask is not None:
+                # Insert ignored id everywhere the  target mask is False
+                targets[~target_mask] = -100
             # if we are given some desired targets also calculate the loss
             logits = self.lm_head(x)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-100)
         else:
             # inference-time mini-optimization: only forward the lm_head on the very last position
             logits = self.lm_head(x[:, [-1], :])  # note: using list [-1] to preserve the time dim

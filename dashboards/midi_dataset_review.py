@@ -2,48 +2,90 @@ import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
 from datasets import load_dataset
-from midi_tokenizers import ExponentialTimeTokenizer
 
+from artifacts import special_tokens
+from data.tokenizer import ExponentialTokenizer
 from data.next_token_dataset import NextTokenDataset
-from tokenized_midi_datasets import ExponentialTimeTokenDataset
 
 
 def main():
-    st.write("MidiDataset review on an example of ExponentialTimeTokenDataset")
-    tokenized_dataset_builder = ExponentialTimeTokenDataset
-    tokenized_dataset = load_dataset(
-        "tokenized_midi_datasets/ExponentialTimeTokenDataset",
-        name="basic-no-overlap",
-        split="test",
+    dataset_names = [
+        "MidiTokenizedDataset",
+    ]
+    dataset_name = st.selectbox(label="dataset", options=dataset_names)
+    dataset_split = st.selectbox(label="split", options=["train", "test", "validation"])
+    with st.form(key="config_form"):
+        base_dataset_name = st.text_input(label="base_dataset_name", value="roszcz/maestro-sustain-v2")
+        extra_datasets = st.text_input(label="extra_datasets (comma separated)", value="")
+        pause_detection_threshold = st.number_input(label="pause_detection_threshold", value=2)
+        sequence_length = st.number_input(label="sequence_length", min_value=1, value=5000, step=500)
+
+        st.form_submit_button(label="Submit")
+
+    with st.form(key="tokenizer_form"):
+        min_time_unit = st.number_input(label="min_time_unit", min_value=0.01, value=0.01, step=0.01, format="%.2f")
+        n_velocity_bins = st.number_input(label="n_velocity_bins", min_value=1, value=32, step=1)
+
+        st.form_submit_button(label="Submit")
+
+    extra_datasets_list = [x.strip() for x in extra_datasets.split(",") if x.strip()]
+
+    config = {
+        "base_dataset_name": base_dataset_name,
+        "extra_datasets": extra_datasets_list,
+        "pause_detection_threshold": pause_detection_threshold,
+    }
+
+    tokenizer_parameters = {
+        "min_time_unit": min_time_unit,
+        "n_velocity_bins": n_velocity_bins,
+        "special_tokens": special_tokens,
+    }
+
+    tokenizer = ExponentialTokenizer(**tokenizer_parameters)
+
+    dataset = load_dataset(
+        f"midi_datasets/{dataset_name}",
+        split=dataset_split,
+        trust_remote_code=True,
+        num_proc=8,
+        **config,
     )
-    tokenizer_parameters = tokenized_dataset_builder.builder_configs["basic-no-overlap"].tokenizer_parameters
-    tokenizer = ExponentialTimeTokenizer(**tokenizer_parameters)
-    dataset_names = ["NextTokenDataset"]
+    midi_dataset = NextTokenDataset(
+        dataset=dataset,
+        tokenizer=tokenizer,
+        sequence_length=sequence_length,
+    )
+    st.write(f"rows: {dataset.num_rows}")
+    with st.expander("config"):
+        st.write(config)
 
-    dataset_name = st.selectbox("midi dataset name", options=dataset_names)
+    idx = st.number_input(label="record_id", value=0, max_value=len(dataset))
+    record = midi_dataset[idx]
 
-    match dataset_name:
-        case "NextTokenDataset":
-            dataset = NextTokenDataset(
-                dataset=tokenized_dataset,
-                tokenizer=tokenizer,
-            )
+    with st.expander(label="source"):
+        st.json(record["source"])
 
-    idx = st.number_input(label="record id", min_value=0, max_value=len(dataset))
-    record = dataset[idx]
+    src_token_ids = record["source_token_ids"]
+    tgt_token_ids = record["target_token_ids"]
 
-    source_ids = record["source_token_ids"]
-    target_ids = record["target_token_ids"]
+    src_tokens = [midi_dataset.tokenizer.vocab[token_id] for token_id in src_token_ids]
+    tgt_tokens = [midi_dataset.tokenizer.vocab[token_id] for token_id in tgt_token_ids]
 
-    source_notes = tokenizer.decode(source_ids)
-    target_notes = tokenizer.decode(target_ids)
+    source_notes = midi_dataset.tokenizer.untokenize(src_tokens)
+    target_notes = midi_dataset.tokenizer.untokenize(tgt_tokens)
 
-    source_piece = ff.MidiPiece(df=source_notes)
-    target_piece = ff.MidiPiece(df=target_notes)
+    src_piece = ff.MidiPiece(source_notes)
+    tgt_piece = ff.MidiPiece(target_notes)
 
-    pieces_columns = st.columns(2)
+    token_columns = st.columns(2)
+    token_columns[0].write(src_tokens)
+    token_columns[1].write(tgt_tokens)
+    st.write("#### Prompt:")
+    streamlit_pianoroll.from_fortepyan(piece=src_piece)
+    st.write("#### Target:")
+    streamlit_pianoroll.from_fortepyan(piece=tgt_piece)
 
-    with pieces_columns[0]:
-        streamlit_pianoroll.from_fortepyan(source_piece)
-    with pieces_columns[1]:
-        streamlit_pianoroll.from_fortepyan(target_piece)
+
+if __name__ == "__main__":
+    main()

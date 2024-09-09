@@ -1,0 +1,4 @@
+wandb_log: True  # disabled by default
+wandb_project: 'midi-gpt2'
+wandb_run_name_suffix: subsequence-${now:%Y-%m-%d-%H-%M}
+log_interval: 20

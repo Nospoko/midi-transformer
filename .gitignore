@@ -6,4 +6,5 @@ venv
 checkpoints*
 pretrained*
 .env
-*notes*
+notes*
+.csv

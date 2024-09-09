@@ -19,92 +19,247 @@ $ torchrun --nproc_per_node=8 --nnodes=2 --node_rank=1 --master_addr=123.456.123
 import os
 import math
 import time
+import datetime
+from typing import Any
 from contextlib import nullcontext
 
 import hydra
 import torch
-import numpy as np
+import psutil
 from dotenv import load_dotenv
-from datasets import load_dataset
 from hydra.utils import to_absolute_path
+from datasets import Dataset, load_dataset
 from omegaconf import OmegaConf, DictConfig
-from midi_trainable_tokenizers import AwesomeMidiTokenizer
+from torch.utils.data import Sampler, DataLoader
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
-from midi_tokenizers_generation.tokenizer_generator import generate_tokenizer
 
 import wandb
 from gpt2.model import GPT, GPTConfig
+from data.piano_dataset import PianoDataset
+from data.median_dataset import MedianDataset
 from data.next_token_dataset import NextTokenDataset
+from data.subsequence_dataset import SubSequenceMidiDataset
+from data.memory_efficient_random_sampler import MemoryEfficientRandomSampler
+from gpt2.utils import load_tokenizer, run_generation_step, prepare_validation_examples_for_task
 
 load_dotenv()
-tokenizer_name_to_dataset_map: dict[str, str] = {
-    "ExponentialTimeTokenizer": "ExponentialTimeTokenDataset",
-    "OneTimeTokenizer": "OneTimeTokenDataset",
-    "AwesomeMidiTokenizer": "AwesomeTokensDataset",
-}
+
+
+def log_open_files():
+    process = psutil.Process()
+    print(f"Open file descriptors: {process.num_fds()}")
+
+
+class CyclicalDataLoader:
+    def __init__(
+        self,
+        dataset: SubSequenceMidiDataset | NextTokenDataset,
+        sampler: Sampler,
+        batch_size: int,
+        shuffle: bool = False,
+        pin_memory: bool = False,
+        num_workers: int = 0,
+        device: torch.device = torch.device("cpu"),
+    ):
+        self.dataset = dataset
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.pin_memory = pin_memory
+        self.num_workers = num_workers
+        self.device = device
+        self.dataloader = DataLoader(
+            dataset=dataset,
+            sampler=sampler,
+            batch_size=self.batch_size,
+            pin_memory=self.pin_memory,
+            num_workers=num_workers,
+        )
+        self.iterator = iter(self.dataloader)
+
+    def get_batch(self):
+        try:
+            batch = next(self.iterator)
+        except StopIteration:
+            # Reset the iterator when it's exhausted
+            self.iterator = iter(self.dataloader)
+            batch = next(self.iterator)
+
+        x = batch["source_token_ids"].to(self.device, non_blocking=True)
+        y = batch["target_token_ids"].to(self.device, non_blocking=True)
+        mask = batch["target_mask"].to(self.device, non_blocking=True)
+        return x, y, mask
+
+
+def get_dataset_for_task(cfg: DictConfig) -> tuple[Any, Any]:
+    task_to_dataset = {
+        "next_token_prediction": prepare_next_token_datasets,
+        "bass_prediction": prepare_subsequence_datasets,
+        "reverse_bass_prediction": prepare_reverse_bass_datasets,
+        "high_median_prediction": prepare_median_datasets,
+        "multi": prepare_piano_dataset,
+    }
+    prepare_function = task_to_dataset.get(cfg.task)
+    if prepare_function:
+        return prepare_function(cfg)
+    raise ValueError(f"Unknown task: {cfg.task}")
+
+
+def prepare_dataset_base(cfg: DictConfig, dataset_name: str) -> tuple[Dataset, Dataset]:
+    dataset_config = OmegaConf.to_container(cfg.dataset)
+    dataset_path = to_absolute_path(f"./midi_datasets/{dataset_name}")
+    if dataset_name == "MidiTokenizedDataset":
+        dataset_config["tokenizer_parameters"] = OmegaConf.to_container(cfg.tokenizer.tokenizer_parameters)
+
+    dataset = load_dataset(
+        dataset_path,
+        trust_remote_code=True,
+        num_proc=cfg.system.data_workers,
+        **dataset_config,
+    )
+    train_split: Dataset = dataset["train"]
+    validation_split: Dataset = dataset["validation"]
+    validation_split.shuffle(seed=1337)
+
+    if validation_split.num_rows > cfg.data.batch_size * cfg.eval_iters:
+        validation_split = validation_split.select(range(cfg.data.batch_size * cfg.eval_iters))
+    return train_split, validation_split
+
+
+def create_datasets(
+    train_split: Dataset,
+    validation_split: Dataset,
+    cfg: DictConfig,
+    dataset_class,
+) -> tuple[Any, Any, str]:
+    tokenizer = load_tokenizer(cfg)
+    train_dataset = dataset_class(
+        dataset=train_split,
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+        loss_masking=cfg.loss_masking,
+    )
+    val_dataset = dataset_class(
+        dataset=validation_split,
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+        loss_masking=cfg.loss_masking,
+    )
+    return train_dataset, val_dataset
+
+
+def prepare_reverse_bass_datasets(cfg: DictConfig) -> tuple[Any, Any]:
+    train_split, validation_split = prepare_dataset_base(cfg, "ReverseBassPredictionDataset")
+    return create_datasets(train_split, validation_split, cfg, SubSequenceMidiDataset)
+
+
+def prepare_next_token_datasets(cfg: DictConfig) -> tuple[Any, Any]:
+    train_split, validation_split = prepare_dataset_base(cfg, "MidiTokenizedDataset")
+    return create_datasets(train_split, validation_split, cfg, NextTokenDataset)
+
+
+def prepare_subsequence_datasets(cfg: DictConfig) -> tuple[Any, Any]:
+    train_split, validation_split = prepare_dataset_base(cfg, "BassPredictionDataset")
+    return create_datasets(train_split, validation_split, cfg, SubSequenceMidiDataset)
+
+
+def prepare_median_datasets(cfg: DictConfig) -> tuple[Any, Any]:
+    dataset_config = OmegaConf.to_container(cfg.dataset)
+    dataset_path = to_absolute_path("./midi_datasets/AugmentedDataset")
+
+    dataset = load_dataset(
+        dataset_path,
+        trust_remote_code=True,
+        num_proc=cfg.system.data_workers,
+        **dataset_config,
+    )
+    train_split: Dataset = dataset["train"]
+    validation_split: Dataset = dataset["validation"]
+
+    tokenizer = load_tokenizer(cfg)
+    train_dataset = MedianDataset(
+        dataset=train_split,
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+        loss_masking=cfg.loss_masking,
+        notes_per_record=cfg.data.notes_per_record,
+    )
+    val_dataset = MedianDataset(
+        dataset=validation_split,
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+        loss_masking=cfg.loss_masking,
+        notes_per_record=cfg.data.notes_per_record,
+    )
+    return train_dataset, val_dataset
+
+
+def prepare_piano_dataset(cfg: DictConfig) -> tuple[Any, Any]:
+    dataset_config = OmegaConf.to_container(cfg.dataset)
+    dataset_path = to_absolute_path("./midi_datasets/AugmentedDataset")
+
+    dataset = load_dataset(
+        dataset_path,
+        trust_remote_code=True,
+        num_proc=cfg.system.data_workers,
+        **dataset_config,
+    )
+    train_split: Dataset = dataset["train"]
+    validation_split: Dataset = dataset["validation"]
+
+    tokenizer = load_tokenizer(cfg)
+    train_dataset = PianoDataset(
+        dataset=train_split,
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+        loss_masking=cfg.loss_masking,
+        notes_per_record=cfg.data.notes_per_record,
+        tasks=cfg.tasks,
+    )
+    val_dataset = PianoDataset(
+        dataset=validation_split,
+        tokenizer=tokenizer,
+        sequence_length=cfg.data.sequence_length,
+        loss_masking=cfg.loss_masking,
+        notes_per_record=cfg.data.notes_per_record,
+        tasks=cfg.tasks,
+    )
+    return train_dataset, val_dataset
+
+
+def setup_device(cfg: DictConfig):
+    if int(os.environ.get("RANK", -1)) != -1:
+        init_process_group(backend=cfg.ddp.backend, timeout=datetime.timedelta(seconds=1800))
+        local_rank = int(os.environ["LOCAL_RANK"])
+        torch.cuda.set_device(local_rank)
+        return f"cuda:{local_rank}", True
+    return cfg.system.device, False
 
 
 @hydra.main(config_path="configs", config_name="gpt2_pretraining", version_base=None)
 def main(cfg: DictConfig):
-    out_dir = to_absolute_path(cfg.out_dir)
-    if cfg.task == "pretraining":
-        out_dir = os.path.join(
-            out_dir,
-            "pretraining",
-        )
-    # Get the right data for the tokenizer specified in config
-    dataset_name = tokenizer_name_to_dataset_map[cfg.data.tokenizer]
-    dataset_config = cfg.dataset
-    tokenizer_parameters = dataset_config.tokenizer_parameters
-    # We have to use dict so that HuggingFace can serialize the configuration and cache the dataset
-    dataset_parameters = OmegaConf.to_container(dataset_config)
+    model_args = dict(
+        n_layer=cfg.model.n_layer,
+        n_head=cfg.model.n_head,
+        n_embd=cfg.model.n_embd,
+        block_size=cfg.data.sequence_length,
+        bias=cfg.model.bias,
+        vocab_size=None,
+        dropout=cfg.model.dropout,
+    )  # start with model_args from command line
 
-    # Hydra changes paths - we have to change them back
-    # Load the suitable dataset
-    dataset_path = to_absolute_path(f"./tokenized_midi_datasets/{dataset_name}")
-    dataset = load_dataset(
-        dataset_path,
-        num_proc=8,
-        trust_remote_code=True,
-        **dataset_parameters,
-    )
-    total_tokens = dataset_config.sequence_length * dataset["train"].num_rows
-    print(f"tokens in a training dataset: {total_tokens}")
-
-    # Keep config as a dict as well for logging at wandb and for checkpoints
-    config = OmegaConf.to_container(cfg)
-    if cfg.data.tokenizer == "AwesomeMidiTokenizer":
-        tokenizer_path = to_absolute_path("pretrained/awesome_tokenizers/awesome-tokenizer-pretrained.json")
-        tokenizer = AwesomeMidiTokenizer.from_file(tokenizer_path)
-    else:
-        tokenizer = generate_tokenizer(name=cfg.data.tokenizer, parameters=tokenizer_parameters)
-
-    train_dataset = NextTokenDataset(dataset=dataset["train"], tokenizer=tokenizer)
-    val_dataset = NextTokenDataset(dataset=dataset["validation"], tokenizer=tokenizer)
-
-    device = cfg.system.device
-
-    # Various inits, derived attributes, I/O setup
-    ddp = int(os.environ.get("RANK", -1)) != -1  # is this a ddp run?
+    device, ddp = setup_device(cfg=cfg)
     if ddp:
-        init_process_group(backend=cfg.ddp.backend)
-
         ddp_rank = int(os.environ["RANK"])
         ddp_local_rank = int(os.environ["LOCAL_RANK"])
         ddp_world_size = int(os.environ["WORLD_SIZE"])
-
-        device = f"cuda:{ddp_local_rank}"
-        torch.cuda.set_device(device)
-
         master_process = ddp_rank == 0  # this process will do logging, checkpointing etc.
-
         seed_offset = ddp_rank  # each process gets a different seed
 
         # World_size number of processes will be training simultaneously, so we can scale
         # down the desired gradient accumulation iterations per process proportionally
-        assert cfg.data.gradient_accumulation_steps % ddp_world_size == 0
-        cfg.data.gradient_accumulation_steps //= ddp_world_size
+        assert cfg.optimizer.gradient_accumulation_steps % ddp_world_size == 0
+        cfg.optimizer.gradient_accumulation_steps //= ddp_world_size
 
     else:
         # If not ddp, we are running on a single gpu, and one process
@@ -112,9 +267,70 @@ def main(cfg: DictConfig):
         seed_offset = 0
         ddp_world_size = 1
 
-    tokens_per_batch = cfg.data.batch_size * dataset_config.sequence_length
-    tokens_per_iter = cfg.data.gradient_accumulation_steps * ddp_world_size * tokens_per_batch
+    if master_process:
+        validation_examples = prepare_validation_examples_for_task(cfg=cfg)
+
+    # First load checkpoint if init_from midi_gpt2*
+    if cfg.init_from.startswith("midi-gpt2"):
+        # resume training from a checkpoint.
+        ckpt_path = os.path.join("checkpoints/", cfg.init_from)
+        checkpoint = torch.load(ckpt_path, map_location=device)
+        checkpoint_model_args = checkpoint["model_args"]
+        checkpoint_cfg = OmegaConf.create(checkpoint["config"])
+
+        cfg.model = checkpoint_cfg.model
+        if "tokenizer" in checkpoint_cfg:
+            cfg.tokenizer = checkpoint_cfg.tokenizer
+
+        cfg.system.dtype = checkpoint_cfg.system.dtype
+
+        train_dataset, val_dataset = get_dataset_for_task(cfg=cfg)
+        out_dir = to_absolute_path(cfg.out_dir)
+        tokenizer = train_dataset.tokenizer
+        pad_token_id = tokenizer.token_to_id["<PAD>"]
+        config = OmegaConf.to_container(cfg=cfg)
+        # model init
+
+        # force these config attributes to be equal otherwise we can't even resume training
+        # the rest of the attributes (e.g. dropout) can stay as desired from config
+        for k in ["n_layer", "n_head", "n_embd", "block_size", "bias", "vocab_size"]:
+            model_args[k] = checkpoint_model_args[k]
+
+        # create the model
+        gptconf = GPTConfig(**model_args)
+        model = GPT(config=gptconf, pad_token_id=pad_token_id)
+        state_dict = checkpoint["model"]
+        checkpoint = None  # free up memory
+
+        # fix the keys of the state dictionary :(
+        # honestly no idea how checkpoints sometimes get this prefix, have to debug more
+        unwanted_prefix = "_orig_mod."
+        for k, v in list(state_dict.items()):
+            if k.startswith(unwanted_prefix):
+                state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
+
+        model.load_state_dict(state_dict)
+        state_dict = None
+
+    elif cfg.init_from == "scratch":
+        train_dataset, val_dataset = get_dataset_for_task(cfg=cfg)
+        out_dir = to_absolute_path(cfg.out_dir)
+        tokenizer = train_dataset.tokenizer
+        pad_token_id = tokenizer.token_to_id["<PAD>"]
+        config = OmegaConf.to_container(cfg=cfg)
+        # init a new model from scratch
+        print("Initializing a new model from scratch")
+        # determine the vocab size we'll use for from-scratch training
+        model_args["vocab_size"] = tokenizer.vocab_size
+        gptconf = GPTConfig(**model_args)
+        model = GPT(config=gptconf, pad_token_id=pad_token_id)
+
+    tokens_per_batch = cfg.data.batch_size * cfg.data.sequence_length
+    tokens_per_iter = cfg.optimizer.gradient_accumulation_steps * ddp_world_size * tokens_per_batch
     print(f"tokens per iteration will be: {tokens_per_iter:,}")
+    if cfg.task != "next_token_prediction":
+        tokens_in_dataset = train_dataset.dataset.num_rows * train_dataset.sequence_length
+        print(f"total tokens in the training dataset will be: {tokens_in_dataset:,}")
 
     if master_process:
         os.makedirs(out_dir, exist_ok=True)
@@ -122,27 +338,48 @@ def main(cfg: DictConfig):
     torch.backends.cuda.matmul.allow_tf32 = True  # allow tf32 on matmul
     torch.backends.cudnn.allow_tf32 = True  # allow tf32 on cudnn
 
+    torch.set_num_threads(math.floor(cfg.system.data_workers / ddp_world_size))
+
     device_type = "cuda" if "cuda" in device else "cpu"  # for later use in torch.autocast
 
     # note: float16 data type will automatically use a GradScaler
     ptdtype = {"float32": torch.float32, "bfloat16": torch.bfloat16, "float16": torch.float16}[cfg.system.dtype]
     ctx = nullcontext() if device_type == "cpu" else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
+    train_sampler = MemoryEfficientRandomSampler(
+        data_source=train_dataset,
+        seed=4 + seed_offset,
+    )
+    val_sampler = MemoryEfficientRandomSampler(
+        data_source=val_dataset,
+        seed=4 + seed_offset,
+        num_samples=cfg.data.batch_size * cfg.eval_iters,
+    )
+    # Create the loaders
+    train_loader = CyclicalDataLoader(
+        train_dataset,
+        sampler=train_sampler,
+        batch_size=cfg.data.batch_size,
+        shuffle=True,
+        pin_memory=device_type == "cuda",
+        num_workers=cfg.system.data_workers // ddp_world_size,
+        device=device,
+    )
+
+    val_loader = CyclicalDataLoader(
+        val_dataset,
+        sampler=val_sampler,
+        batch_size=cfg.data.batch_size,
+        shuffle=False,
+        pin_memory=device_type == "cuda",
+        num_workers=cfg.system.data_workers // ddp_world_size,
+        device=device,
+    )
 
     def get_batch(split):
         if split == "train":
-            data = train_dataset
+            return train_loader.get_batch()
         else:
-            data = val_dataset
-        ix = np.random.randint(0, len(data), size=(cfg.data.batch_size,))
-        # numpy to int :(
-        x = torch.stack([data[int(i)]["source_token_ids"] for i in ix])
-        y = torch.stack([data[int(i)]["target_token_ids"] for i in ix])
-        if device_type == "cuda":
-            # pin arrays x,y, which allows us to move them to GPU asynchronously (non_blocking=True)
-            x, y = x.pin_memory().to(device, non_blocking=True), y.pin_memory().to(device, non_blocking=True)
-        else:
-            x, y = x.to(device), y.to(device)
-        return x, y
+            return val_loader.get_batch()
 
     # init these up here, can override if init_from='resume' (i.e. from a checkpoint)
     iter_num = 0
@@ -153,83 +390,10 @@ def main(cfg: DictConfig):
 
     print(f"found vocab_size = {meta_vocab_size} (inside {tokenizer.name})")
 
-    # model init
-    model_args = dict(
-        n_layer=cfg.model.n_layer,
-        n_head=cfg.model.n_head,
-        n_embd=cfg.model.n_embd,
-        block_size=dataset_config.sequence_length,
-        bias=cfg.model.bias,
-        vocab_size=None,
-        dropout=cfg.model.dropout,
-    )  # start with model_args from command line
-
-    if cfg.init_from == "scratch":
-        # init a new model from scratch
-        print("Initializing a new model from scratch")
-        # determine the vocab size we'll use for from-scratch training
-        model_args["vocab_size"] = meta_vocab_size
-        gptconf = GPTConfig(**model_args)
-        model = GPT(gptconf)
-
-    elif cfg.init_from == "resume":
-        print(f"Resuming training from {out_dir}")
-
-        # resume training from a checkpoint.
-        ckpt_path = os.path.join(out_dir, "ckpt.pt")
-        checkpoint = torch.load(ckpt_path, map_location=device)
-        checkpoint_model_args = checkpoint["model_args"]
-
-        # force these config attributes to be equal otherwise we can't even resume training
-        # the rest of the attributes (e.g. dropout) can stay as desired from command line
-        for k in ["n_layer", "n_head", "n_embd", "block_size", "bias", "vocab_size"]:
-            model_args[k] = checkpoint_model_args[k]
-
-        # create the model
-        gptconf = GPTConfig(**model_args)
-        model = GPT(gptconf)
-        state_dict = checkpoint["model"]
-
-        # fix the keys of the state dictionary :(
-        # honestly no idea how checkpoints sometimes get this prefix, have to debug more
-        unwanted_prefix = "_orig_mod."
-        for k, v in list(state_dict.items()):
-            if k.startswith(unwanted_prefix):
-                state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
-
-        model.load_state_dict(state_dict)
-        iter_num = checkpoint["iter_num"]
-        best_val_loss = checkpoint["best_val_loss"]
-
-    elif cfg.init_from.startswith("midi-gpt2"):
-        # resume training from a checkpoint.
-        ckpt_path = os.path.join(out_dir, f"pretrained/{cfg.init_from}")
-        checkpoint = torch.load(ckpt_path, map_location=device)
-        checkpoint_model_args = checkpoint["model_args"]
-
-        # force these config attributes to be equal otherwise we can't even resume training
-        # the rest of the attributes (e.g. dropout) can stay as desired from command line
-        for k in ["n_layer", "n_head", "n_embd", "block_size", "bias", "vocab_size"]:
-            model_args[k] = checkpoint_model_args[k]
-
-        # create the model
-        gptconf = GPTConfig(**model_args)
-        model = GPT(gptconf)
-        state_dict = checkpoint["model"]
-
-        # fix the keys of the state dictionary :(
-        # honestly no idea how checkpoints sometimes get this prefix, have to debug more
-        unwanted_prefix = "_orig_mod."
-        for k, v in list(state_dict.items()):
-            if k.startswith(unwanted_prefix):
-                state_dict[k[len(unwanted_prefix) :]] = state_dict.pop(k)
-
-        model.load_state_dict(state_dict)
-
     # crop down the model block size if desired, using model surgery
-    if dataset_config.sequence_length < model.config.block_size:
-        model.crop_block_size(dataset_config.sequence_length)
-        model_args["block_size"] = dataset_config.sequence_length  # so that the checkpoint will have the right value
+    if cfg.data.sequence_length < model.config.block_size:
+        model.crop_block_size(cfg.data.sequence_length)
+        model_args["block_size"] = cfg.data.sequence_length  # so that the checkpoint will have the right value
     model.to(device)
 
     # initialize a GradScaler. If enabled=False scaler is a no-op
@@ -238,14 +402,10 @@ def main(cfg: DictConfig):
     # optimizer
     optimizer = model.configure_optimizers(
         weight_decay=cfg.optimizer.weight_decay,
-        learning_rate=cfg.optimizer.learning_rate,
+        learning_rate=cfg.lr.learning_rate,
         betas=(cfg.optimizer.beta1, cfg.optimizer.beta2),
         device_type=device_type,
     )
-
-    if cfg.init_from == "resume":
-        optimizer.load_state_dict(checkpoint["optimizer"])
-    checkpoint = None  # free up memory
 
     # compile the model
     if cfg.system.compile:
@@ -267,9 +427,9 @@ def main(cfg: DictConfig):
         for split in ["train", "val"]:
             losses = torch.zeros(cfg.eval_iters)
             for k in range(cfg.eval_iters):
-                X, Y = get_batch(split)
+                X, Y, mask = get_batch(split)
                 with ctx:
-                    logits, loss = model(X, Y)
+                    logits, loss = model(X, Y, mask)
                 losses[k] = loss.item()
             out[split] = losses.mean()
         model.train()
@@ -279,7 +439,7 @@ def main(cfg: DictConfig):
     def get_lr(it):
         # 1) linear warmup for warmup_iters steps
         if it < cfg.lr.warmup_iters:
-            return cfg.optimizer.learning_rate * it / cfg.lr.warmup_iters
+            return cfg.lr.learning_rate * it / cfg.lr.warmup_iters
 
         # 2) if it > lr_decay_iters, return min learning rate
         if it > cfg.lr.lr_decay_iters:
@@ -289,7 +449,7 @@ def main(cfg: DictConfig):
         decay_ratio = (it - cfg.lr.warmup_iters) / (cfg.lr.lr_decay_iters - cfg.lr.warmup_iters)
         assert 0 <= decay_ratio <= 1
         coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))  # coeff ranges 0..1
-        return cfg.lr.min_lr + coeff * (cfg.optimizer.learning_rate - cfg.lr.min_lr)
+        return cfg.lr.min_lr + coeff * (cfg.lr.learning_rate - cfg.lr.min_lr)
 
     run_name = f"midi-gpt2-{milion_params:.0f}M-" + cfg.logging.wandb_run_name_suffix
     # logging
@@ -298,73 +458,49 @@ def main(cfg: DictConfig):
         # define our custom x axis metric
         wandb.define_metric("total_tokens")
         # define which metrics will be plotted against it
-        wandb.define_metric("train_batch/loss", step_metric="total_tokens")
-        wandb.define_metric("val_batch/loss", step_metric="total_tokens")
+        wandb.define_metric("train/loss_batch", step_metric="total_tokens")
+        wandb.define_metric("val/loss_batch", step_metric="total_tokens")
         wandb.define_metric("train/loss", step_metric="total_tokens")
+        wandb_link = wandb.run.get_url()
 
     total_tokens = 0
     # training loop
-    X, Y = get_batch("train")  # fetch the very first batch
+    X, Y, mask = get_batch("train")  # fetch the very first batch
     t0 = time.time()
     local_iter_num = 0  # number of iterations in the lifetime of this process
     raw_model = model.module if ddp else model  # unwrap DDP container if needed
     running_mfu = -1.0
-    iter_num = 0
+    iter_num = 1
     while True:
         # determine and set the learning rate for this iteration
-        lr = get_lr(iter_num) if cfg.lr.decay_lr else cfg.optimizer.learning_rate
+        lr = get_lr(iter_num) if cfg.lr.decay_lr else cfg.lr.learning_rate
         for param_group in optimizer.param_groups:
             param_group["lr"] = lr
-
-        # evaluate the loss on train/val sets and write checkpoints
-        if iter_num % cfg.eval_interval == 1 and master_process:
-            losses = estimate_loss()
-            print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
-            if cfg.logging.wandb_log:
-                wandb.log(
-                    {
-                        "iter": iter_num,
-                        "train_batch/loss": losses["train"],
-                        "val_batch/loss": losses["val"],
-                        "total_tokens": total_tokens,
-                    }
-                )
-            if losses["val"] < best_val_loss or cfg.always_save_checkpoint:
-                best_val_loss = losses["val"]
-                checkpoint = {
-                    "model": raw_model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "model_args": model_args,
-                    "iter_num": iter_num,
-                    "best_val_loss": best_val_loss,
-                    "config": config,
-                }
-                print(f"saving checkpoint to {out_dir}")
-                torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
 
         # forward backward update, with optional gradient accumulation to simulate larger batch size
         # and using the GradScaler if data type is float16
         t00 = time.time()
         n_iter_tokens = 0
-        for micro_step in range(cfg.data.gradient_accumulation_steps):
+        for micro_step in range(cfg.optimizer.gradient_accumulation_steps):
             if ddp:
                 # in DDP training we only need to sync gradients at the last micro step.
                 # the official way to do this is with model.no_sync() context manager, but
                 # I really dislike that this bloats the code and forces us to repeat code
                 # looking at the source of that context manager, it just toggles this variable
-                model.require_backward_grad_sync = micro_step == cfg.data.gradient_accumulation_steps - 1
+                model.require_backward_grad_sync = micro_step == cfg.optimizer.gradient_accumulation_steps - 1
             with ctx:
                 n_iter_tokens += X.numel()
-                logits, loss = model(X, Y)
+                logits, loss = model(X, Y, mask)
                 # scale the loss to account for gradient accumulation
-                loss = loss / cfg.data.gradient_accumulation_steps
+                loss = loss / cfg.optimizer.gradient_accumulation_steps
 
             # immediately async prefetch next batch while model is doing the forward pass on the GPU
-            X, Y = get_batch("train")
+            X, Y, mask = get_batch("train")
             # backward pass, with gradient scaling if training in fp16
             scaler.scale(loss).backward()
 
-        total_tokens += n_iter_tokens
+        tokens_in_step = n_iter_tokens * ddp_world_size
+        total_tokens += tokens_in_step
 
         # clip the gradient
         if cfg.optimizer.grad_clip != 0.0:
@@ -374,25 +510,97 @@ def main(cfg: DictConfig):
         # step the optimizer and scaler if training in fp16
         scaler.step(optimizer)
         scaler.update()
-        # flush the gradients as soon as we can, no need for this memory anymore
-        optimizer.zero_grad(set_to_none=True)
 
         t_forward_backward = time.time() - t00
-
         # timing and logging
         t1 = time.time()
         dt = t1 - t0
         t0 = t1
-        if iter_num % cfg.logging.log_interval == 0 and master_process:
+
+        # evaluate the loss on train/val sets and write checkpoints
+        if iter_num % cfg.eval_interval == 0 and master_process:
+            log_open_files()
+            losses = estimate_loss()
+            print(f"step {iter_num}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+            if losses["val"] < best_val_loss:
+                best_val_loss = losses["val"]
+                checkpoint = {
+                    "model": raw_model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "model_args": model_args,
+                    "iter_num": iter_num,
+                    "best_val_loss": best_val_loss.item(),
+                    "train_loss": losses["train"].item(),
+                    "config": config,
+                    "wandb": wandb_link,
+                    "total_tokens": total_tokens,
+                }
+                print(f"saving checkpoint to {out_dir}")
+                torch.save(checkpoint, os.path.join(out_dir, run_name + ".pt"))
+                if os.path.exists(".generate"):
+                    model.eval()
+                    run_generation_step(
+                        model=raw_model,
+                        tokenizer=tokenizer,
+                        checkpoint=checkpoint,
+                        run_name=run_name,
+                        validation_examples=validation_examples,
+                        device=device,
+                        ctx=ctx,
+                        model_config=gptconf,
+                    )
+                    model.train()
+                    os.unlink(".generate")
+
+            checkpoint = {
+                "model": raw_model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "model_args": model_args,
+                "iter_num": iter_num,
+                "best_val_loss": best_val_loss.item(),
+                "config": config,
+                "wandb": wandb_link,
+                "total_tokens": total_tokens,
+            }
+            print(f"saving checkpoint to {out_dir}")
+            torch.save(checkpoint, os.path.join(out_dir, run_name + "last.pt"))
+            if os.path.exists(".generate_last"):
+                model.eval()
+                run_generation_step(
+                    model=raw_model,
+                    tokenizer=tokenizer,
+                    checkpoint=checkpoint,
+                    run_name=run_name,
+                    validation_examples=validation_examples,
+                    device=device,
+                    ctx=ctx,
+                    model_config=gptconf,
+                )
+                model.train()
+                os.unlink(".generate_last")
+            if cfg.logging.wandb_log:
+                wandb.log(
+                    {
+                        "iter": iter_num,
+                        "train/loss_batch": losses["train"],
+                        "val/loss_batch": losses["val"],
+                        "total_tokens": total_tokens,
+                        "best_val_loss": best_val_loss,
+                    },
+                    step=iter_num,
+                )
+
+        # flush the gradients as soon as we can, no need for this memory anymore
+        optimizer.zero_grad(set_to_none=True)
+
+        if local_iter_num % cfg.logging.log_interval == 0 and master_process:
             # get loss as float. note: this is a CPU-GPU sync point
             # scale up to undo the division above, approximating the true total loss (exact would have been a sum)
-            lossf = loss.item() * cfg.data.gradient_accumulation_steps
-            if local_iter_num >= 5:  # let the training loop settle a bit
-                mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.data.gradient_accumulation_steps, dt)
-                running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
+            lossf = loss.item() * cfg.optimizer.gradient_accumulation_steps
+            mfu = raw_model.estimate_mfu(cfg.data.batch_size * cfg.optimizer.gradient_accumulation_steps, dt)
+            running_mfu = mfu if running_mfu == -1.0 else 0.9 * running_mfu + 0.1 * mfu
+            tps = tokens_in_step / t_forward_backward
 
-            # Here's my version
-            tps = n_iter_tokens / t_forward_backward
             wandb.log(
                 {
                     "iter": iter_num,
@@ -401,7 +609,8 @@ def main(cfg: DictConfig):
                     "mfu": running_mfu * 100,  # convert to percentage
                     "total_tokens": total_tokens,
                     "tps": tps,
-                }
+                },
+                step=iter_num,
             )
             print(
                 f"iter {iter_num}: loss {lossf:.4f}, time {dt:.2f}s, mfu {running_mfu*100:.2f}%, tps {tps:.2f}",

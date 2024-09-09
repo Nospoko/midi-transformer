@@ -5,75 +5,136 @@ import pandas as pd
 import fortepyan as ff
 import streamlit as st
 import streamlit_pianoroll
+from streamlit.errors import DuplicateWidgetID
 
+import data.database_manager as database_manager
 from dashboards.common.components import download_button
 
 
+def format_model_params(model_params):
+    total_tokens, model_loss = model_params
+    return f"{total_tokens:,}, best_val_loss: {model_loss}"
+
+
 def main():
-    models = ["midi-gpt2-302M-pretraining-2024-04-30-05-26", "midi-gpt2-333M-pretraining-2024-04-30-14-59"]
-    model = st.selectbox(options=models, label="model")
-    directory = f"tmp/{model}"
-    with open(f"{directory}/file_descriptors.json", "r+") as file:
-        file_descriptors = json.load(file)
+    st.title("MIDI Transformers Database Browser")
 
-    file_descriptors = pd.DataFrame.from_dict(file_descriptors, orient="index")
-    composers = file_descriptors.composer.unique()
+    tab1, tab2, tab3, tab4 = st.tabs(["Model Predictions", "Models", "Generation Parameters", "Prompt Notes"])
 
-    selected_composer = st.selectbox(
-        label="Select composer",
-        options=composers,
-        index=0,
-    )
+    with tab1:
+        st.header("Model Predictions")
 
-    ids = file_descriptors.composer == selected_composer
-    piece_titles = file_descriptors[ids].title.unique()
+        models_df = database_manager.get_all_models()
+        model_names = models_df["name"].unique().tolist()
 
-    selected_title = st.selectbox(
-        label="Select title",
-        options=piece_titles,
-    )
+        selected_model_name = st.selectbox("Select Model", model_names, key="model")
 
-    ids = (file_descriptors.composer == selected_composer) & (file_descriptors.title == selected_title)
-    selected_files = file_descriptors[ids]
-    idx = st.number_input(label="idx", value=0, max_value=len(selected_files))
-    path = f"{directory}/{selected_files.index[idx]}"
+        if selected_model_name:
+            selected_models = models_df[models_df["name"] == selected_model_name]
+            model_tokens = selected_models["total_tokens"].tolist()
+            model_losses = selected_models["best_val_loss"].tolist()
 
-    piece = ff.MidiPiece.from_file(path)
-    piece.source = selected_files.iloc[idx].to_dict()
-
-    st.json(piece.source)
-    st.write("whole model output")
-    generated_notes_with_offset = piece.df[piece.df.start > piece.source["original end"]].copy()
-    second_part = ff.MidiPiece(generated_notes_with_offset)
-
-    # Model could have also add "NOTE_OFF" events to original sequence
-    expanded_input_notes = piece.df[: -second_part.size].copy()
-    expanded_piece = ff.MidiPiece(expanded_input_notes)
-    streamlit_pianoroll.from_fortepyan(piece=expanded_piece, secondary_piece=second_part)
-
-    try:
-        with open(path, "rb") as file:
-            download_button_str = download_button(
-                object_to_download=file.read(),
-                download_filename=path.split("/")[-1],
-                button_text="Download midi with context",
+            selected_model_params = st.selectbox(
+                label="Select tokens",
+                options=zip(model_tokens, model_losses),
+                format_func=format_model_params,
             )
-            st.markdown(download_button_str, unsafe_allow_html=True)
-    except ValueError:
-        print("Error with reading the file...")
+            selected_model_tokens, _ = selected_model_params
+            selected_model = selected_models[selected_models["total_tokens"] == selected_model_tokens].iloc[0]
+            st.json(selected_model.to_dict(), expanded=False)
 
-    midi_path = f"tmp/{model}_{selected_files.index[idx]}.mid"
-    generated_file = second_part.to_midi()
+            if pd.notna(selected_model["wandb_link"]):
+                st.link_button("View Model on W&B", url=selected_model["wandb_link"])
+            else:
+                st.write("No W&B link available for this model")
 
-    try:
-        generated_file.write(midi_path)
-        with open(midi_path, "rb") as file:
-            download_button_str = download_button(
-                object_to_download=file.read(),
-                download_filename=midi_path.split("/")[-1],
-                button_text="Download generated midi",
-            )
-            st.markdown(download_button_str, unsafe_allow_html=True)
-    finally:
-        # make sure to always clean up
-        os.unlink(midi_path)
+            selected_model_id = selected_model["model_id"]
+
+            # Fetch prompts for the selected model
+            prompts = database_manager.get_prompts_for_model(model_id=selected_model_id)
+            selected_prompt_id = st.selectbox("Select Prompt", prompts["prompt_id"].tolist())
+
+            if selected_prompt_id:
+                full_prompt = database_manager.get_prompt(prompt_id=selected_prompt_id)
+                st.write(full_prompt)
+
+                # Fetch all predictions for the selected model and prompt
+                predictions_df = database_manager.get_model_predictions(
+                    model_filters={"model_id": selected_model_id}, prompt_filters={"prompt_id": selected_prompt_id}
+                )
+
+                if not predictions_df.empty:
+                    for _, row in predictions_df.iterrows():
+                        parameters = database_manager.get_parameters(row["parameters_id"]).iloc[0].to_dict()
+                        prompt_id = row["prompt_id"]
+                        prompt = database_manager.get_prompt(prompt_id=prompt_id).iloc[0]
+
+                        st.json(parameters | {"created_at": row["created_at"]}, expanded=False)
+                        if row["tokenzied_prompt_notes"] is None:
+                            prompt_notes_json: str = prompt["prompt_notes"]
+                            prompt_notes_json = prompt_notes_json
+                            prompt_notes = json.loads(prompt_notes_json)
+                        else:
+                            prompt_notes = row["tokenized_prompt_notes"]
+                        # Due to error in early dataset manager implementation, some records are json-dumped strings...
+                        if isinstance(prompt_notes, str):
+                            prompt_notes = json.loads(prompt_notes)
+                        prompt_notes_df = pd.DataFrame(prompt_notes)
+
+                        generated_notes = json.loads(row["generated_notes"])
+                        generated_notes_df = pd.DataFrame(generated_notes)
+
+                        generated_piece = ff.MidiPiece(df=generated_notes_df)
+
+                        prompt_piece = ff.MidiPiece(df=prompt_notes_df)
+                        try:
+                            streamlit_pianoroll.from_fortepyan(piece=prompt_piece, secondary_piece=generated_piece)
+                        except DuplicateWidgetID:
+                            st.write("Duplicate widget")
+                        out_piece = ff.MidiPiece(pd.concat([prompt_notes_df, generated_notes_df]))
+                        # Allow download of the full MIDI with context\
+                        midi_name = f"{selected_model_name}_{selected_model_tokens:.2f}_variations_on_{prompt_id}"
+                        full_midi_path = f"tmp/{midi_name}.mid"
+                        out_piece.to_midi().write(full_midi_path)
+                        with open(full_midi_path, "rb") as file:
+                            st.markdown(
+                                download_button(
+                                    file.read(),
+                                    full_midi_path.split("/")[-1],
+                                    "Download midi with context",
+                                ),
+                                unsafe_allow_html=True,
+                            )
+                        os.unlink(full_midi_path)
+                        st.divider()  # Add a divider between predictions
+
+                else:
+                    st.write("No predictions found for this prompt and model combination.")
+
+    with tab2:
+        st.header("Models")
+        models_df = database_manager.get_all_models()
+        st.write(models_df)
+
+        st.subheader("Purge Model")
+        model_to_purge = st.selectbox("Select a model to purge", models_df["name"].tolist())
+        if st.button("Purge Selected Model"):
+            try:
+                database_manager.purge_model(model_to_purge)
+                st.success(f"Model '{model_to_purge}' has been purged successfully.")
+            except Exception as e:
+                st.error(f"An error occurred while purging the model: {str(e)}")
+
+    with tab3:
+        st.header("Generation Parameters")
+        parameters_df = database_manager.get_all_generation_parameters()
+        st.write(parameters_df)
+
+    with tab4:
+        st.header("Prompt Notes")
+        prompts_df = database_manager.get_all_prompt_notes()
+        st.write(prompts_df)
+
+
+if __name__ == "__main__":
+    main()

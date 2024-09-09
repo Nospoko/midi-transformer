@@ -1,8 +1,10 @@
+from typing import Literal
 from abc import abstractmethod
 
 from datasets import Dataset as HuggingFaceDataset
 from torch.utils.data import Dataset as TorchDataset
-from midi_tokenizers.midi_tokenizer import MidiTokenizer
+
+from data.tokenizer import AwesomeTokenizer, ExponentialTokenizer
 
 
 class MidiDataset(TorchDataset):
@@ -17,7 +19,8 @@ class MidiDataset(TorchDataset):
     def __init__(
         self,
         dataset: HuggingFaceDataset,
-        tokenizer: MidiTokenizer,
+        tokenizer: ExponentialTokenizer | AwesomeTokenizer,
+        loss_masking: Literal["finetuning", "pretraining"] = "pretraining",
     ):
         """
         Initialize the MidiDataset.
@@ -30,6 +33,7 @@ class MidiDataset(TorchDataset):
 
         # MidiTokenizer which was used during creation of the dataset
         self.tokenizer = tokenizer
+        self.loss_masking = loss_masking
 
         # Dataset with tokenized MIDI data
         self.dataset = dataset
